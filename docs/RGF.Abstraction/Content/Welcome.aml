@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<topic id="affb0486-21a1-4166-95a8-8afa62fe54e5" revisionNumber="1">
+	<developerConceptualDocument xmlns="http://ddue.schemas.microsoft.com/authoring/2003/5" xmlns:xlink="http://www.w3.org/1999/xlink">
+		<introduction>
+			<para>This is a sample conceptual topic.  You can use this as a starting point for adding more conceptual
+content to your help project.</para>
+		</introduction>
+
+		<section>
+			<title>Getting Started</title>
+			<content>
+				<para></para>
+			</content>
+		</section>
+
+		<relatedTopics>
+			<link xlink:href="ae75cca7-0883-41f6-8abb-0e5687ba707f" />
+		</relatedTopics>
+	</developerConceptualDocument>
+</topic>
