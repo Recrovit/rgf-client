@@ -1,0 +1,39 @@
+﻿
+<button @attributes="_attributes" @onclick="OnClick">
+    @if (IconName != null)
+    {
+        <i class="@($"bi {IconName}")"></i>
+    }
+    @if (!string.IsNullOrEmpty(Label))
+    {
+        @Label
+    }
+    @if (ChildContent != null)
+    {
+        @ChildContent
+    }
+</button>
+
+@inherits RgfBaseComponent
+@code {
+
+    [Parameter]
+    public string? IconName { get; set; }
+
+    [Parameter]
+    public string? Button { get; set; }
+
+    [Parameter]
+    public EventCallback<MouseEventArgs> OnClick { get; set; }
+
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    protected override void OnParametersSet()
+    {
+        _baseCssClass = "btn btn-sm";
+        AdditionalAttributes["type"] = "button";
+
+        base.OnParametersSet();
+    }
+}

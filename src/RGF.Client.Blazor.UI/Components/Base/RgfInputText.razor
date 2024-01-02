@@ -1,0 +1,35 @@
+﻿@if (!string.IsNullOrEmpty(Label))
+{
+    <label for="@Id" class="@($"form-label {LabelCssClass ?? ""}".TrimEnd())">@Label</label>
+}
+@if (Multiline)
+{
+    <InputTextArea Value="@Value" ValueExpression="ValueExpression" ValueChanged="OnValueChanged" DisplayName="@DisplayName" AdditionalAttributes="_attributes" />
+}
+else
+{
+    <InputText Value="@Value" ValueExpression="ValueExpression" ValueChanged="OnValueChanged" DisplayName="@DisplayName" AdditionalAttributes="_attributes" />
+}
+
+@inherits RgfInput<string>
+@code {
+
+    [Parameter]
+    public bool Multiline { get; set; } = default!;
+
+    [Parameter]
+    public bool Password { get; set; } = default!;
+
+
+    protected override void OnParametersSet()
+    {
+        _baseCssClass = "form-control form-control-sm";
+
+        if (Password)
+        {
+            AdditionalAttributes["type"] = "password";
+        }
+
+        base.OnParametersSet();
+    }
+}

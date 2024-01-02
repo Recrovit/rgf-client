@@ -1,0 +1,22 @@
+﻿.checkbox-lg .form-check input {
+    margin-top: 0.55rem;
+    margin-right: 0.55rem;
+    width: 1.25rem;
+    height: 1.25rem;
+}
+
+.checkbox-lg .form-switch input {
+    width: 2.55rem !important;
+}
+
+.checkbox-lg .form-check-reverse input {
+    margin-right: 0;
+}
+
+.checkbox-lg label {
+    padding-top: 0.55rem;
+}
+
+.checkbox-lg .form-check-reverse label {
+    padding-right: 0.55rem;
+}

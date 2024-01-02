@@ -1,0 +1,98 @@
+﻿@using Microsoft.AspNetCore.Components.Forms
+
+<RgfFormComponent @ref="_rgfFormRef" EntityParameters="EntityParameters"
+                  FormGroupLayoutTemplate="FormGroupLayoutTemplate"
+                  FormItemLayoutTemplate="FormItemLayoutTemplate">
+    <FormTemplate Context="RgfForm">
+        <EditForm EditContext="RgfForm.CurrentEditContext" class="needs-validation">
+            <div class="card">
+                <div class="card-header">
+                    <ul class="nav nav-tabs card-header-tabs" id="@_tabsId" role="tablist">
+                        @for (var idx = 0; idx < RgfForm.FormData.FormTabs.Count; idx++)
+                        {
+                            var tab = RgfForm.FormData.FormTabs[idx];
+                            <li class="nav-item" role="presentation">
+                                <button class="@($"nav-link{(idx==0 ? " active" : "")}")" id="@($"{_tabsId}-tab-{tab.Index}")" data-bs-toggle="tab" data-bs-target="@($"#{_tabsId}-tab-{tab.Index}-pane")" type="button" role="tab">
+                                    @tab.Title
+                                </button>
+                            </li>
+                        }
+                    </ul>
+                </div>
+                <div class="card-body">
+                    <div class="tab-content">
+                        @for (var idx = 0; idx < RgfForm.FormData.FormTabs.Count; idx++)
+                        {
+                            var tab = RgfForm.FormData.FormTabs[idx];
+                            <div class="@($"tab-pane fade show{(idx ==0 ? " active" : "")}")" id="@($"{_tabsId}-tab-{tab.Index}-pane")" role="tabpanel" tabindex="@idx">
+                                @foreach (var group in tab.Groups)
+                                {
+                                    if (!string.IsNullOrEmpty(group.Title))
+                                    {
+                                        <h5 class="mt-3">@group.Title</h5>
+                                    }
+                                    @RgfForm.GetFormGroupLayoutTemplate(new RgfFormGroupLayoutParameters(RgfForm, group))
+                                }
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+            @RgfForm.GetFormValidationTemplate()
+        </EditForm>
+    </FormTemplate>
+
+    <FormItemTemplate>
+        <FormItemComponent FormItemParameters="context" />
+    </FormItemTemplate>
+
+    <FormValidationTemplate>
+        <div class="card mt-3">
+            <div class="card-header text-bg-danger">
+                @RecroDict.GetRgfUiString("Error")
+            </div>
+            <div class="card-body">
+                <ValidationSummary />
+            </div>
+        </div>
+    </FormValidationTemplate>
+
+</RgfFormComponent>
+
+@inject IJSRuntime _jsRuntime
+@code {
+
+    [Parameter, EditorRequired]
+    public RgfEntityParameters EntityParameters { get; set; } = null!;
+
+    private IRgManager Manager => EntityParameters.Manager!;
+    private RgfFormParameters FormParameters { get => EntityParameters.FormParameters; }
+    protected IRecroDictService RecroDict => Manager.RecroDict;
+
+    private RgfFormComponent _rgfFormRef { get; set; } = null!;
+    private string _tabsId = RgfBaseComponent.GetNextId();
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        FormParameters.ErrorCssClass = FormParameters.ErrorCssClass ?? "is-invalid";
+        FormParameters.ModifiedCssClass = FormParameters.ModifiedCssClass ?? "is-valid";
+    }
+
+    public RenderFragment<RgfFormGroupLayoutParameters> FormGroupLayoutTemplate => (param) =>
+    @<div class="row my-2 g-2">
+        @foreach (var prop in param.FormGroup.Properties)
+        {
+            @param.FormComponent.GetFormItemLayoutTemplate(new RgfFormItemParameters(param.FormComponent, param.FormGroup, prop))
+        }
+    </div>;
+
+    public RenderFragment<RgfFormItemParameters> FormItemLayoutTemplate => (param) =>
+    @<div name="@param.Property.ClientName" class="@($"col-{param.Property.FlexColumnWidth ?? param.Group.FlexColumnWidth}")">
+        @if (!string.IsNullOrEmpty(param.Property.PreElement))
+        {
+            @((MarkupString)param.Property.PreElement)
+        }
+        @param.FormComponent.GetFormItemTemplate(param)
+    </div>;
+}

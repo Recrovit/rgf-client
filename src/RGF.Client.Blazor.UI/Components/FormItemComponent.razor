@@ -1,0 +1,163 @@
+﻿@using Microsoft.AspNetCore.Components.Forms
+
+<RgfFormItemComponent FormItemParameters="FormItemParameters">
+    <ItemTemplate Context="RgfFormItem">
+
+        @if (!Property.EmbededGrid && !Property.NoLabel && (PropertyDesc.FormType != PropertyFormType.CheckBox || Property.AvailableItems?.Any() == true))
+        {
+            <label for="@Id" class="form-label rg-label">@(Property.Label)</label>
+        }
+
+        @switch (PropertyDesc.FormType)
+        {
+            case PropertyFormType.TextBox:
+                if (Property.ForeignEntity != null)
+                {
+                    <div class="input-group input-group-sm">
+                        <RgfInputText @bind-Value="ItemData.StringValue"
+                                      Readonly="Property.Readonly" Disabled="Property.Disabled"
+                                      CssClass="@RgfFormItem.CssClass" Id="@Id" />
+                        <RgfButton IconName="bi-search" CssClass="button.IsPrimary" OnClick="() => RgfFormItem.OnSearchEntity(ItemData.StringValue)" />
+                    </div>
+                }
+                else
+                {
+                    @switch (PropertyDesc.ClientDataType)
+                    {
+                        case ClientDataType.Integer:
+                            <RgfInputNumber @bind-Value="ItemData.IntValue"
+                                            TValue="int?" HideSpinButton="true"
+                                            Readonly="Property.Readonly" Disabled="Property.Disabled"
+                                            CssClass="@RgfFormItem.CssClass" Id="@Id" />
+                            break;
+
+                        case ClientDataType.Decimal:
+                            <RgfInputNumber @bind-Value="ItemData.DecimalValue"
+                                            TValue="decimal?" HideSpinButton="true"
+                                            Readonly="Property.Readonly" Disabled="Property.Disabled"
+                                            CssClass="@RgfFormItem.CssClass" Id="@Id" />
+                            break;
+
+                        case ClientDataType.Double:
+                            <RgfInputNumber @bind-Value="ItemData.DoubleValue"
+                                            TValue="double?" HideSpinButton="true"
+                                            Readonly="Property.Readonly" Disabled="Property.Disabled"
+                                            CssClass="@RgfFormItem.CssClass" Id="@Id" />
+                            break;
+
+                        default:
+                            <RgfInputText @bind-Value="ItemData.StringValue"
+                                          Password="PropertyDesc.PasswordType"
+                                          Readonly="Property.Readonly" Disabled="Property.Disabled"
+                                          CssClass="@RgfFormItem.CssClass" Id="@Id" />
+                            break;
+                    }
+                }
+                break;
+
+            case PropertyFormType.TextBoxMultiLine:
+                <RgfInputText @bind-Value="ItemData.StringValue"
+                              Multiline="true"
+                              Readonly="Property.Readonly" Disabled="Property.Disabled"
+                              CssClass="@RgfFormItem.CssClass" Id="@Id" />
+                break;
+
+            case PropertyFormType.CheckBox:
+            case PropertyFormType.DropDown:
+                if (PropertyDesc.FormType == PropertyFormType.CheckBox && Property.AvailableItems?.Any() != true)
+                {
+                    <div class="checkbox-lg mt-4">
+                        <RgfCheckBox @bind-Value="@ItemData.BooleanValue"
+                                     Label="@Property.Label" LabelCssClass="rg-label"
+                                     Readonly="Property.Readonly" Disabled="Property.Disabled"
+                                     CssClass="@RgfFormItem.CssClass" />
+                    </div>
+                }
+                else
+                {
+                    <RgfComboBox TValue="string" DataSource="Property.AvailableDictionary" @bind-Value="ItemData.StringValue"
+                                 Readonly="Property.Readonly" Disabled="Property.Disabled"
+                                 CssClass="@RgfFormItem.CssClass" Id="@Id" />
+                }
+                break;
+
+            case PropertyFormType.Date:
+                <RgfInputDate @bind-Value="ItemData.DateTimeValue"
+                              TValue="DateTime?"
+                              Readonly="Property.Readonly" Disabled="Property.Disabled"
+                              CssClass="@RgfFormItem.CssClass" Id="@Id" />
+                break;
+
+            case PropertyFormType.DateTime:
+                <RgfInputDate @bind-Value="ItemData.DateTimeValue"
+                              TValue="DateTime?" DateType="InputDateType.DateTimeLocal"
+                              Readonly="Property.Readonly" Disabled="Property.Disabled"
+                              CssClass="@RgfFormItem.CssClass" Id="@Id" />
+                break;
+
+            case PropertyFormType.StaticText:
+                <div class="@RgfFormItem.CssClass" style="@Property.Style">
+                    @(ItemData.StringValue)
+                </div>
+                break;
+
+            case PropertyFormType.ImageInDB:
+                <img src="@($"{ApiService.BaseAddress}{ItemData.StringValue}")" class="@RgfFormItem.CssClass" style="@Property.Style" />
+                break;
+
+            case PropertyFormType.RecroDict:
+                <div class="@RgfFormItem.CssClass" style="@Property.Style">
+                    @((MarkupString)ItemData.StringValue)
+                </div>
+                break;
+
+            case PropertyFormType.HtmlEditor:
+                <RgfInputText @bind-Value="ItemData.StringValue"
+                              Multiline="true"
+                              Readonly="Property.Readonly" Disabled="Property.Disabled"
+                              CssClass="@RgfFormItem.CssClass" Id="@Id" />
+                break;
+
+            case PropertyFormType.RecroGrid:
+                <div class="@($"overflow-x-auto {RgfFormItem.CssClass ?? ""}".TrimEnd())" style="@Property.Style">
+                    @if (this.FormComponent.FormEditMode == FormEditMode.Create)
+                    {
+                        <div class="card">
+                            <div class="card-header">
+                                @Property.Label
+                            </div>
+                        </div>
+                    }
+                    else
+                    {
+                        @RgfEntityComponent.Create(new RgfEntityParameters(Property.ForeignEntity.EntityName, FormComponent.Manager.SessionParams) { GridId = ItemData.StringValue})
+                    }
+                </div>
+                break;
+
+            case PropertyFormType.Entity:
+            case PropertyFormType.Invalid:
+            case PropertyFormType.ListBox:
+            case PropertyFormType.Custom:
+            default:
+                break;
+        }
+
+    </ItemTemplate>
+</RgfFormItemComponent>
+
+@code {
+
+    [Parameter, EditorRequired]
+    public RgfFormItemParameters FormItemParameters { get; set; } = null!;
+
+    [CascadingParameter]
+    public EditContext CurrentEditContext { get; set; } = null!;
+
+    protected RgfFormComponent FormComponent => FormItemParameters.FormComponent;
+    protected RgfForm.Property Property => FormItemParameters.Property;
+    protected RgfDynamicData ItemData => FormItemParameters.ItemData;
+
+    protected RgfProperty PropertyDesc => Property.PropertyDesc;
+    protected string Id { get; set; } = RgfBaseComponent.GetNextId();
+}

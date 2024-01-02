@@ -1,0 +1,131 @@
+﻿@if (!string.IsNullOrEmpty(Label))
+{
+    <label for="@Id" class="@($"form-label {LabelCssClass ?? ""}".TrimEnd())">@Label</label>
+}
+@if (!AllowCustom && DataSource != null)
+{
+    if (Values != null)
+    {
+        <InputSelect TValue="TValue[]" Value="@Values" ValueExpression="ValuesExpression" ValueChanged="OnValuesChanged" DisplayName="@DisplayName" AdditionalAttributes="_attributes">
+            @foreach (var option in DataSource)
+            {
+                <option value="@option.Key">@option.Value</option>
+            }
+        </InputSelect>
+    }
+    else
+    {
+        <InputSelect TValue="TValue" Value="@Value" ValueExpression="ValueExpression" ValueChanged="OnValueChanged" DisplayName="@DisplayName" AdditionalAttributes="_attributes">
+            @foreach (var option in DataSource)
+            {
+                <option value="@option.Key">@option.Value</option>
+            }
+        </InputSelect>
+    }
+}
+else
+{
+    if (IsNumericType)
+    {
+        <InputNumber TValue="TValue" Value="@Value" ValueExpression="ValueExpression" ValueChanged="OnValueChanged" DisplayName="@DisplayName" AdditionalAttributes="_attributes" />
+    }
+    else
+    {
+        @*<InputText Value="@(Value.ToString())" ValueExpression="() => (string)Convert.ChangeType(Value, typeof(string))" ValueChanged="(value) => OnValueChanged((TValue?)Convert.ChangeType(value, typeof(TValue)))" DisplayName="@DisplayName" AdditionalAttributes="_attributes" />*@
+        <input type="text" value="@Value" @onchange="(arg) => OnValueChanged((TValue?)Convert.ChangeType(arg.Value, typeof(TValue)))" @attributes="_attributes" />
+    }
+    if (Items != null)
+    {
+        <datalist id="@_datalistId">
+            @foreach (var option in Items)
+            {
+                <option value="@option"></option>
+            }
+        </datalist>
+    }
+}
+
+@typeparam TValue
+@inherits RgfInput<TValue>
+@code {
+    [Parameter]
+    public IEnumerable<KeyValuePair<TValue, string>> DataSource { get; set; } = default!;
+
+    [Parameter]
+    public IEnumerable<TValue>? Items { get; set; }
+
+    [Parameter]
+    public bool AllowCustom { get; set; } = default;
+
+    [Parameter]
+    public bool AllowCustomAutoSelect { get; set; } = default;
+
+    [Parameter]
+    public bool Multiple { get; set; } = default;
+
+    [Parameter]
+    public TValue[]? Values { get; set; }
+
+    [Parameter]
+    public System.Linq.Expressions.Expression<Func<TValue[]>>? ValuesExpression { get; set; }
+
+    [Parameter]
+    public EventCallback<ChangeEventArgs<TValue[]>> OnValuesChanging { get; set; }
+
+    [Parameter]
+    public EventCallback<TValue[]> ValuesChanged { get; set; }
+
+    private string? _datalistId { get; set; }
+
+    protected override void OnParametersSet()
+    {
+        _baseCssClass = "form-select form-select-sm";
+
+        if (AllowCustom)
+        {
+            _baseCssClass = "form-control form-control-sm hide-spin-button";
+            _datalistId = Guid.NewGuid().ToString("N");
+            AdditionalAttributes["list"] = _datalistId;
+            if (AllowCustomAutoSelect)
+            {
+                AdditionalAttributes["oninput"] = EventCallback.Factory.Create(this, OnInput);
+            }
+        }
+        else if (DataSource == null && Items != null)
+        {
+            DataSource = Items.Select(e => new KeyValuePair<TValue, string>(e, e?.ToString() ?? string.Empty)).ToList();
+        }
+
+        base.OnParametersSet();
+    }
+
+    protected void OnValuesChanged(TValue[] values)
+    {
+        var arg = new ChangeEventArgs<TValue[]>(Values!, values!);
+        if (OnValuesChanging.HasDelegate)
+        {
+            OnValuesChanging.InvokeAsync(arg);
+        }
+        if (!arg.Cancel)
+        {
+            Values = values;
+            if (ValuesChanged.HasDelegate)
+            {
+                ValuesChanged.InvokeAsync(values);
+            }
+        }
+    }
+
+    private void OnInput(ChangeEventArgs args)
+    {
+        if (Items != null)
+        {
+            var item = Items.SingleOrDefault(e => e.Equals(args.Value));
+            if (item != null)
+            {
+                OnValueChanged(item);
+            }
+        }
+    }
+
+}

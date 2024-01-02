@@ -1,0 +1,192 @@
+﻿@using Microsoft.AspNetCore.Components.Routing
+
+@if (!_initialized)
+{
+    <div class="text-center" style="width:fit-content;">
+        <div class="spinner-border" role="status">
+            <span class="visually-hidden">Loading menu...</span>
+        </div>
+        <div>Loading menu...</div>
+    </div>
+}
+else if (_menuItems != null)
+{
+    if (MenuParameters.Navbar)
+    {
+        <nav class="navbar navbar-expand-lg bg-body-tertiary ">
+            <div class="container-fluid">
+                <div class="collapse navbar-collapse">
+                    <ul class="navbar-nav rgf-menu">
+                        @foreach (var item in _menuItems)
+                        {
+                            @item
+                        }
+                    </ul>
+                </div>
+            </div>
+        </nav>
+    }
+    else
+    {
+        <ul class="rgf-menu dropdown-menu">
+            @foreach (var item in _menuItems)
+            {
+                @item
+            }
+        </ul>
+    }
+}
+
+@inject IRecroDictService _recroDict
+@code
+{
+    [Parameter, EditorRequired]
+    public RgfMenuParameters MenuParameters { get; set; } = null!;
+
+    [Inject]
+    private IRgfMenuService _menuService { get; set; } = null!;
+
+    private bool _initialized = false;
+
+    private List<RenderFragment>? _menuItems { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await base.OnInitializedAsync();
+        if (MenuParameters.MenuId != null)
+        {
+            var res = await _menuService.GetMenuAsync((int)MenuParameters.MenuId, _recroDict.DefaultLanguage);
+            if (res.Success)
+            {
+                MenuParameters.MenuItems = res.Result;
+            }
+        }
+        _initialized = true;
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await base.OnParametersSetAsync();
+        if (MenuParameters.MenuItems != null)
+        {
+            _menuItems = new();
+            foreach (var item in MenuParameters.MenuItems)
+            {
+                if (MenuParameters.MenuRenderCallback != null)
+                {
+                    await MenuParameters.MenuRenderCallback.Invoke(item);
+                }
+                _menuItems.Add(MenuParameters.Navbar ? RenderNavItem(item) : RenderMenuItem(item));
+            }
+        }
+    }
+
+    private RenderFragment RenderNavItem(RgfMenu item) => builder =>
+    {
+        int sequence = 0;
+        builder.OpenElement(sequence++, "li");
+        builder.AddAttribute(sequence++, "class", item.MenuType == RgfMenuType.Menu ? "nav-item dropdown" : "nav-item");
+        if (item.Disabled || item.MenuType == RgfMenuType.Disabled)
+        {
+            builder.AddMarkupContent(sequence++, $"<a class=\"nav-link dropdown-toggle disabled\">{item.Title}</a>");
+        }
+        else
+        {
+            switch (item.MenuType)
+            {
+                case RgfMenuType.ActionLink:
+                    builder.OpenComponent(sequence++, typeof(NavLink));
+                    builder.AddAttribute(sequence++, "class", $"nav-link {item.CssClass}");
+                    builder.AddAttribute(sequence++, "href", item.Command);
+                    builder.AddAttribute(sequence++, nameof(NavLink.ChildContent), (RenderFragment)((b) => b.AddContent(sequence++, item.Title)));
+                    builder.CloseComponent();
+                    break;
+
+                case RgfMenuType.Divider:
+                    builder.AddMarkupContent(sequence++, "<div class=\"vr d-lg-flex h-100 mx-lg-2\"></div>");
+                    break;
+
+                case RgfMenuType.Menu:
+                    string link = $"<a class=\"nav-link dropdown-toggle\" role=\"button\" aria-expanded=\"false\"";
+                    if (!string.IsNullOrEmpty(item.Command))
+                    {
+                        link += $" href=\"{item.Command}\"";
+                    }
+                    else
+                    {
+                        link += $" data-bs-toggle=\"dropdown\"";
+                    }
+                    link += $">{item.Title}</a>";
+                    builder.AddMarkupContent(sequence++, link);
+                    builder.OpenComponent(sequence++, typeof(MenuComponent));
+                    builder.AddAttribute(sequence++, nameof(MenuParameters), new RgfMenuParameters()
+                        {
+                            MenuItems = item.NestedMenu,
+                            MenuRenderCallback = MenuParameters.MenuRenderCallback,
+                            MenuSelectionCallback = MenuParameters.MenuSelectionCallback
+                        });
+                    builder.CloseComponent();
+                    break;
+
+                case RgfMenuType.Custom:
+                    builder.AddMarkupContent(sequence++, string.Format(item.Command, item.Title));
+                    break;
+            }
+        }
+        builder.CloseElement();
+    };
+
+    private RenderFragment RenderMenuItem(RgfMenu item) => builder =>
+    {
+        int sequence = 0;
+        builder.OpenElement(sequence++, "li");
+        if (item.Disabled || item.MenuType == RgfMenuType.Disabled)
+        {
+            builder.AddMarkupContent(sequence++, $"<a class=\"dropdown-item disabled\">{item.Title}</a>");
+        }
+        else
+        {
+            switch (item.MenuType)
+            {
+                case RgfMenuType.ActionLink:
+                    builder.AddMarkupContent(sequence++, $"<a class=\"dropdown-item\" href=\"{item.Command}\">{item.Title}</a>");
+                    break;
+
+                case RgfMenuType.Function:
+                case RgfMenuType.FunctionForRec:
+                    if (MenuParameters.MenuSelectionCallback != null)
+                    {
+                        builder.OpenElement(sequence++, "button");
+                        builder.AddAttribute(sequence++, "type", "button");
+                        builder.AddAttribute(sequence++, "class", "dropdown-item");
+                        builder.AddAttribute(sequence++, "onclick", EventCallback.Factory.Create(this, async () => await MenuParameters.MenuSelectionCallback.Invoke(item)));
+                        builder.AddContent(sequence++, item.Title);
+                        builder.CloseElement();
+                    }
+                    break;
+
+                case RgfMenuType.Divider:
+                    builder.AddMarkupContent(sequence++, $"<hr class=\"dropdown-divider\" />");
+                    break;
+
+                case RgfMenuType.Menu:
+                    builder.AddAttribute(sequence++, "class", "dropdown-submenu");
+                    builder.AddMarkupContent(sequence++, $"<a class=\"dropdown-item\">{item.Title}</a>");
+                    builder.OpenComponent(sequence++, typeof(MenuComponent));
+                    builder.AddAttribute(sequence++, nameof(MenuParameters), new RgfMenuParameters()
+                        {
+                            MenuItems = item.NestedMenu,
+                            MenuRenderCallback = MenuParameters.MenuRenderCallback,
+                            MenuSelectionCallback = MenuParameters.MenuSelectionCallback
+                        });
+                    builder.CloseComponent();
+                    break;
+
+                case RgfMenuType.Custom:
+                    builder.AddMarkupContent(sequence++, string.Format(item.Command, item.Title));
+                    break;
+            }
+        }
+        builder.CloseElement();
+    };
+}

@@ -1,0 +1,154 @@
+﻿
+<div class="modal-backdrop show"></div>
+
+<div id="@_dialogId" class="modal fade show" tabindex="-1" role="dialog" style="display:block">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable" @onkeydown="@OnKeyDown">
+        <div @attributes="_attributes">
+            @if (DialogParameters.NoHeader != true)
+            {
+                <div class="@($"modal-header {ThemeColor}")">
+                    <div class="modal-title fs-5">
+                        @DialogParameters.Header
+                    </div>
+                    @if (DialogParameters.ShowCloseButton == true)
+                    {
+                        <RgfButton CssClass="btn-close" OnClick="OnClose" />
+                    }
+                </div>
+            }
+            <div class="modal-body">
+                @DialogParameters.Content
+            </div>
+            <div class="modal-footer d-block">
+                @if (DialogParameters.FooterTemplate != null)
+                {
+                    @DialogParameters.FooterTemplate
+                }
+                @if (DialogParameters.PredefinedButtons != null)
+                {
+                    <div class="d-flex justify-content-end">
+                        @foreach (var button in DialogParameters.PredefinedButtons)
+                        {
+                            <div class="p-1">
+                                <RgfButton Id="@(button.IsPrimary ? _nextButtonId : null)" CssClass="@(button.IsPrimary ? "btn-primary" : "btn-secondary")" MinWidth="4rem" OnClick="button.Callback">
+                                    @if (!string.IsNullOrEmpty(button.ChildText))
+                                    {
+                                        @button.ChildText
+                                    }
+                                    else if (button.ChildContent != null)
+                                    {
+                                        @button.ChildContent
+                                    }
+                                </RgfButton>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+    @if (@DialogParameters.DynamicChild != null)
+    {
+        <div>
+            @DialogParameters.DynamicChild
+        </div>
+    }
+</div>
+
+@inherits RgfBaseComponent
+@inject IJSRuntime _jsRuntime
+@code {
+
+    [Parameter, EditorRequired]
+    public RgfDialogParameters DialogParameters { get; set; } = null!;
+
+    private string? _show { get; set; } = "display:block";
+    private string _dialogId = RgfBaseComponent.GetNextId();
+    private bool _isDestroyed = false;
+    private string? _focusId;
+    private string _nextButtonId
+    {
+        get
+        {
+            _focusId = RgfBaseComponent.GetNextId();
+            return _focusId;
+        }
+    }
+
+
+    private string ThemeColor
+    {
+        get
+        {
+            switch (DialogParameters.DialogType)
+            {
+                case DialogType.Error:
+                    return "text-bg-danger";
+
+                case DialogType.Warning:
+                    return "text-bg-warning";
+
+                case DialogType.Info:
+                    return "text-bg-info";
+            }
+            return "bg-body-tertiary";
+        }
+    }
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        DialogParameters.Destroy = Destroy;
+    }
+
+    protected override void OnParametersSet()
+    {
+        _baseCssClass = "modal-content";
+
+        CssClass = DialogParameters.CssClass;
+        MinWidth = "400px";
+        Width = DialogParameters.Width;
+        Height = DialogParameters.Height;
+        //IsModal = DialogParameters.IsModal;
+
+        base.OnParametersSet();
+    }
+
+    private void Destroy()
+    {
+        if (!_isDestroyed)
+        {
+            if (!string.IsNullOrEmpty(DialogParameters.UniqueName))
+            {
+                _ = _jsRuntime.InvokeVoidAsync(RGFClientBlazorUIConfiguration.JsBlazorUiNamespace + ".Dialog.saveDialogPos", DialogParameters.UniqueName, _dialogId);
+            }
+            _isDestroyed = true;
+        }
+    }
+
+    private void OnClose(MouseEventArgs args)
+    {
+        bool cancel = false;
+        if (DialogParameters.OnClose != null)
+        {
+            cancel = DialogParameters.OnClose.Invoke() == false;
+        }
+    }
+
+    public void OnKeyDown(KeyboardEventArgs args)
+    {
+        if (args.Code == "Escape")
+        {
+            OnClose(new());
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await base.OnAfterRenderAsync(firstRender);
+        if (firstRender)
+        {
+            await _jsRuntime.InvokeVoidAsync(RGFClientBlazorUIConfiguration.JsBlazorUiNamespace + ".Dialog.initialize", _dialogId, DialogParameters.Resizable, DialogParameters.UniqueName, _focusId);
+        }
+    }
+}

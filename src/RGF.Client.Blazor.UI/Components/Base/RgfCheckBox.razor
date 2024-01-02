@@ -1,0 +1,39 @@
+﻿
+<div class="@_formClass">
+    <InputCheckbox Value="@Value" ValueExpression="ValueExpression" ValueChanged="OnValueChanged" DisplayName="@DisplayName" AdditionalAttributes="_attributes" />
+    @if (!string.IsNullOrEmpty(Label))
+    {
+        <label for="@Id" class="@($"form-check-label {LabelCssClass ?? ""}".TrimEnd())">@Label</label>
+    }
+</div>
+
+@inherits RgfInput<bool>
+@code {
+
+    [Parameter]
+    public bool Switch { get; set; } = default;
+
+    [Parameter]
+    public bool Reverse { get; set; } = default;
+
+    private string _formClass { get; set; } = default!;
+
+    protected override void OnParametersSet()
+    {
+        AdditionalAttributes["rgf-bs-checkbox"] = "";
+        if(Readonly)
+        {
+            Disabled = true;
+        }
+        _formClass = Switch ? "text-nowrap form-check form-switch" : "text-nowrap form-check";
+
+        if(Reverse)
+        {
+            _formClass += " form-check-reverse";
+        }
+
+        _baseCssClass = "form-check-input";
+
+        base.OnParametersSet();
+    }
+}

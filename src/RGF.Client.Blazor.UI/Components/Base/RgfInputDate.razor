@@ -1,0 +1,20 @@
+﻿@if (!string.IsNullOrEmpty(Label))
+{
+    <label for="@Id" class="@($"form-label {LabelCssClass ?? ""}".TrimEnd())">@Label</label>
+}
+<InputDate TValue="TValue" Type="DateType" Value="@Value" ValueExpression="ValueExpression" ValueChanged="OnValueChanged" DisplayName="@DisplayName" AdditionalAttributes="_attributes" />
+
+@typeparam TValue
+@inherits RgfInput<TValue>
+@code {
+
+    [Parameter]
+    public InputDateType DateType { get; set; } = InputDateType.Date;
+
+    protected override void OnParametersSet()
+    {
+        _baseCssClass = "form-control form-control-sm";
+
+        base.OnParametersSet();
+    }
+}

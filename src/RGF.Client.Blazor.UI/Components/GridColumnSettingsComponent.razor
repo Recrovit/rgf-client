@@ -1,0 +1,37 @@
+﻿
+<RgfGridColumnSettingsComponent GridComponent="GridComponent">
+    <SettingsTemplate Context="RgfColSettings">
+        <table class="tablesorter">
+            <thead>
+                <tr>
+                    <th>@RecroDict.GetRgfUiString("Name")</th>
+                    <th style="text-align:center">@RecroDict.GetRgfUiString("Position")</th>
+                    <th style="text-align:center">@RecroDict.GetRgfUiString("Width")</th>
+                </tr>
+            </thead>
+            <tbody>
+                @for (int i = 0; i < RgfColSettings.Columns.Length; i++)
+                {
+                    var col = RgfColSettings.Columns[i];
+                    <tr>
+                        <td class="@col.CssClass" style="white-space:nowrap">@col.Property.ColTitle</td>
+                        <td>
+                            <RgfInputNumber TValue="int?" @bind-Value="@col.ColPos" Width="125px" />
+                        </td>
+                        <td>
+                            <RgfInputNumber TValue="int?" @bind-Value="@col.ColWidth" Width="125px" />
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </SettingsTemplate>
+</RgfGridColumnSettingsComponent>
+
+@code {
+
+    [Parameter, EditorRequired]
+    public RgfGridComponent GridComponent { get; set; } = null!;
+
+    private IRecroDictService RecroDict => GridComponent.Manager.RecroDict;
+}

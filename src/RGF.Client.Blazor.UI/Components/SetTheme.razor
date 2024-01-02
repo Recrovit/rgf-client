@@ -1,0 +1,38 @@
+﻿<RgfComboBox TValue="string" CssClass="d-inline-block" Width="auto" @bind-Value="_size" OnValueChanging="OnSizeChange" DataSource="_sizes" />
+<RgfComboBox TValue="string" CssClass="d-inline-block" Width="auto" @bind-Value="ThemeName" OnValueChanging="OnThemeChange" DataSource="Themes" />
+
+@inject IJSRuntime _jsRuntime
+@code {
+
+    [Parameter]
+    public string ThemeName { get; set; } = "light";
+
+    private Dictionary<string, string> Themes = new() {
+        { "light", "Light" },
+        { "dark", "Dark" }
+    };
+
+    private string _size { get; set; } = "";
+
+    private Dictionary<string, string> _sizes = new() {
+        { "", "default" },
+        { "small", "small" }
+    };
+
+    private void OnThemeChange(ChangeEventArgs<string> args)
+    {
+        _jsRuntime.InvokeVoidAsync("eval", $"document.getElementsByTagName('html')[0].setAttribute('data-bs-theme', '{args.NewValue}');");
+    }
+
+    private async Task OnSizeChange(ChangeEventArgs<string> args)
+    {
+        if (!string.IsNullOrEmpty(args.OldValue))
+        {
+            await _jsRuntime.InvokeVoidAsync("eval", $"$('body').removeClass('{args.OldValue}')");
+        }
+        if (!string.IsNullOrEmpty(args.NewValue))
+        {
+            await _jsRuntime.InvokeVoidAsync("eval", $"$('body').addClass('{args.NewValue}')");
+        }
+    }
+}

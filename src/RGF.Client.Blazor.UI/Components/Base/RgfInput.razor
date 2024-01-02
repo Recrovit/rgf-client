@@ -1,0 +1,47 @@
+﻿@typeparam TValue
+@inherits RgfBaseComponent
+@code {
+    [Parameter]
+    public TValue Value { get; set; } = default!;
+
+    [Parameter]
+    public EventCallback<TValue> ValueChanged { get; set; }
+
+    [Parameter]
+    public EventCallback<ChangeEventArgs<TValue>> OnValueChanging { get; set; }
+
+    [Parameter]
+    public System.Linq.Expressions.Expression<Func<TValue>>? ValueExpression { get; set; }
+
+    protected bool IsNumericType => RgfDynamicData.IsNumeric(typeof(TValue));
+
+    protected override void OnInitialized()
+    {
+        if (!string.IsNullOrEmpty(Label) && string.IsNullOrEmpty(Id))
+        {
+            Id = GetNextId();
+        }
+
+        base.OnInitialized();
+    }
+
+    protected void OnValueChanged(TValue value)
+    {
+        if (Value == null && value != null || Value?.Equals(value) == false)
+        {
+            var arg = new ChangeEventArgs<TValue>(Value, value);
+            if (OnValueChanging.HasDelegate)
+            {
+                OnValueChanging.InvokeAsync(arg);
+            }
+            if (!arg.Cancel)
+            {
+                Value = value;
+                if (ValueChanged.HasDelegate)
+                {
+                    ValueChanged.InvokeAsync(value);
+                }
+            }
+        }
+    }
+}

@@ -1,0 +1,58 @@
+﻿
+<RgfGridComponent @ref="_rgfGridRef" EntityParameters="EntityParameters">
+    <GridTemplate Context="RgfGrid">
+        <table @ref="_tableRef" class="recro-grid table table-sm table-bordered table-hover mb-0">
+            <thead>
+                <tr>
+                    @foreach (var prop in EntityDesc.SortedVisibleColumns)
+                    {
+                        <th scope="col" class="@($"rg-col-{prop.Id}") bg-body-tertiary" title="@prop.ColTitle">
+                            <div class="d-flex justify-content-between align-items-center pe-0" style="@(prop.ColWidth > 0 ? $"width:{prop.ColWidth}px" : null)">
+                                <div class="p-1">@prop.ColTitle</div>
+                                @if (prop.Orderable)
+                                {
+                                    <RgfButton IconName="@(prop.Sort > 0 ? "bi-arrow-up" : (prop.Sort < 0) ? "bi-arrow-down" : "bi-arrow-down-up")"
+                                               CssClass="@($"p-0 ml-1{(prop.Sort != 0 ? " btn-success" : "")}")"
+                                               OnClick="(arg) => OnSort(arg, prop)">
+                                        <sup>@(prop.Sort != 0 ? Math.Abs(prop.Sort) : "")</sup>
+                                    </RgfButton>
+                                }
+                            </div>
+                        </th>
+                    }
+                </tr>
+            </thead>
+            <tbody>
+                @{
+                    int index = 0;
+                    foreach (var rowData in RgfGrid.GridData)
+                    {
+                        int currIdx = index++;
+                        var attributes = (RgfDynamicDictionary)rowData["__attributes"];
+                        <tr @ref="_rowRef[currIdx]" class="@(attributes["class"])" style="@(attributes["style"])" @onclick="(arg) => OnRowClick(arg, rowData, currIdx)" @ondblclick="(arg) => OnRowDoubleClick(arg, rowData, currIdx)">
+                            @foreach (var prop in EntityDesc.SortedVisibleColumns)
+                            {
+                                <td class="@attributes[$"class-{prop.Alias}"]" style="@(attributes[$"style-{prop.Alias}"])">
+                                    @RgfGrid.CreateGridColumn(prop, (RgfDynamicDictionary)rowData)
+                                </td>
+                            }
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    </GridTemplate>
+
+    <ColumnSettingsTemplate>
+        <GridColumnSettingsComponent GridComponent="context" />
+    </ColumnSettingsTemplate>
+</RgfGridComponent>
+
+@code {
+
+    [Parameter, EditorRequired]
+    public RgfEntityParameters EntityParameters { get; set; } = null!;
+
+    private IRgManager Manager => EntityParameters.Manager!;
+    private RgfGridParameters GridParameters { get => EntityParameters.GridParameters; }
+}

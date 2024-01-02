@@ -1,0 +1,7 @@
+﻿.modal-dialog {
+    max-width: fit-content;
+}
+
+.modal-content {
+    margin: auto;
+}
