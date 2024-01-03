@@ -12,7 +12,7 @@
                                 @if (prop.Orderable)
                                 {
                                     <RgfButton IconName="@(prop.Sort > 0 ? "bi-arrow-up" : (prop.Sort < 0) ? "bi-arrow-down" : "bi-arrow-down-up")"
-                                               CssClass="@($"p-0 ml-1{(prop.Sort != 0 ? " btn-success" : "")}")"
+                                               CssClass="@($"p-0 ms-1{(prop.Sort != 0 ? " btn-success" : "")}")"
                                                OnClick="(arg) => OnSort(arg, prop)">
                                         <sup>@(prop.Sort != 0 ? Math.Abs(prop.Sort) : "")</sup>
                                     </RgfButton>

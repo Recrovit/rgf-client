@@ -34,6 +34,7 @@ public static class RGFClientBlazorUIConfiguration
         await jsRuntime.InvokeVoidAsync("Recrovit.LPUtils.AddStyleSheetLink", $"{RgfClientConfiguration.AppRootUrl}_content/{libName}/lib/bootstrap/dist/css/bootstrap.min.css", false, BootstrapCssId);
         await jsRuntime.InvokeVoidAsync("Recrovit.LPUtils.RemoveLinkedFile", "css/bootstrap/bootstrap.min.css", "stylesheet");
         await jsRuntime.InvokeVoidAsync("Recrovit.LPUtils.AddStyleSheetLink", $"{RgfClientConfiguration.AppRootUrl}_content/{libName}/lib/bootstrap-icons/font/bootstrap-icons.min.css", false, BootstrapIconsId);
+        await jsRuntime.InvokeVoidAsync("Recrovit.LPUtils.AddStyleSheetLink", $"{RgfClientConfiguration.AppRootUrl}_content/{libName}/css/styles.css", false, BlazorUICss);
 
         await jsRuntime.InvokeVoidAsync("Recrovit.LPUtils.AddStyleSheetLink", $"{ApiService.BaseAddress}/rgf/resource/bootstrap-submenu.css", false, BootstrapSubmenuCssId);
 
@@ -47,12 +48,14 @@ public static class RGFClientBlazorUIConfiguration
         await jsRuntime.InvokeVoidAsync("eval", $"document.getElementById('{BootstrapCssId}')?.remove();");
         await jsRuntime.InvokeVoidAsync("eval", $"document.getElementById('{BootstrapIconsId}')?.remove();");
         await jsRuntime.InvokeVoidAsync("eval", $"document.getElementById('{BootstrapSubmenuCssId}')?.remove();");
+        await jsRuntime.InvokeVoidAsync("eval", $"document.getElementById('{BlazorUICss}')?.remove();");
         await jsRuntime.InvokeVoidAsync("eval", "document.getElementsByTagName('html')[0].removeAttribute('data-bs-theme');");
     }
 
     private static readonly string JqueryUiCssId = "rgf-jquery-ui";
     private static readonly string BootstrapCssId = "rgf-bootstrap";
     private static readonly string BootstrapIconsId = "rgf-bootstrap-icons";
+    private static readonly string BlazorUICss = "rgf-client-blazor-ui";
     private static readonly string BootstrapSubmenuCssId = "rgf-bootstrap-submenu";
 
     public static readonly string JsBlazorUiNamespace = "Recrovit.RGF.Blazor.UI";

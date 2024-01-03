@@ -118,9 +118,9 @@ else
 
     private void OnInput(ChangeEventArgs args)
     {
-        if (Items != null)
+        if (Items?.Any() == true)
         {
-            var item = Items.SingleOrDefault(e => e.Equals(args.Value));
+            var item = Items.FirstOrDefault(e => e!.Equals(args.Value));
             if (item != null)
             {
                 OnValueChanged(item);
