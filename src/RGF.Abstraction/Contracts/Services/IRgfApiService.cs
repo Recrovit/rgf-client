@@ -18,10 +18,10 @@ public interface IRgfApiService
 
 public static class IRgfApiServiceExtension
 {
-    public static ApiRequest CreateRequest(this IRgfApiService service, string uri, HttpContent content = null, string query = null, Dictionary<string, string> headerParam = null, CancellationToken cancellationToken = default, Version version = null, bool authClient = true)
+    public static ApiRequest CreateRequest(this IRgfApiService service, string uri, HttpContent content = null, Dictionary<string, string> query = null, Dictionary<string, string> headerParam = null, CancellationToken cancellationToken = default, Version version = null, bool authClient = true)
         => new ApiRequest(uri, content, query, headerParam, cancellationToken, version, authClient);
 
-    public static Task<IRgfApiResponse<ResultType>> GetAsync<ResultType>(this IRgfApiService service, string requestUri, string query = null, Dictionary<string, string> headerParam = null, CancellationToken cancellationToken = default, Version version = null, bool authClient = true) where ResultType : class
+    public static Task<IRgfApiResponse<ResultType>> GetAsync<ResultType>(this IRgfApiService service, string requestUri, Dictionary<string, string> query = null, Dictionary<string, string> headerParam = null, CancellationToken cancellationToken = default, Version version = null, bool authClient = true) where ResultType : class
         => service.GetAsync<ResultType>(service.CreateRequest(requestUri, null, query, headerParam, cancellationToken, version, authClient));
 
     public static Task<IRgfApiResponse<ResultType>> PostAsync<ResultType>(this IRgfApiService service, string requestUri, HttpContent content, Dictionary<string, string> headerParam = null, CancellationToken cancellationToken = default, Version version = null, bool authClient = true) where ResultType : class

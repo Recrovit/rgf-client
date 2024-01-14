@@ -1,7 +1,5 @@
 ﻿using Recrovit.RecroGridFramework.Abstraction.Models;
-using System;
 using System.Collections.Generic;
-using System.Text;
 using System.Text.Json.Serialization;
 
 namespace Recrovit.RecroGridFramework.Abstraction.Contracts.API;
@@ -41,4 +39,7 @@ public class RgfGridRequest : RgfSessionParams
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Dictionary<string, object> CustomParams { get; set; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string FunctionName { get; set; }
 }

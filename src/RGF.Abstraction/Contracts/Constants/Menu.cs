@@ -1,20 +1,19 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-
+﻿
 namespace Recrovit.RecroGridFramework.Abstraction.Contracts.Constants;
 
 public static class Menu
 {
-    public static readonly string ColumnSettings = "rg-sc";
-    public static readonly string SaveSettings = "rg-ss";
-    public static readonly string ResetSettings = "rg-rs";
+    public const string ColumnSettings = "rg-sc";
+    public const string SaveSettings = "rg-ss";
+    public const string ResetSettings = "rg-rs";
 
-    public static readonly string RecroTrack = "rg-rt";
-    public static readonly string QueryString = "rg-aqs";
-    public static readonly string QuickWatch = "rg-aqw";
+    public const string RecroTrack = "rg-rt";
+    public const string QueryString = "rg-aqs";
+    public const string QuickWatch = "rg-aqw";
 
-    public static readonly string EntityEditor = "rg-ase";
+    public const string ExportCsv = "rg-export-csv";
 
-    public static readonly string RgfAbout = "rg-about";
+    public const string EntityEditor = "rg-ase";
+
+    public const string RgfAbout = "rg-about";
 }
