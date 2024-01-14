@@ -47,6 +47,7 @@ else
 
 @typeparam TValue
 @inherits RgfInput<TValue>
+@inject IJSRuntime _jsRuntime
 @code {
     [Parameter]
     public IEnumerable<KeyValuePair<TValue, string>> DataSource { get; set; } = default!;
@@ -128,4 +129,15 @@ else
         }
     }
 
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await base.OnAfterRenderAsync(firstRender);
+        if (firstRender)
+        {
+            if (this.Id != null && DataSource != null && !DataSource.Any(e => e.Key?.Equals(Value) == true))
+            {
+                await _jsRuntime.InvokeVoidAsync("eval", $"$('#{this.Id}').val('');");
+            }
+        }
+    }
 }

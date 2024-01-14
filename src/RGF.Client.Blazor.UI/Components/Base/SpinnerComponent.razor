@@ -1,0 +1,29 @@
+﻿<div class="@ContainerClass">
+    <div class="@SpinnerClass" style="@Style" role="status">
+        @if (string.IsNullOrEmpty(Status))
+        {
+            <span class="visually-hidden">@Text</span>
+        }
+    </div>
+    @if (!string.IsNullOrEmpty(Status))
+    {
+        <div>@Status</div>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public string ContainerClass { get; set; } = "spinner-container";
+
+    [Parameter]
+    public string SpinnerClass { get; set; } = "spinner-border text-primary";
+
+    [Parameter]
+    public string Style { get; set; }
+
+    [Parameter]
+    public string Text { get; set; } = "Loading...";
+
+    [Parameter]
+    public string? Status { get; set; }
+}

@@ -53,8 +53,7 @@ Blazor.UI = {
                 content.parent('div.modal-dialog').css({
                     top: `${dialogPos[2]}px`,
                     left: `${dialogPos[3]}px`,
-                    margin: '0',
-                    display: 'inherit'
+                    margin: '0'
                 });
             }
         }

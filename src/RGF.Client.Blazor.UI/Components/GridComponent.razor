@@ -1,13 +1,17 @@
 ﻿
 <RgfGridComponent @ref="_rgfGridRef" EntityParameters="EntityParameters">
     <GridTemplate Context="RgfGrid">
+        @if (ListHandler.IsLoading)
+        {
+            <SpinnerComponent ContainerClass="spinner-flex" Style="width: 3rem; height: 3rem;" />
+        }
         <table @ref="_tableRef" class="recro-grid table table-sm table-bordered table-hover mb-0">
             <thead>
                 <tr>
                     @foreach (var prop in EntityDesc.SortedVisibleColumns)
                     {
-                        <th scope="col" class="@($"rg-col-{prop.Id}") bg-body-tertiary" title="@prop.ColTitle">
-                            <div class="d-flex justify-content-between align-items-center pe-0" style="@(prop.ColWidth > 0 ? $"width:{prop.ColWidth}px" : null)">
+                        <th scope="col" class="@($"rg-col-{prop.Id}") bg-body-tertiary" title="@prop.ColTitle" style="@(prop.ColWidth > 0 ? $"width:{prop.ColWidth}px" : null)">
+                            <div class="d-flex justify-content-between align-items-center pe-0">
                                 <div class="p-1">@prop.ColTitle</div>
                                 @if (prop.Orderable)
                                 {
@@ -22,7 +26,7 @@
                     }
                 </tr>
             </thead>
-            <tbody>
+            <tbody class="@(ListHandler.IsLoading ? "opacity-50" : null)">
                 @{
                     int index = 0;
                     foreach (var rowData in RgfGrid.GridData)
@@ -47,6 +51,7 @@
         <GridColumnSettingsComponent GridComponent="context" />
     </ColumnSettingsTemplate>
 </RgfGridComponent>
+
 
 @code {
 

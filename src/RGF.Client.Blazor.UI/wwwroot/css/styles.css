@@ -1,3 +1,16 @@
 ﻿table.recro-grid td > div.cell-content {
     width: 40px;
 }
+
+div.spinner-container {
+    display: inline-block;
+}
+
+div.spinner-flex {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: absolute;
+    height: 100%;
+    width: 100%;
+}

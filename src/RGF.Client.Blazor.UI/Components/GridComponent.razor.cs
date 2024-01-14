@@ -6,8 +6,6 @@ using Recrovit.RecroGridFramework.Abstraction.Infrastructure.Events;
 using Recrovit.RecroGridFramework.Abstraction.Models;
 using Recrovit.RecroGridFramework.Client.Blazor.Components;
 using Recrovit.RecroGridFramework.Client.Handlers;
-using System;
-using System.Linq;
 
 namespace Recrovit.RecroGridFramework.Client.Blazor.UI.Components;
 
@@ -54,7 +52,7 @@ public partial class GridComponent : ComponentBase, IDisposable
         await base.OnAfterRenderAsync(firstRender);
         if (firstRender)
         {
-            _rgfGridRef.Disposables.Add(Manager.ListHandler.GridData.OnAfterChange(this, OnChangeGridData));
+            _rgfGridRef.Disposables.Add(Manager.ListHandler.GridData.OnAfterChange(this, OnChangedGridData));
         }
         await _jsRuntime.InvokeVoidAsync(RGFClientBlazorUIConfiguration.JsBlazorUiNamespace + ".Grid.initializeTable", _selfRef, _tableRef);
     }
@@ -65,7 +63,7 @@ public partial class GridComponent : ComponentBase, IDisposable
     [JSInvokable]
     public Task SetColumnPos(int from, int to) => ListHandler.MoveColumnAsync(from, to);
 
-    protected virtual async Task OnChangeGridData(ObservablePropertyEventArgs<List<RgfDynamicDictionary>> args)
+    protected virtual async Task OnChangedGridData(ObservablePropertyEventArgs<List<RgfDynamicDictionary>> args)
     {
         await _jsRuntime.InvokeVoidAsync(RGFClientBlazorUIConfiguration.JsBlazorUiNamespace + ".Grid.deselectAllRow", _tableRef);
     }
