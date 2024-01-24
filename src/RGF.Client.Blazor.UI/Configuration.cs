@@ -1,4 +1,5 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.JSInterop;
 using Recrovit.RecroGridFramework.Client.Blazor.UI.Components;
 using Recrovit.RecroGridFramework.Client.Services;
@@ -6,21 +7,8 @@ using System.Reflection;
 
 namespace Recrovit.RecroGridFramework.Client.Blazor.UI;
 
-public static class RGFClientBlazorUIConfiguration
+public class RGFClientBlazorUIConfiguration
 {
-    public static async Task InitializeRgfUIAsync(this IServiceProvider serviceProvider, string themeName = "light", bool loadResources = true)
-    {
-        RgfBlazorConfiguration.RegisterComponent<MenuComponent>(RgfBlazorConfiguration.ComponentType.Menu);
-        RgfBlazorConfiguration.RegisterComponent<DialogComponent>(RgfBlazorConfiguration.ComponentType.Dialog);
-        RgfBlazorConfiguration.RegisterEntityComponent<EntityComponent>(string.Empty);
-
-        if (loadResources)
-        {
-            var jsRuntime = serviceProvider.GetRequiredService<IJSRuntime>();
-            await LoadResourcesAsync(jsRuntime, themeName);
-        }
-    }
-
     public static async Task LoadResourcesAsync(IJSRuntime jsRuntime, string themeName)
     {
         var libName = Assembly.GetExecutingAssembly().GetName().Name;
@@ -59,4 +47,23 @@ public static class RGFClientBlazorUIConfiguration
     private static readonly string BootstrapSubmenuCssId = "rgf-bootstrap-submenu";
 
     public static readonly string JsBlazorUiNamespace = "Recrovit.RGF.Blazor.UI";
+}
+
+public static class RGFClientBlazorUIConfigurationExtension
+{
+    public static async Task InitializeRgfUIAsync(this IServiceProvider serviceProvider, string themeName = "light", bool loadResources = true)
+    {
+        RgfBlazorConfiguration.RegisterComponent<MenuComponent>(RgfBlazorConfiguration.ComponentType.Menu);
+        RgfBlazorConfiguration.RegisterComponent<DialogComponent>(RgfBlazorConfiguration.ComponentType.Dialog);
+        RgfBlazorConfiguration.RegisterEntityComponent<EntityComponent>(string.Empty);
+
+        if (loadResources)
+        {
+            var jsRuntime = serviceProvider.GetRequiredService<IJSRuntime>();
+            await RGFClientBlazorUIConfiguration.LoadResourcesAsync(jsRuntime, themeName);
+        }
+        var ver = Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyFileVersionAttribute>()?.Version;
+        var logger = serviceProvider.GetRequiredService<ILogger<RGFClientBlazorUIConfiguration>>();
+        logger?.LogInformation($"RecroGrid Framework Blazor.UI v{ver} initialized.");
+    }
 }

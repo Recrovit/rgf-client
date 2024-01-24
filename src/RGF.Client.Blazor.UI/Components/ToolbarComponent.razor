@@ -50,10 +50,12 @@
                 @if (RgfToolbar.SettingsMenu != null)
                 {
                     <div class="dropdown me-2" role="group">
+                        <div style="position:fixed;z-index:10;">
+                            @RgfToolbar.SettingsMenu
+                        </div>
                         <RgfButton IconName="bi-gear" CssClass="btn-secondary"
                                    Title="@RecroDict.GetRgfUiString("Setup")"
                                    AdditionalAttributes="@(new(){ {"data-bs-toggle","dropdown"}, {"aria-expanded", "false"} })" />
-                        @RgfToolbar.SettingsMenu
                     </div>
                 }
                 @if (RgfToolbar.SelectParam != null && Manager.EntityDesc.Options.GetBoolValue("RGO_SelectMode") == true)

@@ -1,4 +1,4 @@
-﻿<RgfComboBox TValue="string" CssClass="d-inline-block" Width="auto" @bind-Value="_size" OnValueChanging="OnSizeChange" DataSource="_sizes" />
+﻿<RgfComboBox TValue="string" CssClass="d-inline-block" Width="auto" @bind-Value="Size" OnValueChanging="OnSizeChange" DataSource="_sizes" />
 <RgfComboBox TValue="string" CssClass="d-inline-block" Width="auto" @bind-Value="ThemeName" OnValueChanging="OnThemeChange" DataSource="Themes" />
 
 @inject IJSRuntime _jsRuntime
@@ -7,12 +7,13 @@
     [Parameter]
     public string ThemeName { get; set; } = "light";
 
+    [Parameter]
+    public string Size { get; set; } = "";
+
     private Dictionary<string, string> Themes = new() {
         { "light", "Light" },
         { "dark", "Dark" }
     };
-
-    private string _size { get; set; } = "";
 
     private Dictionary<string, string> _sizes = new() {
         { "", "default" },

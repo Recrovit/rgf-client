@@ -39,7 +39,7 @@ else if (_menuItems != null)
     }
 }
 
-@inject IRecroDictService _recroDict
+@inject IRecroSecService _recroSec
 @code
 {
     [Parameter, EditorRequired]
@@ -57,7 +57,7 @@ else if (_menuItems != null)
         await base.OnInitializedAsync();
         if (MenuParameters.MenuId != null)
         {
-            var res = await _menuService.GetMenuAsync((int)MenuParameters.MenuId, _recroDict.DefaultLanguage);
+            var res = await _menuService.GetMenuAsync((int)MenuParameters.MenuId, _recroSec.UserLanguage);
             if (res.Success)
             {
                 MenuParameters.MenuItems = res.Result;
