@@ -47,10 +47,7 @@ public class RgfDynamicDictionary : DynamicObject, IDictionary<string, object>, 
             {
                 dynValue.Value = value;
             }
-            else
-            {
-                _data[key] = value;
-            }
+            _data[key] = value;
         }
     }
     public object GetMember(string key)
@@ -112,6 +109,7 @@ public class RgfDynamicDictionary : DynamicObject, IDictionary<string, object>, 
                         value = System.Web.HttpUtility.HtmlDecode(value.ToString());
                     }
                 }
+                logger.LogDebug("RgfDynamicData.Create: {name}, {prop}, {value}", name, prop?.ClientDataType.ToString() ?? "?", value);
                 dynData.SetMember(name, value);
             }
         }

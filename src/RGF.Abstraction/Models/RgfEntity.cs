@@ -3,7 +3,6 @@ using Recrovit.RecroGridFramework.Abstraction.Infrastructure.Security;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using System.Text.Json.Serialization;
 
 namespace Recrovit.RecroGridFramework.Abstraction.Models;
@@ -21,6 +20,8 @@ public class RgfEntity
 
     public string Title { get; set; }
 
+    public string MenuTitle { get; set; }
+
     public string CRUD { get; set; }
 
     public RgfPermissions Permissions { get; set; }
@@ -31,7 +32,6 @@ public class RgfEntity
 
     public Dictionary<string, object> Options { get; set; } = new();
 
-    [Obsolete]
     public List<string> StylesheetsReferences { get; set; }
 
     [JsonIgnore]

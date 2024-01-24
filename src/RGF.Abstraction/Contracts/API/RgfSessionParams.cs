@@ -1,7 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-using System.Text.Json.Serialization;
+﻿using System.Text.Json.Serialization;
 
 namespace Recrovit.RecroGridFramework.Abstraction.Contracts.API;
 
@@ -26,5 +23,5 @@ public class RgfSessionParams
     public string GridId { get; set; }
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public string Language { get; set; }//TODO: küldeni
+    public string Language { get; set; }
 }

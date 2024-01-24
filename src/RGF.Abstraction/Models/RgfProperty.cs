@@ -110,7 +110,7 @@ public class RgfProperty : IRgfProperty
     public bool PasswordType => Options?.GetBoolValue("RGO_Password") ?? false;
 
     [JsonIgnore]
-    public bool Nullable => Options?.ContainsKey("RGO_Nullable") != true ? ClientDataType == ClientDataType.String : Options.GetBoolValue("RGO_Nullable");
+    public bool Nullable => Options?.GetBoolValue("RGO_Nullable") ?? false;
 
     [JsonIgnore]
     public bool Required => !Nullable;
@@ -136,7 +136,7 @@ public class RgfProperty : IRgfProperty
                     return ClientDataType.String;//kliens oldalon mindig string
 
                 case PropertyFormType.CheckBox:
-                    if (Options?.GetBoolValue("RGO_Nullable") == false)
+                    if (Options?.GetBoolValue("RGO_Nullable") != true)
                     {
                         return ClientDataType.Boolean;
                     }

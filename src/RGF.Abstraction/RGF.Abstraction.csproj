@@ -11,7 +11,7 @@
     <Company>Recrovit Kft.</Company>
     <Product>RecroGrid Framework Abstraction</Product>
     <Copyright>© Recrovit Kft. All rights reserved.</Copyright>
-    <Version>1.1.0</Version>
+    <Version>1.2.0</Version>
     <FileVersion>$(Version).1$([System.DateTime]::Now.ToString(MMdd))</FileVersion>
     <InformationalVersion>$(FileVersion)</InformationalVersion>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
