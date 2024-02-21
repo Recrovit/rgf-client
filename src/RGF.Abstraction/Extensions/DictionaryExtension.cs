@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Text;
 
 namespace Recrovit.RecroGridFramework.Abstraction.Extensions;
 
@@ -22,6 +21,19 @@ public static class DictionaryExtension
         if (self.TryGetValue(key, out var val))
         {
             res = val.ToString();
+        }
+        return res;
+    }
+
+    public static int GetIntValue<TKey, TValue>(this Dictionary<TKey, TValue> self, TKey key, int defaultValue = 0)
+    {
+        int res = defaultValue;
+        if (self.TryGetValue(key, out var val))
+        {
+            if (int.TryParse(val.ToString(), out int r))
+            {
+                res = r;
+            }
         }
         return res;
     }

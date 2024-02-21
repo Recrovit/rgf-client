@@ -1,12 +1,10 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 
 namespace Recrovit.RecroGridFramework.Abstraction.Infrastructure.Events;
 
-public class EventDispatcher<TValue> where TValue : EventArgs
+public class EventDispatcher<TValue>
 {
     private event Action<TValue> _event;
 
@@ -14,25 +12,37 @@ public class EventDispatcher<TValue> where TValue : EventArgs
 
     public static EventDispatcher<TValue> operator +(EventDispatcher<TValue> eventHolder, Func<TValue, Task> eventHandler)
     {
-        eventHolder.Subscribe(eventHandler);
+        if (eventHandler != null)
+        {
+            eventHolder.Subscribe(eventHandler);
+        }
         return eventHolder;
     }
 
     public static EventDispatcher<TValue> operator +(EventDispatcher<TValue> eventHolder, Action<TValue> eventHandler)
     {
-        eventHolder.Subscribe(eventHandler);
+        if (eventHandler != null)
+        {
+            eventHolder.Subscribe(eventHandler);
+        }
         return eventHolder;
     }
 
     public static EventDispatcher<TValue> operator -(EventDispatcher<TValue> eventHolder, Func<TValue, Task> eventHandler)
     {
-        eventHolder.Unsubscribe(eventHandler);
+        if (eventHandler != null)
+        {
+            eventHolder.Unsubscribe(eventHandler);
+        }
         return eventHolder;
     }
 
     public static EventDispatcher<TValue> operator -(EventDispatcher<TValue> eventHolder, Action<TValue> eventHandler)
     {
-        eventHolder.Unsubscribe(eventHandler);
+        if (eventHandler != null)
+        {
+            eventHolder.Unsubscribe(eventHandler);
+        }
         return eventHolder;
     }
 

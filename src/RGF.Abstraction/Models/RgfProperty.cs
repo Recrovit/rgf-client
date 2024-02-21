@@ -1,9 +1,6 @@
 ﻿using Recrovit.RecroGridFramework.Abstraction.Extensions;
-using System;
 using System.Collections.Generic;
 using System.Runtime.Serialization;
-using System.Security.Claims;
-using System.Text;
 using System.Text.Json.Serialization;
 
 namespace Recrovit.RecroGridFramework.Abstraction.Models;
@@ -71,39 +68,74 @@ public enum ClientDataType
 public interface IRgfProperty
 {
     string Alias { get; set; }
+
     string ClientName { get; set; }
+
     int ColPos { get; set; }
+
     string ColTitle { get; set; }
+
     int ColWidth { get; set; }
+
     bool Editable { get; set; }
+
     string Ex { get; set; }
+
     ClientDataType ClientDataType { get; }
+
     PropertyFormType FormType { get; set; }
+
     int Id { get; set; }
+
     bool IsKey { get; set; }
+
     PropertyListType ListType { get; set; }
+
     Dictionary<string, object> Options { get; set; }
+
     bool Orderable { get; set; }
+
     bool Readable { get; set; }
+
     int Sort { get; set; }
 }
 
 public class RgfProperty : IRgfProperty
 {
     public int Id { get; set; }
+
     public string ClientName { get; set; }
+
     public string Alias { get; set; }
+
     public string ColTitle { get; set; }
+
     public PropertyListType ListType { get; set; }
-    public PropertyFormType FormType { get; set; }
+
     public int ColPos { get; set; }
+
     public int ColWidth { get; set; }
+
+    public PropertyFormType FormType { get; set; }
+
+    public int FormTab { get; set; }
+
+    public int FormGroup { get; set; }
+
+    public int FormPos { get; set; }
+
     public int Sort { get; set; }
+
     public bool IsKey { get; set; }
+
     public bool Readable { get; set; }
+
     public bool Editable { get; set; }
+
     public bool Orderable { get; set; }
+
     public string Ex { get; set; }
+
     public Dictionary<string, object> Options { get; set; }
 
     [JsonIgnore]

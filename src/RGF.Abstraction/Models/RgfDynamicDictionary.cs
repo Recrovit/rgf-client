@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Dynamic;
 using System.Globalization;
 using System.Linq;
+using System.Reflection;
 
 namespace Recrovit.RecroGridFramework.Abstraction.Models;
 
@@ -32,12 +33,23 @@ public class RgfDynamicDictionary : DynamicObject, IDictionary<string, object>, 
     }
 
     private Dictionary<string, object> _data { get; set; }
+
     private Dictionary<string, RgfDynamicData> _dynData { get; set; } = new();
+
     private readonly object _lock = new object();
 
     public bool TryGetMember(string key, out object result) => _data.TryGetValue(key, out result);
+
     public override bool TryGetMember(GetMemberBinder binder, out object result) => TryGetMember(binder.Name, out result);
+
     public override bool TrySetMember(SetMemberBinder binder, object value) { SetMember(binder.Name, value); return true; }
+
+    public override bool TryConvert(ConvertBinder binder, out object result)
+    {
+        result = Activator.CreateInstance(binder.Type);
+        var res = this.CopyTo(binder.Type, result);
+        return res.Invalid.Any() == false && res.MissingPrimitive.Any() == false;
+    }
 
     public void SetMember(string key, object value)
     {
@@ -50,6 +62,7 @@ public class RgfDynamicDictionary : DynamicObject, IDictionary<string, object>, 
             _data[key] = value;
         }
     }
+
     public object GetMember(string key)
     {
         lock (_lock)
@@ -58,8 +71,7 @@ public class RgfDynamicDictionary : DynamicObject, IDictionary<string, object>, 
             {
                 return dynValue.Value;
             }
-            object value;
-            TryGetMember(key, out value);
+            TryGetMember(key, out object value);
             return value;
         }
     }
@@ -83,6 +95,7 @@ public class RgfDynamicDictionary : DynamicObject, IDictionary<string, object>, 
     public object this[string key] { get => GetMember(key); set => SetMember(key, value); }
 
     public static RgfDynamicDictionary Create(ILogger logger, RgfEntity entityDesc, Dictionary<string, object> data) => Create(logger, entityDesc, data.Keys.ToArray(), data.Values.ToArray());
+
     public static RgfDynamicDictionary Create(ILogger logger, RgfEntity entityDesc, string[] dataColumns, object[] dataArray, bool htmlDecode = false)
     {
         var dynData = new RgfDynamicDictionary();
@@ -162,5 +175,44 @@ public class RgfDynamicDictionary : DynamicObject, IDictionary<string, object>, 
             }
         }
         return true;
+    }
+}
+
+public static class RgfDynamicDictionaryExtension
+{
+    public static (List<string> Invalid, List<string> Missing, List<string> MissingPrimitive) CopyTo<TEntity>(this RgfDynamicDictionary self, TEntity dataRec, StringComparison comparisonType = StringComparison.OrdinalIgnoreCase) => self.CopyTo(typeof(TEntity), dataRec, comparisonType);
+
+    public static (List<string> Invalid, List<string> Missing, List<string> MissingPrimitive) CopyTo(this RgfDynamicDictionary self, Type dataType, object dataRec, StringComparison comparisonType = StringComparison.OrdinalIgnoreCase)
+    {
+        var invalid = new List<string>();
+        var missing = new List<string>();
+        var missingPrimitive = new List<string>();
+        IEnumerable<PropertyInfo> properties = dataType.GetProperties(BindingFlags.Public | BindingFlags.Instance).Where(p => p.CanWrite);
+        var names = self.GetDynamicMemberNames().ToArray();
+        foreach (var prop in properties)
+        {
+            try
+            {
+                var name = names.SingleOrDefault(e => e.Equals(prop.Name, comparisonType));
+                if (name != null)
+                {
+                    var data = self.GetMember(name);
+                    prop.SetValue(dataRec, data);
+                }
+                else
+                {
+                    missing.Add(prop.Name);
+                    if (prop.PropertyType.IsPrimitive)
+                    {
+                        missingPrimitive.Add(prop.Name);
+                    }
+                }
+            }
+            catch
+            {
+                invalid.Add(prop.Name);
+            }
+        }
+        return (invalid, missing, missingPrimitive);
     }
 }

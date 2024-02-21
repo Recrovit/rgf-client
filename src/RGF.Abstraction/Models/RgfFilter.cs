@@ -4,7 +4,6 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Xml.Serialization;
@@ -144,7 +143,7 @@ public class RgfFilter
                 {
                     op = new QueryOperator[] { QueryOperator.Equal, QueryOperator.NotEqual };
                 }
-                else if (RgClass.Contains("rg-numeric") || RgClass.Contains("datepicker") || RgClass.Contains("datetimepicker"))
+                else if (RgClass.Contains("rg-numeric") || RgClass.Contains("rg-date"))
                 {
                     op = new QueryOperator[] { QueryOperator.Equal, QueryOperator.NotEqual, QueryOperator.Interval, QueryOperator.IntervalE };
                 }

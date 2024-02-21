@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Text;
 using System.Xml.Serialization;
 
 namespace Recrovit.RecroGridFramework.Abstraction.Models;
@@ -53,7 +52,7 @@ public class RgfForm
         public string Title { get; set; }
 
         [XmlIgnore]
-        public int FlexColumnWidth { get; set; } = 6;
+        public int FlexColumnWidth { get; set; }
 
         [XmlArray("properties")]
         [XmlArrayItem("property")]
