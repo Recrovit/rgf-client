@@ -133,6 +133,10 @@
         {
             cancel = DialogParameters.OnClose.Invoke() == false;
         }
+        else
+        {
+            DialogParameters.Destroy?.Invoke();
+        }
     }
 
     public void OnKeyDown(KeyboardEventArgs args)

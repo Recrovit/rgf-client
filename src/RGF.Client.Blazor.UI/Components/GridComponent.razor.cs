@@ -2,9 +2,10 @@
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.Logging;
 using Microsoft.JSInterop;
-using Recrovit.RecroGridFramework.Abstraction.Infrastructure.Events;
+using Recrovit.RecroGridFramework.Abstraction.Contracts.Services;
 using Recrovit.RecroGridFramework.Abstraction.Models;
 using Recrovit.RecroGridFramework.Client.Blazor.Components;
+using Recrovit.RecroGridFramework.Client.Blazor.Events;
 using Recrovit.RecroGridFramework.Client.Handlers;
 
 namespace Recrovit.RecroGridFramework.Client.Blazor.UI.Components;
@@ -31,11 +32,13 @@ public partial class GridComponent : ComponentBase, IDisposable
 
     private DotNetObjectReference<GridComponent>? _selfRef;
 
+    private List<IDisposable> _disposables { get; set; } = new();
+
     protected override void OnInitialized()
     {
         base.OnInitialized();
         _selfRef = DotNetObjectReference.Create(this);
-        GridParameters.Events.CreateAttributes.Subscribe(OnCreateAttributes);
+        GridParameters.EventDispatcher.Subscribe(RgfGridEventKind.CreateAttributes, OnCreateAttributes);
     }
 
     public void Dispose()
@@ -45,6 +48,11 @@ public partial class GridComponent : ComponentBase, IDisposable
             _selfRef.Dispose();
             _selfRef = null;
         }
+        if (_disposables != null)
+        {
+            _disposables.ForEach(disposable => disposable.Dispose());
+            _disposables = null!;
+        }
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -52,7 +60,7 @@ public partial class GridComponent : ComponentBase, IDisposable
         await base.OnAfterRenderAsync(firstRender);
         if (firstRender)
         {
-            _rgfGridRef.Disposables.Add(Manager.ListHandler.GridData.OnAfterChange(this, OnChangedGridData));
+            _disposables.Add(_rgfGridRef.GridDataSource.OnAfterChange(this, OnChangedGridData));
         }
         await _jsRuntime.InvokeVoidAsync(RGFClientBlazorUIConfiguration.JsBlazorUiNamespace + ".Grid.initializeTable", _selfRef, _tableRef);
     }
@@ -68,11 +76,12 @@ public partial class GridComponent : ComponentBase, IDisposable
         await _jsRuntime.InvokeVoidAsync(RGFClientBlazorUIConfiguration.JsBlazorUiNamespace + ".Grid.deselectAllRow", _tableRef);
     }
 
-    protected virtual Task OnCreateAttributes(DataEventArgs<RgfDynamicDictionary> rowData)
+    protected virtual Task OnCreateAttributes(IRgfEventArgs<RgfGridEventArgs> arg)
     {
+        var rowData = arg.Args.RowData ?? throw new ArgumentException();
         foreach (var prop in EntityDesc.SortedVisibleColumns)
         {
-            var attr = rowData.Value["__attributes"] as RgfDynamicDictionary;
+            var attr = rowData["__attributes"] as RgfDynamicDictionary;
             if (attr != null)
             {
                 string? propAttr = null;

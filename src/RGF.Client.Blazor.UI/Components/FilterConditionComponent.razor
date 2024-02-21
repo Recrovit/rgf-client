@@ -70,6 +70,7 @@
                         </div>
                         @if (new[] { RgfFilter.QueryOperator.Interval, RgfFilter.QueryOperator.IntervalE }.Contains(item.QueryOperator))
                         {
+                            <span>-</span>
                             <div class="p-1">
                                 @switch (prop.ClientDataType)
                                 {

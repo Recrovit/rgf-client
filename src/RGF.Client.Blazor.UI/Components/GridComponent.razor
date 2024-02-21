@@ -1,7 +1,7 @@
 ﻿
-<RgfGridComponent @ref="_rgfGridRef" EntityParameters="EntityParameters">
+<RgfGridComponent @ref="_rgfGridRef" EntityParameters="EntityParameters" GridComponent="this">
     <GridTemplate Context="RgfGrid">
-        @if (ListHandler.IsLoading)
+        @if (_rgfGridRef.IsProcessing)
         {
             <SpinnerComponent ContainerClass="spinner-flex" Style="width: 3rem; height: 3rem;" />
         }
@@ -26,7 +26,7 @@
                     }
                 </tr>
             </thead>
-            <tbody class="@(ListHandler.IsLoading ? "opacity-50" : null)">
+            <tbody class="@(_rgfGridRef.IsProcessing ? "opacity-50" : null)">
                 @{
                     int index = 0;
                     foreach (var rowData in RgfGrid.GridData)
@@ -48,7 +48,7 @@
     </GridTemplate>
 
     <ColumnSettingsTemplate>
-        <GridColumnSettingsComponent GridComponent="context" />
+        <GridColumnSettingsComponent BaseGridComponent="context" />
     </ColumnSettingsTemplate>
 </RgfGridComponent>
 

@@ -9,7 +9,14 @@
         <InputSelect TValue="TValue[]" Value="@Values" ValueExpression="ValuesExpression" ValueChanged="OnValuesChanged" DisplayName="@DisplayName" AdditionalAttributes="_attributes">
             @foreach (var option in DataSource)
             {
-                <option value="@option.Key">@option.Value</option>
+                if (option.Key != null && Values.Any(e => option.Key.Equals(e)))
+                {
+                    <option value="@option.Key" selected>@option.Value</option>
+                }
+                else
+                {
+                    <option value="@option.Key">@option.Value</option>
+                }
             }
         </InputSelect>
     }
@@ -18,7 +25,14 @@
         <InputSelect TValue="TValue" Value="@Value" ValueExpression="ValueExpression" ValueChanged="OnValueChanged" DisplayName="@DisplayName" AdditionalAttributes="_attributes">
             @foreach (var option in DataSource)
             {
-                <option value="@option.Key">@option.Value</option>
+                if (option.Key?.Equals(Value) == true)
+                {
+                    <option value="@option.Key" selected>@option.Value</option>
+                }
+                else
+                {
+                    <option value="@option.Key">@option.Value</option>
+                }
             }
         </InputSelect>
     }
@@ -39,7 +53,14 @@ else
         <datalist id="@_datalistId">
             @foreach (var option in Items)
             {
-                <option value="@option"></option>
+                if (option?.Equals(Value) == true)
+                {
+                    <option value="@option" selected></option>
+                }
+                else
+                {
+                    <option value="@option"></option>
+                }
             }
         </datalist>
     }
