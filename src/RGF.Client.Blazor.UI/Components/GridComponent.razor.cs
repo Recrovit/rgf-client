@@ -5,7 +5,7 @@ using Microsoft.JSInterop;
 using Recrovit.RecroGridFramework.Abstraction.Contracts.Services;
 using Recrovit.RecroGridFramework.Abstraction.Models;
 using Recrovit.RecroGridFramework.Client.Blazor.Components;
-using Recrovit.RecroGridFramework.Client.Blazor.Events;
+using Recrovit.RecroGridFramework.Client.Events;
 using Recrovit.RecroGridFramework.Client.Handlers;
 
 namespace Recrovit.RecroGridFramework.Client.Blazor.UI.Components;
@@ -26,8 +26,6 @@ public partial class GridComponent : ComponentBase, IDisposable
 
     private RgfEntity EntityDesc => Manager.EntityDesc;
 
-    private bool _isDblClick { get; set; }
-
     public IRgListHandler ListHandler => Manager.ListHandler;
 
     private DotNetObjectReference<GridComponent>? _selfRef;
@@ -38,7 +36,18 @@ public partial class GridComponent : ComponentBase, IDisposable
     {
         base.OnInitialized();
         _selfRef = DotNetObjectReference.Create(this);
-        GridParameters.EventDispatcher.Subscribe(RgfGridEventKind.CreateAttributes, OnCreateAttributes);
+        GridParameters.EventDispatcher.Subscribe(RgfListEventKind.CreateRowData, OnCreateAttributes);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await base.OnAfterRenderAsync(firstRender);
+        if (firstRender)
+        {
+            _disposables.Add(_rgfGridRef.GridDataSource.OnAfterChange(this, OnChangedGridData));
+            _rgfGridRef.EntityParameters.ToolbarParameters.EventDispatcher.Subscribe([RgfToolbarEventKind.Read, RgfToolbarEventKind.Edit], OnSetFormItem);
+        }
+        await _jsRuntime.InvokeVoidAsync(RGFClientBlazorUIConfiguration.JsBlazorUiNamespace + ".Grid.initializeTable", _selfRef, _tableRef);
     }
 
     public void Dispose()
@@ -53,16 +62,7 @@ public partial class GridComponent : ComponentBase, IDisposable
             _disposables.ForEach(disposable => disposable.Dispose());
             _disposables = null!;
         }
-    }
-
-    protected override async Task OnAfterRenderAsync(bool firstRender)
-    {
-        await base.OnAfterRenderAsync(firstRender);
-        if (firstRender)
-        {
-            _disposables.Add(_rgfGridRef.GridDataSource.OnAfterChange(this, OnChangedGridData));
-        }
-        await _jsRuntime.InvokeVoidAsync(RGFClientBlazorUIConfiguration.JsBlazorUiNamespace + ".Grid.initializeTable", _selfRef, _tableRef);
+        _rgfGridRef.EntityParameters.ToolbarParameters.EventDispatcher.Unsubscribe([RgfToolbarEventKind.Read, RgfToolbarEventKind.Edit], OnSetFormItem);
     }
 
     [JSInvokable]
@@ -76,40 +76,39 @@ public partial class GridComponent : ComponentBase, IDisposable
         await _jsRuntime.InvokeVoidAsync(RGFClientBlazorUIConfiguration.JsBlazorUiNamespace + ".Grid.deselectAllRow", _tableRef);
     }
 
-    protected virtual Task OnCreateAttributes(IRgfEventArgs<RgfGridEventArgs> arg)
+    protected virtual Task OnCreateAttributes(IRgfEventArgs<RgfListEventArgs> arg)
     {
-        var rowData = arg.Args.RowData ?? throw new ArgumentException();
+        _logger.LogDebug("CreateAttributes");
+        var rowData = arg.Args.Data ?? throw new ArgumentException();
         foreach (var prop in EntityDesc.SortedVisibleColumns)
         {
-            var attr = rowData["__attributes"] as RgfDynamicDictionary;
-            if (attr != null)
+            string? propClass = null;
+            if (prop.FormType == PropertyFormType.CheckBox)
             {
-                string? propAttr = null;
-                if (prop.FormType == PropertyFormType.CheckBox)
+                propClass = "rg-center";
+            }
+            else
+            {
+                switch (prop.ListType)
                 {
-                    propAttr = " rg-center";
-                }
-                else
-                {
-                    switch (prop.ListType)
-                    {
-                        case PropertyListType.Numeric:
-                            propAttr = " rg-numeric";
-                            break;
+                    case PropertyListType.Numeric:
+                        propClass = "rg-numeric";
+                        break;
 
-                        case PropertyListType.String:
-                            propAttr = " rg-string";
-                            break;
+                    case PropertyListType.String:
+                        propClass = "rg-string";
+                        break;
 
-                        case PropertyListType.Image:
-                            propAttr = " rg-html";
-                            break;
-                    }
+                    case PropertyListType.Image:
+                        propClass = "rg-html";
+                        break;
                 }
-                if (propAttr != null)
-                {
-                    attr[$"class-{prop.Alias}"] += propAttr;
-                }
+            }
+            if (propClass != null)
+            {
+                var attributes = rowData.GetOrNew<RgfDynamicDictionary>("__attributes");
+                var propAttributes = attributes.GetOrNew<RgfDynamicDictionary>(prop.Alias);
+                propAttributes.Set<string>("class", (old) => string.IsNullOrEmpty(old) ? propClass : $"{old.Trim()} {propClass}");
             }
         }
         return Task.CompletedTask;
@@ -162,9 +161,7 @@ public partial class GridComponent : ComponentBase, IDisposable
 
     protected virtual async Task OnRowClick(MouseEventArgs args, RgfDynamicDictionary rowData, int rowIndex)
     {
-        _isDblClick = false;
-        await Task.Delay(200);
-        if (!_isDblClick)
+        if (args.Detail == 1)
         {
             if (_rgfGridRef.SelectedItems.Any())
             {
@@ -179,13 +176,20 @@ public partial class GridComponent : ComponentBase, IDisposable
             await _jsRuntime.InvokeVoidAsync(RGFClientBlazorUIConfiguration.JsBlazorUiNamespace + ".Grid.selectRow", _rowRef[rowIndex], rowIndex);
             await _rgfGridRef.RowSelectHandlerAsync(rowData);
         }
+        else
+        {
+            await _rgfGridRef.OnRecordDoubleClickAsync(rowData);
+        }
     }
 
-    protected virtual async Task OnRowDoubleClick(MouseEventArgs args, RgfDynamicDictionary rowData, int rowIndex)
+    private async Task OnSetFormItem(IRgfEventArgs<RgfToolbarEventArgs> arg)
     {
-        _isDblClick = true;
-        await _rgfGridRef.OnRecordDoubleClickAsync(rowData);
-        await _jsRuntime.InvokeVoidAsync(RGFClientBlazorUIConfiguration.JsBlazorUiNamespace + ".Grid.deselectAllRow", _tableRef);
-        await _jsRuntime.InvokeVoidAsync(RGFClientBlazorUIConfiguration.JsBlazorUiNamespace + ".Grid.selectRow", _rowRef[rowIndex], rowIndex);
+        var data = _rgfGridRef.SelectedItems.Single();
+        int rowIndex = Manager.ListHandler.GetRelativeRowIndex(data);
+        if (rowIndex != -1)
+        {
+            await _jsRuntime.InvokeVoidAsync(RGFClientBlazorUIConfiguration.JsBlazorUiNamespace + ".Grid.deselectAllRow", _tableRef);
+            await _jsRuntime.InvokeVoidAsync(RGFClientBlazorUIConfiguration.JsBlazorUiNamespace + ".Grid.selectRow", _rowRef[rowIndex], rowIndex);
+        }
     }
 }

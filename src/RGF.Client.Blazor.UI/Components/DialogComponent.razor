@@ -24,26 +24,20 @@
                 {
                     @DialogParameters.FooterTemplate
                 }
-                @if (DialogParameters.PredefinedButtons != null)
-                {
-                    <div class="d-flex justify-content-end">
-                        @foreach (var button in DialogParameters.PredefinedButtons)
+                <div class="d-flex flex-wrap justify-content-between align-items-center">
+                    <div class="d-flex justify-content-start">
+                        @foreach (var button in DialogParameters.LeftButtons ?? [])
                         {
-                            <div class="p-1">
-                                <RgfButton Id="@(button.IsPrimary ? _nextButtonId : null)" CssClass="@(button.IsPrimary ? "btn-primary" : "btn-secondary")" MinWidth="4rem" OnClick="button.Callback">
-                                    @if (!string.IsNullOrEmpty(button.ChildText))
-                                    {
-                                        @button.ChildText
-                                    }
-                                    else if (button.ChildContent != null)
-                                    {
-                                        @button.ChildContent
-                                    }
-                                </RgfButton>
-                            </div>
+                            @CreateButton(button)
                         }
                     </div>
-                }
+                    <div class="d-flex justify-content-end">
+                        @foreach (var button in DialogParameters.PredefinedButtons ?? [])
+                        {
+                            @CreateButton(button)
+                        }
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -75,6 +69,20 @@
         }
     }
 
+    private RenderFragment<ButtonParameters> CreateButton => (button) =>
+    @<div class="p-1">
+        <RgfButton Id="@(button.IsPrimary ? _nextButtonId : null)" Title="@button.Title" CssClass="@(button.CssClass ?? (button.IsPrimary ? "btn-primary" : "btn-secondary"))"
+                   IconName="@button.IconName" Disabled="@button.Disabled" MinWidth="@button.MinWidth" OnClick="button.Callback">
+            @if (!string.IsNullOrEmpty(button.ChildText))
+        {
+            @button.ChildText
+        }
+        else if (button.ChildContent != null)
+        {
+            @button.ChildContent
+        }
+        </RgfButton>
+    </div>;
 
     private string ThemeColor
     {

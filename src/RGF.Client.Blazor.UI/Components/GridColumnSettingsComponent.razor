@@ -1,5 +1,4 @@
-﻿
-<RgfGridColumnSettingsComponent BaseGridComponent="BaseGridComponent">
+﻿<RgfGridColumnSettingsComponent BaseGridComponent="BaseGridComponent">
     <SettingsTemplate Context="RgfColSettings">
         <table class="tablesorter">
             <thead>
@@ -28,10 +27,9 @@
     </SettingsTemplate>
 </RgfGridColumnSettingsComponent>
 
+@inject IRecroDictService RecroDict
 @code {
 
     [Parameter, EditorRequired]
     public RgfGridComponent BaseGridComponent { get; set; } = null!;
-
-    private IRecroDictService RecroDict => BaseGridComponent.Manager.RecroDict;
 }

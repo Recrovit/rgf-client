@@ -1,5 +1,4 @@
-﻿
-<RgfToolbarComponent @ref="_rgfToolbarRef" EntityParameters="EntityParameters">
+﻿<RgfToolbarComponent @ref="_rgfToolbarRef" EntityParameters="EntityParameters">
     <ToolbarTemplate Context="RgfToolbar">
         <div class="bg-body-secondary p-1">
             <div class="btn-toolbar" role="toolbar">
@@ -19,13 +18,13 @@
                     <div class="btn-group me-2" role="group">
                         <RgfButton IconName="bi-arrow-clockwise" CssClass="btn-secondary"
                                    Title="@RecroDict.GetRgfUiString("Refresh")"
-                                   OnClick="() => RgfToolbar.OnToolbarCommand(ToolbarAction.Refresh)" />
+                                   OnClick="() => RgfToolbar.OnToolbarCommand(RgfToolbarEventKind.Refresh)" />
                         @if (Manager.EntityDesc.Options.GetBoolValue("RGO_NoFilter") != true)
                         {
                             <RgfButton IconName="@(RgfToolbar.IsFiltered ? "bi-funnel-fill" : "bi-funnel")"
                                        CssClass="@(RgfToolbar.IsFiltered ? "btn-success" : "btn-secondary")"
                                        Title="@RecroDict.GetRgfUiString("Filter")"
-                                       OnClick="() => RgfToolbar.OnToolbarCommand(ToolbarAction.ShowFilter)" />
+                                       OnClick="() => RgfToolbar.OnToolbarCommand(RgfToolbarEventKind.ShowFilter)" />
                         }
                     </div>
                 }
@@ -36,19 +35,19 @@
                         {
                             <RgfButton IconName="bi-plus-lg" CssClass="btn-secondary"
                                        Title="@RecroDict.GetRgfUiString("New")"
-                                       OnClick="() => RgfToolbar.OnToolbarCommand(ToolbarAction.Add)" />
+                                       OnClick="() => RgfToolbar.OnToolbarCommand(RgfToolbarEventKind.Add)" />
                         }
                         if (RgfToolbar.BasePermissions.Edit)
                         {
                             <RgfButton IconName="bi-pencil" CssClass="btn-secondary" Disabled="@(!RgfToolbar.IsSingleSelectedRow)"
                                        Title="@RecroDict.GetRgfUiString("Modify")"
-                                       OnClick="() => RgfToolbar.OnToolbarCommand(ToolbarAction.Edit)" />
+                                       OnClick="() => RgfToolbar.OnToolbarCommand(RgfToolbarEventKind.Edit)" />
                         }
                         else if (RgfToolbar.BasePermissions.Read)
                         {
                             <RgfButton IconName="bi-book" CssClass="btn-secondary" Disabled="@(!RgfToolbar.IsSingleSelectedRow)"
                                        Title="@RecroDict.GetRgfUiString("Details")"
-                                       OnClick="() => RgfToolbar.OnToolbarCommand(ToolbarAction.Read)" />
+                                       OnClick="() => RgfToolbar.OnToolbarCommand(RgfToolbarEventKind.Read)" />
                         }
                     }
                     @if (RgfToolbar.BasePermissions.Delete)
@@ -74,7 +73,7 @@
                     <div class="btn-group" role="group">
                         <RgfButton IconName="bi-link" CssClass="@(RgfToolbar.IsSingleSelectedRow ? "btn-success" : "btn-secondary")" Disabled="@(!RgfToolbar.IsSingleSelectedRow)"
                                    Title="@RecroDict.GetRgfUiString("Select")"
-                                   OnClick="() => RgfToolbar.OnToolbarCommand(ToolbarAction.Select)" />
+                                   OnClick="() => RgfToolbar.OnToolbarCommand(RgfToolbarEventKind.Select)" />
                     </div>
                 }
             </div>
@@ -82,6 +81,7 @@
     </ToolbarTemplate>
 </RgfToolbarComponent>
 
+@inject IRecroDictService RecroDict
 @code {
 
     [Parameter, EditorRequired]
@@ -89,7 +89,6 @@
 
     private IRgManager Manager => EntityParameters.Manager!;
     private RgfToolbarParameters ToolbarParameters { get => EntityParameters.ToolbarParameters; }
-    private IRecroDictService RecroDict => Manager.RecroDict;
 
     private RgfToolbarComponent _rgfToolbarRef { get; set; } = null!;
 }

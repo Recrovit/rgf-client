@@ -32,11 +32,12 @@
                     foreach (var rowData in RgfGrid.GridData)
                     {
                         int currIdx = index++;
-                        var attributes = (RgfDynamicDictionary)rowData["__attributes"];
-                        <tr @ref="_rowRef[currIdx]" class="@(attributes["class"])" style="@(attributes["style"])" @onclick="(arg) => OnRowClick(arg, rowData, currIdx)" @ondblclick="(arg) => OnRowDoubleClick(arg, rowData, currIdx)">
+                        var attributes = rowData.Get<RgfDynamicDictionary>("__attributes");
+                        <tr @ref="_rowRef[currIdx]" class="@(attributes?.Get<string>("class"))" style="@(attributes?.Get<string>("style"))" @onclick="(arg) => OnRowClick(arg, rowData, currIdx)">
                             @foreach (var prop in EntityDesc.SortedVisibleColumns)
                             {
-                                <td class="@attributes[$"class-{prop.Alias}"]" style="@(attributes[$"style-{prop.Alias}"])">
+                                var propAttributes = attributes?.Get<RgfDynamicDictionary>(prop.Alias);
+                                <td class="@(propAttributes?.Get<string>("class"))" style="@(propAttributes?.Get<string>("style"))">
                                     @RgfGrid.CreateGridColumn(prop, (RgfDynamicDictionary)rowData)
                                 </td>
                             }

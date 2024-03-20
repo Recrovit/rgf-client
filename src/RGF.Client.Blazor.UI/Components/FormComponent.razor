@@ -62,13 +62,13 @@
 </RgfFormComponent>
 
 @inject IJSRuntime _jsRuntime
+@inject IRecroDictService RecroDict
 @code {
     [Parameter, EditorRequired]
     public RgfEntityParameters EntityParameters { get; set; } = null!;
 
     private IRgManager Manager => EntityParameters.Manager!;
     private RgfFormParameters FormParameters { get => EntityParameters.FormParameters; }
-    protected IRecroDictService RecroDict => Manager.RecroDict;
 
     private RgfFormComponent _rgfFormRef { get; set; } = null!;
     private string _tabsId = RgfBaseComponent.GetNextId();
@@ -80,6 +80,25 @@
         base.OnInitialized();
         FormParameters.ErrorCssClass = FormParameters.ErrorCssClass ?? "is-invalid";
         FormParameters.ModifiedCssClass = FormParameters.ModifiedCssClass ?? "is-valid";
+    }
+
+    protected override void OnParametersSet()
+    {
+        base.OnParametersSet();
+        var rowIndex = FormParameters.FormViewKey.RowIndex;
+        if (rowIndex != -1)
+        {
+            var buttons = new List<ButtonParameters>() {
+                new("bi-chevron-double-left", RecroDict.GetRgfUiString("First"), async (arg) => await _rgfFormRef.FirstFormItemAsync(), "btn-secondary") { Disabled = rowIndex <= 0 },
+                new("bi-chevron-left", RecroDict.GetRgfUiString("Prev"), async (arg) => await _rgfFormRef.PrevFormItemAsync(), "btn-secondary") { Disabled = rowIndex <= 0 },
+                new("bi-chevron-right", RecroDict.GetRgfUiString("Next"), async (arg) => await _rgfFormRef.NextFormItemAsync(), "btn-secondary") { Disabled = rowIndex + 1 >= Manager.ItemCount.Value },
+                new("bi-chevron-double-right", RecroDict.GetRgfUiString("Last"), async (arg) => await _rgfFormRef.LastFormItemAsync(), "btn-secondary") { Disabled = rowIndex + 1 >= Manager.ItemCount.Value } };
+            FormParameters.DialogParameters.LeftButtons = buttons;
+        }
+        else
+        {
+            FormParameters.DialogParameters.LeftButtons = null;
+        }
     }
 
     public RenderFragment<RgfFormGroupLayoutParameters> FormGroupLayoutTemplate => (param) =>

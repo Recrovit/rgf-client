@@ -65,6 +65,7 @@
     </PagerTemplate>
 </RgfPagerComponent>
 
+@inject IRecroDictService RecroDict
 @code {
 
     [Parameter, EditorRequired]
@@ -72,7 +73,6 @@
 
     private IRgManager Manager => EntityParameters.Manager!;
     private RgfPagerParameters PagerParameters { get => EntityParameters.PagerParameters; }
-    private IRecroDictService RecroDict => Manager.RecroDict;
 
     private RgfPagerComponent _rgfPagerRef { get; set; } = null!;
 

@@ -14,14 +14,6 @@
       ]
     },
     {
-      "library": "jqueryui@1.13.2",
-      "destination": "wwwroot/lib/jqueryui/",
-      "files": [
-        "jquery-ui.min.js",
-        "themes/base/**"
-      ]
-    },
-    {
       "provider": "cdnjs",
       "library": "bootstrap-icons@1.11.1",
       "destination": "wwwroot/lib/bootstrap-icons/"

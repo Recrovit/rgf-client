@@ -17,7 +17,7 @@
                         <RgfInputText @bind-Value="ItemData.StringValue"
                                       Readonly="Property.Readonly" Disabled="Property.Disabled"
                                       CssClass="@RgfFormItem.CssClass" Id="@Id" />
-                        <RgfButton IconName="bi-search" CssClass="button.IsPrimary" OnClick="() => RgfFormItem.OnSearchEntity(ItemData.StringValue)" />
+                        <RgfButton IconName="bi-search" CssClass="button.IsPrimary" OnClick="async () => await RgfFormItem.FindEntityAsync(ItemData.StringValue)" />
                     </div>
                 }
                 else
@@ -130,7 +130,11 @@
                     }
                     else if (FormComponent.PreviouslyActiveTabs.Contains(PropertyDesc.FormTab - 1) || FormComponent.ActiveTabIndex == PropertyDesc.FormTab - 1)
                     {
-                        @RgfEntityComponent.Create(new RgfEntityParameters(Property.ForeignEntity.EntityName, BaseFormComponent.Manager.SessionParams) { GridId = ItemData.StringValue })
+                        if (_embeddedGrid == null)
+                        {
+                            _embeddedGrid = RgfEntityComponent.Create(new RgfEntityParameters(Property.ForeignEntity.EntityName, BaseFormComponent.Manager.SessionParams) { GridId = ItemData.StringValue });
+                        }
+                        @_embeddedGrid
                     }
                 </div>
                 break;
@@ -160,5 +164,7 @@
     protected RgfDynamicData ItemData => FormItemParameters.ItemData;
 
     protected RgfProperty PropertyDesc => Property.PropertyDesc;
+    private RenderFragment? _embeddedGrid;
+
     protected string Id { get; set; } = RgfBaseComponent.GetNextId();
 }
