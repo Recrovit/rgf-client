@@ -13,9 +13,11 @@ public interface IRecroSecService
 
     bool IsAdmin { get; }
 
-    List<string> UserRoles { get; }
+    List<string> RoleClaim { get; }
 
     ClaimsPrincipal CurrentUser { get; }
+
+    Task<string> GetAccessTokenAsync();
 
     string UserLanguage { get; }
 
@@ -23,7 +25,9 @@ public interface IRecroSecService
 
     EventDispatcher<DataEventArgs<string>> LanguageChangedEvent { get; }
 
-    Task<RgfPermissions> GetPermissionsAsync(string objectName, string objectKey, int expiration = 60);
+    Task<RgfPermissions> GetEntityPermissionsAsync(string entityName, string objectKey = null, int expiration = 60);
+
+    Task<RgfPermissions> GetPermissionsAsync(string objectName, string objectKey = null, int expiration = 60);
 
     Task<List<RecroSecResult>> GetPermissionsAsync(IEnumerable<RecroSecQuery> query, int expiration = 60);
 }

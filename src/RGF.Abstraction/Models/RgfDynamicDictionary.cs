@@ -55,7 +55,7 @@ public class RgfDynamicDictionary : DynamicObject, IDictionary<string, object>, 
     {
         lock (_lock)
         {
-            if (_dynData.TryGetValue(key, out var dynValue))
+            if (_dynData.TryGetValue(key ?? throw new ArgumentNullException(nameof(key)), out var dynValue))
             {
                 dynValue.Value = value;
             }
@@ -67,13 +67,28 @@ public class RgfDynamicDictionary : DynamicObject, IDictionary<string, object>, 
     {
         lock (_lock)
         {
-            if (_dynData.TryGetValue(key, out var dynValue))
+            if (_dynData.TryGetValue(key ?? throw new ArgumentNullException(nameof(key)), out var dynValue))
             {
                 return dynValue.Value;
             }
             TryGetMember(key, out object value);
             return value;
         }
+    }
+
+    public void Set<TValue>(string key, Func<TValue, TValue> valueFactory) where TValue : class => SetMember(key, valueFactory(Get<TValue>(key)));
+
+    public TValue Get<TValue>(string key) where TValue : class => GetMember(key) as TValue;
+
+    public TValue GetOrNew<TValue>(string key) where TValue : class, new()
+    {
+        var value = Get<TValue>(key);
+        if (value == null)
+        {
+            value = new();
+            SetMember(key, value);
+        }
+        return value;
     }
 
     public RgfDynamicData GetItemData(string key)
@@ -94,9 +109,19 @@ public class RgfDynamicDictionary : DynamicObject, IDictionary<string, object>, 
 
     public object this[string key] { get => GetMember(key); set => SetMember(key, value); }
 
-    public static RgfDynamicDictionary Create(ILogger logger, RgfEntity entityDesc, Dictionary<string, object> data) => Create(logger, entityDesc, data.Keys.ToArray(), data.Values.ToArray());
+    [Obsolete("Use instead Create(ILogger<RgfDynamicDictionary> logger, RgfEntity entityDesc, Dictionary<string, object> data)", true)]
+    public static RgfDynamicDictionary Create(ILogger logger, RgfEntity entityDesc, Dictionary<string, object> data) => Create(logger as ILogger<RgfDynamicDictionary>, entityDesc, data);
 
-    public static RgfDynamicDictionary Create(ILogger logger, RgfEntity entityDesc, string[] dataColumns, object[] dataArray, bool htmlDecode = false)
+    [Obsolete("Use instead Create(ILogger<RgfDynamicDictionary> logger, RgfEntity entityDesc, string[] dataColumns, object[] dataArray, bool htmlDecode)", true)]
+    public static RgfDynamicDictionary Create(ILogger logger, RgfEntity entityDesc, string[] dataColumns, object[] dataArray, bool htmlDecode = false) => Create(logger as ILogger<RgfDynamicDictionary>, entityDesc, dataColumns, dataArray, htmlDecode);
+
+    public static RgfDynamicDictionary Create(IServiceProvider serviceProvider, RgfEntity entityDesc, Dictionary<string, object> data) => Create(serviceProvider.GetService(typeof(ILogger<RgfDynamicDictionary>)) as ILogger<RgfDynamicDictionary>, entityDesc, data);
+
+    public static RgfDynamicDictionary Create(IServiceProvider serviceProvider, RgfEntity entityDesc, string[] dataColumns, object[] dataArray, bool htmlDecode = false) => Create(serviceProvider.GetService(typeof(ILogger<RgfDynamicDictionary>)) as ILogger<RgfDynamicDictionary>, entityDesc, dataColumns, dataArray, htmlDecode);
+
+    public static RgfDynamicDictionary Create(ILogger<RgfDynamicDictionary> logger, RgfEntity entityDesc, Dictionary<string, object> data) => Create(logger, entityDesc, data.Keys.ToArray(), data.Values.ToArray());
+
+    public static RgfDynamicDictionary Create(ILogger<RgfDynamicDictionary> logger, RgfEntity entityDesc, string[] dataColumns, object[] dataArray, bool htmlDecode = false)
     {
         var dynData = new RgfDynamicDictionary();
         RgfProperty prop = null;
@@ -122,13 +147,13 @@ public class RgfDynamicDictionary : DynamicObject, IDictionary<string, object>, 
                         value = System.Web.HttpUtility.HtmlDecode(value.ToString());
                     }
                 }
-                logger.LogDebug("RgfDynamicData.Create: {name}, {prop}, {value}", name, prop?.ClientDataType.ToString() ?? "?", value);
+                logger?.LogDebug("RgfDynamicData.Create: {name}, {prop}, {value}", name, prop?.ClientDataType.ToString() ?? "?", value);
                 dynData.SetMember(name, value);
             }
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "RgfDynamicData.Create => name:{prop}, data:{data}, ClientDataType:{ClientDataType}, Culture:{CultureInfo}", prop?.Alias, data, prop?.ClientDataType, CultureInfo.CurrentCulture.Name);
+            logger?.LogError(ex, "RgfDynamicData.Create => name:{prop}, data:{data}, ClientDataType:{ClientDataType}, Culture:{CultureInfo}", prop?.Alias, data, prop?.ClientDataType, CultureInfo.CurrentCulture.Name);
         }
         return dynData;
     }
