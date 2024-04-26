@@ -20,6 +20,8 @@ else
     [Parameter]
     public bool Password { get; set; } = default!;
 
+    [Parameter]
+    public int? MaxLength { get; set; }
 
     protected override void OnParametersSet()
     {
@@ -28,6 +30,11 @@ else
         if (Password)
         {
             AdditionalAttributes["type"] = "password";
+        }
+
+        if (MaxLength != null && MaxLength > 0)
+        {
+            AdditionalAttributes["maxlength"] = MaxLength;
         }
 
         base.OnParametersSet();

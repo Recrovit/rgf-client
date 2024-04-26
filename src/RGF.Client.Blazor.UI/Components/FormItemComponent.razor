@@ -49,6 +49,7 @@
                             <RgfInputText @bind-Value="ItemData.StringValue"
                                           Password="PropertyDesc.PasswordType"
                                           Readonly="Property.Readonly" Disabled="Property.Disabled"
+                                          MaxLength="Property.PropertyDesc.MaxLength"
                                           CssClass="@RgfFormItem.CssClass" Id="@Id" />
                             break;
                     }
@@ -59,6 +60,7 @@
                 <RgfInputText @bind-Value="ItemData.StringValue"
                               Multiline="true"
                               Readonly="Property.Readonly" Disabled="Property.Disabled"
+                              MaxLength="Property.PropertyDesc.MaxLength"
                               CssClass="@RgfFormItem.CssClass" Id="@Id" />
                 break;
 
@@ -115,6 +117,7 @@
                 <RgfInputText @bind-Value="ItemData.StringValue"
                               Multiline="true"
                               Readonly="Property.Readonly" Disabled="Property.Disabled"
+                              MaxLength="Property.PropertyDesc.MaxLength"
                               CssClass="@RgfFormItem.CssClass" Id="@Id" />
                 break;
 
