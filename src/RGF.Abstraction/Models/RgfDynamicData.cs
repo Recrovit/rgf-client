@@ -46,10 +46,21 @@ public class RgfDynamicData : IEquatable<RgfDynamicData>
     }
 
     public string StringValue { get => Value?.ToString(); set => Value = value; }
-    public int? IntValue { get => Value as int?; set => Value = value; }
+
+    public short? ShortValue { get => Value as short?; set => Value = value; }
+
+    public int? IntValue { get => (Value as int?) ?? ShortValue; set => Value = value; }
+
+    public Int64? Int64Value { get => (Value as Int64?) ?? IntValue; set => Value = value; }
+
     public decimal? DecimalValue { get => Value as decimal?; set => Value = value; }
-    public double? DoubleValue { get => Value as double?; set => Value = value; }
+
+    public float? FloatValue { get => Value as float?; set => Value = value; }
+
+    public double? DoubleValue { get => (Value as double?) ?? FloatValue; set => Value = value; }
+
     public DateTime? DateTimeValue { get => Value as DateTime?; set => Value = value; }
+
     public bool BooleanValue { get => Value as bool? ?? false; set => Value = value; }
 
     public event Action<RgfDynamicData> OnAfterChange;

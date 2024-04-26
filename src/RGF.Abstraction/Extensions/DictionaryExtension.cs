@@ -17,38 +17,41 @@ public static class DictionaryExtension
 
     public static string GetStringValue<TKey, TValue>(this Dictionary<TKey, TValue> self, TKey key, string defaultValue = null)
     {
-        string res = defaultValue;
         if (self.TryGetValue(key, out var val))
         {
-            res = val.ToString();
+            return val.ToString();
         }
-        return res;
+        return defaultValue;
     }
 
     public static int GetIntValue<TKey, TValue>(this Dictionary<TKey, TValue> self, TKey key, int defaultValue = 0)
     {
-        int res = defaultValue;
-        if (self.TryGetValue(key, out var val))
+        if (self.TryGetValue(key, out var val) &&
+            int.TryParse(val.ToString(), out int res))
         {
-            if (int.TryParse(val.ToString(), out int r))
-            {
-                res = r;
-            }
+            return res;
         }
-        return res;
+        return defaultValue;
+    }
+
+    public static int? TryGetIntValue<TKey, TValue>(this Dictionary<TKey, TValue> self, TKey key)
+    {
+        if (self.TryGetValue(key, out var val) &&
+            int.TryParse(val.ToString(), out int res))
+        {
+            return res;
+        }
+        return null;
     }
 
     public static long GetLongValue<TKey, TValue>(this Dictionary<TKey, TValue> self, TKey key, long defaultValue = 0)
     {
-        long res = defaultValue;
-        if (self.TryGetValue(key, out var val))
+        if (self.TryGetValue(key, out var val) &&
+            long.TryParse(val.ToString(), out long res))
         {
-            if (long.TryParse(val.ToString(), out long r))
-            {
-                res = r;
-            }
+            return res;
         }
-        return res;
+        return defaultValue;
     }
 
     public static bool GetBoolValue<TKey, TValue>(this Dictionary<TKey, TValue> self, TKey key)

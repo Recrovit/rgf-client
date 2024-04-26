@@ -6,17 +6,17 @@ namespace Recrovit.RecroGridFramework.Abstraction.Contracts.Services;
 
 public interface IRecroDictService
 {
-    Task<ConcurrentDictionary<string, string>> GetDictionaryAsync(string scope, string language = null, bool authClient = true);
+    bool IsInitialized { get; }
 
     Task InitializeAsync(string language = null);
-
-    string GetRgfUiString(string stringId);
 
     Dictionary<string, string> Languages { get; }
 
     string DefaultLanguage { get; }
 
-    bool IsInitialized { get; }
+    Task<ConcurrentDictionary<string, string>> GetDictionaryAsync(string scope, string language = null, bool authClient = true);
+
+    string GetRgfUiString(string stringId);
 }
 
 public static class IRecroDictServiceExtension

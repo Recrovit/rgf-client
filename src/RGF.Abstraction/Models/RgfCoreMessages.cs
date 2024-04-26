@@ -1,11 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Text;
 using System.Text.Json.Serialization;
 
 namespace Recrovit.RecroGridFramework.Abstraction.Models;
 
-public class RgfMessages
+[Obsolete("Use RgfCoreMessages instead", true)]
+public class RgfMessages : RgfCoreMessages { }
+
+public class RgfCoreMessages
 {
     [JsonIgnore]
     public static string MessageDialog = "MessageDialog";

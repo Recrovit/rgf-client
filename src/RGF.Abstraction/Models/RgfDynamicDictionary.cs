@@ -12,9 +12,13 @@ namespace Recrovit.RecroGridFramework.Abstraction.Models;
 public class RgfDynamicDictionary : DynamicObject, IDictionary<string, object>, IEquatable<RgfDynamicDictionary>
 {
     public RgfDynamicDictionary() { _data = new(); }
+
     public RgfDynamicDictionary(RgfDynamicDictionary data) { _data = data._data; }
+
     public RgfDynamicDictionary(Dictionary<string, object> data) { _data = data; }
+
     public RgfDynamicDictionary(IEqualityComparer<string> comparer) { _data = new Dictionary<string, object>(comparer); }
+
     public RgfDynamicDictionary(string[] key, object[] value)
     {
         if (key?.Length != value?.Length)
@@ -156,6 +160,19 @@ public class RgfDynamicDictionary : DynamicObject, IDictionary<string, object>, 
             logger?.LogError(ex, "RgfDynamicData.Create => name:{prop}, data:{data}, ClientDataType:{ClientDataType}, Culture:{CultureInfo}", prop?.Alias, data, prop?.ClientDataType, CultureInfo.CurrentCulture.Name);
         }
         return dynData;
+    }
+
+    public static RgfDynamicDictionary Create<Type>(Type obj, IEqualityComparer<string> comparer = null) where Type : class
+    {
+        var dictionary = comparer == null ? new RgfDynamicDictionary() : new RgfDynamicDictionary(comparer);
+        var properties = typeof(Type).GetProperties();
+
+        foreach (var property in properties)
+        {
+            var value = property.GetValue(obj);
+            dictionary.SetMember(property.Name, value);
+        }
+        return dictionary;
     }
 
     //The GetDynamicMemberNames method of DynamicObject class must be overridden and return the property names to perform data operation and editing while using DynamicObject.

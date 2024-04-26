@@ -139,6 +139,9 @@ public class RgfProperty : IRgfProperty
     public Dictionary<string, object> Options { get; set; }
 
     [JsonIgnore]
+    public int? MaxLength => Options?.TryGetIntValue("RGO_MaxLength");
+
+    [JsonIgnore]
     public bool PasswordType => Options?.GetBoolValue("RGO_Password") ?? false;
 
     [JsonIgnore]
