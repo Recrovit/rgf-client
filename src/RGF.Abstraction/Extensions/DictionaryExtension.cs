@@ -15,7 +15,7 @@ public static class DictionaryExtension
         return val;
     }
 
-    public static string GetStringValue<TKey, TValue>(this Dictionary<TKey, TValue> self, TKey key, string defaultValue = null)
+    public static string GetStringValue<TKey, TValue>(this IDictionary<TKey, TValue> self, TKey key, string defaultValue = null)
     {
         if (self.TryGetValue(key, out var val))
         {
@@ -24,7 +24,7 @@ public static class DictionaryExtension
         return defaultValue;
     }
 
-    public static int GetIntValue<TKey, TValue>(this Dictionary<TKey, TValue> self, TKey key, int defaultValue = 0)
+    public static int GetIntValue<TKey, TValue>(this IDictionary<TKey, TValue> self, TKey key, int defaultValue = 0)
     {
         if (self.TryGetValue(key, out var val) &&
             int.TryParse(val.ToString(), out int res))
@@ -34,7 +34,7 @@ public static class DictionaryExtension
         return defaultValue;
     }
 
-    public static int? TryGetIntValue<TKey, TValue>(this Dictionary<TKey, TValue> self, TKey key)
+    public static int? TryGetIntValue<TKey, TValue>(this IDictionary<TKey, TValue> self, TKey key)
     {
         if (self.TryGetValue(key, out var val) &&
             int.TryParse(val.ToString(), out int res))
@@ -44,7 +44,7 @@ public static class DictionaryExtension
         return null;
     }
 
-    public static long GetLongValue<TKey, TValue>(this Dictionary<TKey, TValue> self, TKey key, long defaultValue = 0)
+    public static long GetLongValue<TKey, TValue>(this IDictionary<TKey, TValue> self, TKey key, long defaultValue = 0)
     {
         if (self.TryGetValue(key, out var val) &&
             long.TryParse(val.ToString(), out long res))
@@ -54,7 +54,7 @@ public static class DictionaryExtension
         return defaultValue;
     }
 
-    public static bool GetBoolValue<TKey, TValue>(this Dictionary<TKey, TValue> self, TKey key)
+    public static bool GetBoolValue<TKey, TValue>(this IDictionary<TKey, TValue> self, TKey key)
     {
         var value = self.GetStringValue(key);
         return value != null && (value.Equals(bool.TrueString, StringComparison.OrdinalIgnoreCase) || value == "1");

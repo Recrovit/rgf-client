@@ -11,7 +11,7 @@
     <Company>Recrovit Kft.</Company>
     <Product>RecroGrid Framework</Product>
     <Copyright>© Recrovit Kft. All rights reserved.</Copyright>
-    <Version>1.5.0</Version>
+    <Version>1.5.1</Version>
     <FileVersion>$(Version).1$([System.DateTime]::Now.ToString(MMdd))</FileVersion>
     <InformationalVersion>$(FileVersion)</InformationalVersion>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
@@ -20,7 +20,7 @@
   <PropertyGroup>
     <Authors>$(Company)</Authors>
     <PackageOutputPath>..\..\dist</PackageOutputPath>
-    <PackageProjectUrl>https://recrogrid.com/</PackageProjectUrl>
+    <PackageProjectUrl>https://recrogridframework.com/</PackageProjectUrl>
     <Description>RecroGrid Framework Abstraction</Description>
     <PackageTags>RecroGrid Framework</PackageTags>
     <RepositoryUrl>https://github.com/RecroGridFramework/RGF.Abstraction.git</RepositoryUrl>
