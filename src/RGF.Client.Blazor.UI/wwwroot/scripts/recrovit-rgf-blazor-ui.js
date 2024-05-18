@@ -1,5 +1,5 @@
 ﻿/*!
-* recrovit-rgf-blazor-ui.js v1.0.1
+* recrovit-rgf-blazor-ui.js v1.0.2
 */
 
 window.Recrovit = window.Recrovit || {};
@@ -22,6 +22,7 @@ Blazor.UI = {
             else {
                 $('.btn-primary:first', dialog).focus();
             }
+            $('div.modal-dialog', dialog).height('auto');
             if (uniqueName != null) {
                 Blazor.UI.Dialog.loadDialogPos(uniqueName, dialogId);
             }
