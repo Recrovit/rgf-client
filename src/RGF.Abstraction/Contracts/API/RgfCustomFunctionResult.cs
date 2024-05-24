@@ -1,4 +1,5 @@
-﻿
+﻿using Recrovit.RecroGridFramework.Abstraction.Models;
+
 namespace Recrovit.RecroGridFramework.Abstraction.Contracts.API;
 
 public class RgfCustomFunctionResult
@@ -9,5 +10,5 @@ public class RgfCustomFunctionResult
 
     public bool RefreshRow{ get; set; }
 
-    public object Row { get; set; }
+    public RgfDynamicDictionary Row { get; set; }
 }
