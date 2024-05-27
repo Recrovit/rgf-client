@@ -100,7 +100,7 @@ else if (_menuItems != null)
                     builder.OpenComponent(sequence++, typeof(NavLink));
                     builder.AddAttribute(sequence++, "class", $"nav-link {item.CssClass}");
                     builder.AddAttribute(sequence++, "href", item.Command);
-                    builder.AddAttribute(sequence++, nameof(NavLink.ChildContent), (RenderFragment)((b) => b.AddContent(sequence++, item.Title)));
+                    builder.AddAttribute(sequence++, nameof(NavLink.ChildContent), (RenderFragment)((b) => b.AddContent(0, item.Title)));
                     builder.CloseComponent();
                     break;
 
