@@ -30,9 +30,13 @@
         if(Reverse)
         {
             _formClass += " form-check-reverse";
+            if (string.IsNullOrEmpty(LabelCssClass) || !LabelCssClass.Contains("pe-1"))
+            {
+                LabelCssClass = string.IsNullOrEmpty(LabelCssClass) ? "pe-1" : " pe-1";
+            }
         }
 
-        _baseCssClass = "form-check-input";
+        _baseCssClass = "form-check-input form-check";
 
         base.OnParametersSet();
     }

@@ -1,5 +1,5 @@
 ﻿/*!
-* recrovit-rgf-blazor-ui.js v1.0.2
+* recrovit-rgf-blazor-ui.js v1.0.4
 */
 
 window.Recrovit = window.Recrovit || {};
@@ -45,9 +45,9 @@ Blazor.UI = {
         },
         loadDialogPos: function (name, dialogId) {
             const data = localStorage.getItem(`RGF.DialogPos.${name}`);
+            var content = $('div.modal-content:first', '#' + dialogId);
             if (data != undefined) {
                 const dialogPos = JSON.parse(data);
-                var content = $('div.modal-content:first', '#' + dialogId);
                 content.css({
                     width: `${dialogPos[0]}px`,
                     height: `${dialogPos[1]}px`,
@@ -57,6 +57,9 @@ Blazor.UI = {
                     left: `${dialogPos[3]}px`,
                     margin: '0'
                 });
+            }
+            else {
+                content.css('width', '60%');
             }
         }
     },
@@ -71,7 +74,7 @@ Blazor.UI = {
         initializeTable: function (gridRef, table) {
             var rgfTable = new Recrovit.WebCli.RgfTable(table);
             rgfTable.makeColumnsResizable(function (idx, target, width) {
-                gridRef.invokeMethodAsync('SetColumnWidth', idx + 1, parseInt(width));
+                gridRef.invokeMethodAsync('SetColumnWidth', idx + 1, parseInt(width) || 0);
             });
             rgfTable.makeColumnsDragable(function (idx, newIdx) {
                 if (idx != newIdx && idx + 1 != newIdx) {

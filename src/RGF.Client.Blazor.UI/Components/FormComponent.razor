@@ -110,7 +110,7 @@
     </div>;
 
     public RenderFragment<RgfFormItemParameters> FormItemLayoutTemplate => (param) =>
-    @<div name="@param.Property.ClientName" class="@($"col-{param.Property.FlexColumnWidth ?? param.Group.FlexColumnWidth}")">
+    @<div name="@param.Property.ClientName" class="@($"{(param.Property.EmbededGrid ? "rg-collection" : "rg-property")} col-{param.Property.FlexColumnWidth ?? param.Group.FlexColumnWidth}")">
         @if (!string.IsNullOrEmpty(param.Property.PreElement))
     {
         @((MarkupString)param.Property.PreElement)
