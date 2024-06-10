@@ -1,5 +1,5 @@
 ﻿/*!
-* recrovit-rgf-blazor-ui.js v1.0.4
+* recrovit-rgf-blazor-ui.js v1.0.5
 */
 
 window.Recrovit = window.Recrovit || {};
@@ -23,9 +23,7 @@ Blazor.UI = {
                 $('.btn-primary:first', dialog).focus();
             }
             $('div.modal-dialog', dialog).height('auto');
-            if (uniqueName != null) {
-                Blazor.UI.Dialog.loadDialogPos(uniqueName, dialogId);
-            }
+            Blazor.UI.Dialog.loadDialogPos(uniqueName, dialogId, true);
         },
         saveDialogPos: function (name, dialogId) {
             const key = `RGF.DialogPos.${name}`;
@@ -43,23 +41,33 @@ Blazor.UI = {
                 localStorage.setItem(key, JSON.stringify(dialogPos));
             }
         },
-        loadDialogPos: function (name, dialogId) {
-            const data = localStorage.getItem(`RGF.DialogPos.${name}`);
+        loadDialogPos: function (name, dialogId, verticalCenter) {
             var content = $('div.modal-content:first', '#' + dialogId);
-            if (data != undefined) {
-                const dialogPos = JSON.parse(data);
-                content.css({
-                    width: `${dialogPos[0]}px`,
-                    height: `${dialogPos[1]}px`,
-                });
-                content.parent('div.modal-dialog').css({
-                    top: `${dialogPos[2]}px`,
-                    left: `${dialogPos[3]}px`,
-                    margin: '0'
-                });
+            var dialog = content.parent('div.modal-dialog');
+            if (name != null) {
+                var data = localStorage.getItem(`RGF.DialogPos.${name}`);
+                if (data != undefined) {
+                    const dialogPos = JSON.parse(data);
+                    content.css({
+                        width: `${dialogPos[0]}px`,
+                        height: `${dialogPos[1]}px`,
+                    });
+                    dialog.css({
+                        top: `${dialogPos[2]}px`,
+                        left: `${dialogPos[3]}px`,
+                        margin: '0'
+                    });
+                    return;
+                }
+                dialog.css('width', '60%');
             }
-            else {
-                content.css('width', '60%');
+            if (verticalCenter == true) {
+                var windowHeight = $(window).height();
+                var dialogHeight = dialog.height();
+                var top = ((windowHeight - dialogHeight) / 2).toFixed(0);
+                if (top > 0) {
+                    dialog.css('margin-top', top + 'px');
+                }
             }
         }
     },
