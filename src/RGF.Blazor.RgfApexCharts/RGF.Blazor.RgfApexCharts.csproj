@@ -1,0 +1,62 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>Recrovit.RecroGridFramework.Blazor.RgfApexCharts</RootNamespace>
+    <AssemblyName>Recrovit.RecroGridFramework.Blazor.RgfApexCharts</AssemblyName>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <Company>Recrovit Kft.</Company>
+    <Product>RecroGrid Framework</Product>
+    <Copyright>© Recrovit Kft. All rights reserved.</Copyright>
+    <Version>8.0.0</Version>
+    <FileVersion>$(Version).1$([System.DateTime]::Now.ToString(MMdd))</FileVersion>
+    <InformationalVersion>$(FileVersion)</InformationalVersion>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <Authors>$(Company)</Authors>
+    <PackageOutputPath>..\..\dist</PackageOutputPath>
+    <PackageProjectUrl>https://recrogridframework.com/</PackageProjectUrl>
+    <Description>RecroGrid Framework Blazor ApexCharts.</Description>
+    <PackageTags>RecroGrid Framework Blazor ApexCharts</PackageTags>
+    <RepositoryUrl>https://github.com/RecroGridFramework/RGF.Blazor.RgfApexCharts.git</RepositoryUrl>
+    <PackageLicenseExpression>GPL-3.0-only</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+
+  <Target Name="Recrovit-signtool" AfterTargets="PostBuildEvent" Condition="'$(Configuration)'=='Release' and Exists('$(ProjectDir)..\..\dist\signtool.bat')">
+    <Exec Command="$(ProjectDir)..\..\dist\signtool.bat $(ProjectDir)$(OutputPath)$(TargetFileName)" />
+  </Target>
+
+  <ItemGroup>
+    <SupportedPlatform Include="browser" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Blazor-ApexCharts" Version="3.4.0" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.Web" Version="8.0.6" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(Configuration)'=='Release'">
+    <PackageReference Include="Recrovit.RecroGridFramework.Client.Blazor" Version="8.7.0" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(Configuration)'=='Debug'">
+    <ProjectReference Include="..\..\RGF.Client.Blazor\src\RGF.Client.Blazor.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="Components\ChartComponent.razor.css" CssScope="rgf-apexcharts" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\.gitignore" />
+    <None Include="..\README.*" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+</Project>
