@@ -3,7 +3,8 @@
                     GridTemplate="GridTemplate"
                     FilterTemplate="FilterTemplate"
                     PagerTemplate="PagerTemplate"
-                    FormTemplate="FormTemplate">
+                    FormTemplate="FormTemplate"
+                    ChartTemplate="ChartTemplate!">
     <LoadingIndicator>
         <SpinnerComponent Style="width: 3rem; height: 3rem;" />
     </LoadingIndicator>
@@ -28,4 +29,7 @@
 
     [Parameter]
     public RenderFragment<RgfEntityParameters> FormTemplate { get; set; } = (context) => @<FormComponent EntityParameters="context" />;
+
+    [Parameter]
+    public RenderFragment<RgfEntityParameters>? ChartTemplate { get; set; }
 }

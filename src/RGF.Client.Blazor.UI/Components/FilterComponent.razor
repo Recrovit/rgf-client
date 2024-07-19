@@ -5,7 +5,7 @@
     <FooterTemplate Context="RgfFilterComp">
         <div class="d-flex flex-row justify-content-start align-items-center">
             <div class="p-1">
-                <label class="col-form-label">Query timeout</label>
+                <label class="col-form-label text-nowrap">Query timeout</label>
             </div>
             <div class="p-1">
                 <RgfInputNumber TValue="int?" @bind-Value="RgfFilterComp.PredefinedFilter.QueryTimeout" HideSpinButton="true" Width="3rem" Min="0" />
@@ -17,7 +17,10 @@
                              OnValueChanging="OnValueChanging" />
             </div>
             <div class="p-1">
-                <RgfCheckBox @bind-Value=RgfFilterComp.PredefinedFilter.IsGlobal Disabled="!RgfFilterComp.IsPredefinedFilterAdmin" Label="@RecroDict.GetRgfUiString("Public")" Reverse="true" />
+                <label class="col-form-label text-nowrap">@RecroDict.GetRgfUiString("Public")</label>
+            </div>
+            <div class="p-1 checkbox-lg">
+                <RgfCheckBox @bind-Value=RgfFilterComp.PredefinedFilter.IsGlobal Disabled="!RgfFilterComp.IsPredefinedFilterAdmin" Reverse="true" />
             </div>
             <div class="p-1">
                 <RgfButton IconName="bi-save" CssClass="btn-outline-primary" Title="@RecroDict.GetRgfUiString("Save")"
@@ -34,13 +37,13 @@
             <div class="p-1 checkbox-lg">
                 <RgfCheckBox Switch="true" @bind-Value="RgfFilterComp.IsFilterActive" Label="@($"{RecroDict.GetRgfUiString("Off")}/{RecroDict.GetRgfUiString("On")}")" />
             </div>
-            <div>
-                <span class="p-1">
+            <div class="d-flex justify-content-end">
+                <div class="p-1">
                     <RgfButton CssClass="btn-secondary" MinWidth="4rem" Label="@RecroDict.GetRgfUiString("Cancel")" OnClick="RgfFilterComp.OnCancel" />
-                </span>
-                <span class="p-1">
+                </div>
+                <div class="p-1">
                     <RgfButton CssClass="btn-primary" MinWidth="4rem" Label="OK" OnClick="RgfFilterComp.OnOk" />
-                </span>
+                </div>
             </div>
         </div>
     </FooterTemplate>

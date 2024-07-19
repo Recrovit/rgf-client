@@ -9,14 +9,18 @@
     width: 2.55rem !important;
 }
 
+.checkbox-lg div.form-check.form-check-reverse {
+    padding-right: 0;
+}
+
 .checkbox-lg .form-check-reverse input {
     margin-right: 0;
 }
 
-.checkbox-lg label {
-    padding-top: 0.55rem;
+.checkbox-lg .form-check-reverse label {
+    padding-right: 0.55rem !important;
 }
 
-.checkbox-lg .form-check-reverse label {
-    padding-right: 0.55rem;
+.checkbox-lg label {
+    padding-top: 0.55rem;
 }

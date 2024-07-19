@@ -1,5 +1,5 @@
 ﻿/*!
-* recrovit-rgf-blazor-ui.js v1.0.5
+* recrovit-rgf-blazor-ui.js v1.0.6
 */
 
 window.Recrovit = window.Recrovit || {};
@@ -15,7 +15,7 @@ Blazor.UI = {
             if (resizable) {
                 $('div.modal-content', dialog).resizable();
             }
-            $('div.modal-dialog', dialog).draggable();
+            $('div.modal-dialog', dialog).draggable({ handle: '.modal-header, .dialog-header' });
             if (focusId != null) {
                 document.getElementById(focusId).focus();
             }

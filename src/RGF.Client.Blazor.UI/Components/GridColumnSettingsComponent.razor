@@ -1,17 +1,16 @@
-﻿<RgfGridColumnSettingsComponent BaseGridComponent="BaseGridComponent">
+﻿<RgfGridColumnSettingsComponent @ref="_rgfColSettingsRef" BaseGridComponent="BaseGridComponent">
     <SettingsTemplate Context="RgfColSettings">
         <table class="tablesorter">
             <thead>
                 <tr>
-                    <th>@RecroDict.GetRgfUiString("Name")</th>
-                    <th style="text-align:center">@RecroDict.GetRgfUiString("Position")</th>
+                    <th @onclick="(arg) => Sort(1)">@RecroDict.GetRgfUiString("Name")</th>
+                    <th @onclick="(arg) => Sort(2)" style="text-align:center">@RecroDict.GetRgfUiString("Position")</th>
                     <th style="text-align:center">@RecroDict.GetRgfUiString("Width")</th>
                 </tr>
             </thead>
             <tbody>
-                @for (int i = 0; i < RgfColSettings.Columns.Length; i++)
+                @foreach (var col in (Columns ?? RgfColSettings.Columns))
                 {
-                    var col = RgfColSettings.Columns[i];
                     <tr>
                         <td class="@col.CssClass" style="white-space:nowrap">@col.Property.ColTitle</td>
                         <td>
@@ -32,4 +31,21 @@
 
     [Parameter, EditorRequired]
     public RgfGridComponent BaseGridComponent { get; set; } = null!;
+
+    private RgfGridColumnSettingsComponent _rgfColSettingsRef { get; set; } = null!;
+
+    private GridColumnSettings[]? Columns { get; set; }
+
+    private void Sort(int col)
+    {
+        if (col == 1)
+        {
+            Columns = _rgfColSettingsRef.Columns.OrderBy(e => e.Property.ColTitle).ToArray();
+        }
+        else if (col == 2)
+        {
+            Columns = _rgfColSettingsRef.Columns.OrderBy(e => e.ColPos > 0 ? e.ColPos : int.MaxValue).ToArray();
+        }
+        StateHasChanged();
+    }
 }

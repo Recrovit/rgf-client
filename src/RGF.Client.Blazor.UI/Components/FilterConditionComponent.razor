@@ -97,7 +97,7 @@
                         }
                         @if (new[] { RgfFilter.QueryOperator.Like, RgfFilter.QueryOperator.NotLike }.Contains(item.QueryOperator))
                         {
-                            <div class="p-1">
+                            <div class="p-1 checkbox-lg">
                                 <RgfCheckBox @bind-Value="item.ToLower" Label="ToLower" />
                             </div>
                         }
