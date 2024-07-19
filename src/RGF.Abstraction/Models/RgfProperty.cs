@@ -65,6 +65,20 @@ public enum ClientDataType
     Boolean = 7,
 }
 
+public static class EnumExtension
+{
+    public static bool IsNumeric(this ClientDataType data)
+    {
+        switch (data)
+        {
+            case ClientDataType.Integer:
+            case ClientDataType.Decimal:
+            case ClientDataType.Double:
+                return true;
+        }
+        return false;
+    }
+}
 public interface IRgfProperty
 {
     string Alias { get; set; }
@@ -238,6 +252,10 @@ public class GridColumnSettings : RgfColumnSettings
         else if (property.Ex.IndexOf('B') != -1)
         {
             cssClass = "rgf-ebase";
+        }
+        else if (property.Ex.IndexOf('N') != -1)
+        {
+            cssClass = "rgf-esql";
         }
         return cssClass;
     }

@@ -8,7 +8,11 @@ public class RgfGridRequest : RgfSessionParams
 {
     public RgfGridRequest() { }
 
-    public RgfGridRequest(RgfSessionParams param) : base(param) { }
+    public RgfGridRequest(RgfSessionParams param, string entityName = null, RgfListParam listParam = null) : base(param)
+    {
+        EntityName = entityName;
+        ListParam = listParam;
+    }
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string EntityName { get; set; }

@@ -53,7 +53,7 @@ public class RgfDynamicData : IEquatable<RgfDynamicData>
 
     public Int64? Int64Value { get => (Value as Int64?) ?? IntValue; set => Value = value; }
 
-    public decimal? DecimalValue { get => Value as decimal?; set => Value = value; }
+    public decimal? DecimalValue { get => (Value as decimal?) ?? Int64Value; set => Value = value; }
 
     public float? FloatValue { get => Value as float?; set => Value = value; }
 
@@ -262,5 +262,21 @@ public class RgfDynamicData : IEquatable<RgfDynamicData>
             }
         }
         return valueIsNull && otherIsnull;
+    }
+}
+
+public static class RgfDynamicDataExtension
+{
+    public static decimal? TryGetDecimal(this RgfDynamicData data, IFormatProvider provider = null)
+    {
+        var val = data.DecimalValue;
+        if (val == null)
+        {
+            if (decimal.TryParse(data.StringValue, NumberStyles.Any, provider, out decimal result))
+            {
+                val = result;
+            }
+        }
+        return val;
     }
 }
