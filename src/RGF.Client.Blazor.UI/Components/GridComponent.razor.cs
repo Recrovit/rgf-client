@@ -62,6 +62,7 @@ public partial class GridComponent : ComponentBase, IDisposable
             _disposables.ForEach(disposable => disposable.Dispose());
             _disposables = null!;
         }
+        GridParameters.EventDispatcher.Unsubscribe(RgfListEventKind.CreateRowData, OnCreateAttributes);
         _rgfGridRef.EntityParameters.ToolbarParameters.EventDispatcher.Unsubscribe([RgfToolbarEventKind.Read, RgfToolbarEventKind.Edit], OnSetFormItem);
     }
 
