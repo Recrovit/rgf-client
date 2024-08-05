@@ -58,7 +58,7 @@
                                 default:
                                     if (prop.FormType == PropertyFormType.DropDown || prop.FormType == PropertyFormType.ListBox)
                                     {
-                                        <RgfComboBox TValue="string" @bind-Values="item.StringArray1" DataSource="prop.Dictionary" />
+                                        <RgfComboBox TValue="string" @bind-Values="item.StringArray1" DataSource="prop.Dictionary" Resizable="true" />
                                     }
                                     else
                                     {

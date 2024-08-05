@@ -97,6 +97,9 @@ else
     [Parameter]
     public EventCallback<TValue[]> ValuesChanged { get; set; }
 
+    [Parameter]
+    public bool Resizable { get; set; } = default;
+
     private string? _datalistId { get; set; }
 
     protected override void OnParametersSet()
@@ -116,6 +119,11 @@ else
         else if (DataSource == null && Items != null)
         {
             DataSource = Items.Select(e => new KeyValuePair<TValue, string>(e, e?.ToString() ?? string.Empty)).ToList();
+        }
+
+        if (string.IsNullOrEmpty(Id) && Resizable)
+        {
+            Id = GetNextId();
         }
 
         base.OnParametersSet();
@@ -153,11 +161,15 @@ else
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         await base.OnAfterRenderAsync(firstRender);
-        if (firstRender)
+        if (firstRender && this.Id != null)
         {
-            if (this.Id != null && DataSource != null && !DataSource.Any(e => e.Key?.Equals(Value) == true))
+            if (DataSource != null && !DataSource.Any(e => e.Key?.Equals(Value) == true))
             {
                 await _jsRuntime.InvokeVoidAsync("eval", $"$('#{this.Id}').val('');");
+            }
+            if (this.Resizable)
+            {
+                await _jsRuntime.InvokeVoidAsync("eval", $"$('#{this.Id}').resizable();");
             }
         }
     }
