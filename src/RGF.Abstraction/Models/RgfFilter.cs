@@ -185,108 +185,28 @@ public class RgfFilter
         public List<Condition> Conditions { get; set; }
 
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-        public object Param1 { get; set; }
+        public object Param1 
+        { 
+            get => DynValue1.Value;
+            set { DynValue1.Value = value; } 
+        }
 
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-        public object Param2 { get; set; }
-
-        [JsonIgnore]
-        public object Value1
+        public object Param2
         {
-            get { return Param1 is JsonElement ? ((JsonElement)Param1).ConvertToObject() : Param1; }
-            set { Param1 = value; }
+            get => DynValue2.Value;
+            set { DynValue2.Value = value; }
         }
 
         [JsonIgnore]
-        public object Value2
-        {
-            get { return Param2 is JsonElement ? ((JsonElement)Param2).ConvertToObject() : Param2; }
-            set { Param2 = value; }
-        }
+        public RgfDynamicData DynValue1 { get; set; } = new();
+
+        [JsonIgnore]
+        public RgfDynamicData DynValue2 { get; set; } = new();
 
         [JsonIgnore]
         public int ClientId { get; set; }
 
-        #region Convert
-        [JsonIgnore]
-        public string StringValue1
-        {
-            get => Param1 == null ? null : Convert.ToString(Param1 is JsonElement ? ((JsonElement)Param1).ConvertToObject(typeof(string)) : Param1);
-            set { Param1 = value; }
-        }
-        [JsonIgnore]
-        public string StringValue2
-        {
-            get => Param2 == null ? null : Convert.ToString(Param2 is JsonElement ? ((JsonElement)Param2).ConvertToObject(typeof(string)) : Param2);
-            set { Param2 = value; }
-        }
-
-        [JsonIgnore]
-        public int? IntValue1
-        {
-            get => Param1 == null ? default(int?) : Convert.ToInt32(Param1 is JsonElement ? ((JsonElement)Param1).ConvertToObject(typeof(int)) : Param1);
-            set { Param1 = value; }
-        }
-        [JsonIgnore]
-        public int? IntValue2
-        {
-            get => Param2 == null ? default(int?) : Convert.ToInt32(Param2 is JsonElement ? ((JsonElement)Param2).ConvertToObject(typeof(int)) : Param2);
-            set { Param2 = value; }
-        }
-
-        [JsonIgnore]
-        public decimal? DecimalValue1
-        {
-            get => Param1 == null ? default(decimal?) : Convert.ToDecimal(Param1 is JsonElement ? ((JsonElement)Param1).ConvertToObject(typeof(decimal)) : Param1);
-            set { Param1 = value; }
-        }
-        [JsonIgnore]
-        public decimal? DecimalValue2
-        {
-            get => Param2 == null ? default(decimal?) : Convert.ToDecimal(Param2 is JsonElement ? ((JsonElement)Param2).ConvertToObject(typeof(decimal)) : Param2);
-            set => Param2 = value;
-        }
-
-        [JsonIgnore]
-        public double? DoubleValue1
-        {
-            get => Param1 == null ? default(double?) : Convert.ToDouble(Param1 is JsonElement ? ((JsonElement)Param1).ConvertToObject(typeof(double)) : Param1);
-            set { Param1 = value; }
-        }
-        [JsonIgnore]
-        public double? DoubleValue2
-        {
-            get => Param2 == null ? default(double?) : Convert.ToDouble(Param2 is JsonElement ? ((JsonElement)Param2).ConvertToObject(typeof(double)) : Param2);
-            set => Param2 = value;
-        }
-
-        [JsonIgnore]
-        public DateTime? DateTimeValue1
-        {
-            get => Param1 == null ? default(DateTime?) : Convert.ToDateTime(Param1 is JsonElement ? ((JsonElement)Param1).ConvertToObject(typeof(DateTime)) : Param1);
-            set { Param1 = value; }
-        }
-        [JsonIgnore]
-        public DateTime? DateTimeValue2
-        {
-            get => Param2 == null ? default(DateTime?) : Convert.ToDateTime(Param2 is JsonElement ? ((JsonElement)Param2).ConvertToObject(typeof(DateTime)) : Param2);
-            set { Param2 = value; }
-        }
-
-        [JsonIgnore]
-        public bool BooleanValue1
-        {
-            get
-            {
-                if (Param1 == null)
-                {
-                    Param1 = false;
-                    return false;
-                }
-                return Convert.ToBoolean(Param1 is JsonElement ? ((JsonElement)Param1).ConvertToObject() : Param1);
-            }
-            set { Param1 = value; }
-        }
         [JsonIgnore]
         public bool ToLower
         {
@@ -301,30 +221,5 @@ public class RgfFilter
             }
             set { Param2 = value; }
         }
-
-        [JsonIgnore]
-        public string[] StringArray1
-        {
-            get
-            {
-                if (Param1 is string[])
-                {
-                    return (string[])Param1;
-                }
-                else if (Param1 is JsonElement)
-                {
-                    var list = ((JsonElement)Param1).ConvertToObject() as List<object>;
-                    if (list != null)
-                    {
-                        return list.Select(e => e.ToString()).ToArray();
-                        //return list.ToArray();
-                    }
-                }
-                return new string[] { };
-            }
-            set { Param1 = value; }
-        }
-        #endregion
     }
 }
-

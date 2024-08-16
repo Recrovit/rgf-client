@@ -182,7 +182,7 @@ public class RgfProperty : IRgfProperty
 
                 case PropertyFormType.DropDown:
                 case PropertyFormType.ListBox:
-                    return ClientDataType.String;//kliens oldalon mindig string
+                    return ClientDataType.String;//Always a string on the client side
 
                 case PropertyFormType.CheckBox:
                     if (Options?.GetBoolValue("RGO_Nullable") != true)

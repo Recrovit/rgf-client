@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
-using System.Text;
 using System.Text.Json;
 
 namespace Recrovit.RecroGridFramework.Abstraction.Extensions;
@@ -9,6 +8,7 @@ namespace Recrovit.RecroGridFramework.Abstraction.Extensions;
 public static class JsonElementExtensions
 {
     public static object ConvertToObject(this JsonElement jsonElement) => jsonElement.ConvertToObject(null);
+
     public static object ConvertToObject(this JsonElement jsonElement, Type preferredType, string cultureName = "en")
     {
         if (preferredType != null)
@@ -19,31 +19,37 @@ public static class JsonElementExtensions
             {
                 return dateTimeValue;
             }
-            else if (preferredType == typeof(decimal)
-                && decimal.TryParse(jsonElement.ToString(), NumberStyles.Number, culture, out decimal decimalValue))
+            if (preferredType == typeof(decimal)
+               && decimal.TryParse(jsonElement.ToString(), NumberStyles.Number, culture, out decimal decimalValue))
             {
                 return decimalValue;
             }
-            else if (preferredType == typeof(double)
+            if (preferredType == typeof(double)
                 && double.TryParse(jsonElement.ToString(), NumberStyles.Float, culture, out double doubleValue))
             {
                 return doubleValue;
             }
-            else if (preferredType == typeof(short)
+            if (preferredType == typeof(float)
+                && float.TryParse(jsonElement.ToString(), NumberStyles.Float, culture, out float floatValue))
+            {
+                return floatValue;
+            }
+            if (preferredType == typeof(short)
                 && short.TryParse(jsonElement.ToString(), NumberStyles.Integer, culture, out short int16Value))
             {
                 return int16Value;
             }
-            else if (preferredType == typeof(byte)
+            if (preferredType == typeof(byte)
                 && byte.TryParse(jsonElement.ToString(), NumberStyles.Integer, culture, out byte byteValue))
             {
                 return byteValue;
             }
-            else if (preferredType == typeof(Guid) && jsonElement.TryGetGuid(out Guid guidValue))
+            if (preferredType == typeof(Guid)
+                && jsonElement.TryGetGuid(out Guid guidValue))
             {
                 return guidValue;
             }
-            else if (preferredType == typeof(string))
+            if (preferredType == typeof(string))
             {
                 return jsonElement.ToString();
             }
@@ -74,15 +80,15 @@ public static class JsonElementExtensions
                 {
                     return intValue;
                 }
-                else if (jsonElement.TryGetInt64(out long longValue))
+                if (jsonElement.TryGetInt64(out long longValue))
                 {
                     return longValue;
                 }
-                else if (jsonElement.TryGetDecimal(out decimal decimalValue))
+                if (jsonElement.TryGetDecimal(out decimal decimalValue))
                 {
                     return decimalValue;
                 }
-                else if (jsonElement.TryGetDouble(out double doubleValue))
+                if (jsonElement.TryGetDouble(out double doubleValue))
                 {
                     return doubleValue;
                 }

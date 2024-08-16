@@ -1,5 +1,6 @@
 ﻿using Recrovit.RecroGridFramework.Abstraction.Extensions;
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
@@ -45,23 +46,226 @@ public class RgfDynamicData : IEquatable<RgfDynamicData>
         }
     }
 
-    public string StringValue { get => Value?.ToString(); set => Value = value; }
+    public void SetValueSilently(object value)
+    {
+        lock (_lock)
+        {
+            _value = value;
+        }
+    }
 
-    public short? ShortValue { get => Value as short?; set => Value = value; }
 
-    public int? IntValue { get => (Value as int?) ?? ShortValue; set => Value = value; }
+    public object ObjectValue { get { return Value is JsonElement ? ((JsonElement)Value).ConvertToObject() : Value; } }
 
-    public Int64? Int64Value { get => (Value as Int64?) ?? IntValue; set => Value = value; }
+    public string StringValue
+    {
+        get
+        {
+            if (Value is string value)
+            {
+                return value;
+            }
+            if (Value != null)
+            {
+                try
+                {
+                    return Convert.ToString(Value is JsonElement ? ((JsonElement)Value).ConvertToObject(typeof(string)) : Value);
+                }
+                catch { }
+            }
+            return null;
+        }
+        set => Value = value;
+    }
 
-    public decimal? DecimalValue { get => (Value as decimal?) ?? Int64Value; set => Value = value; }
+    public short? ShortValue
+    {
+        get
+        {
+            if (Value is short value)
+            {
+                return value;
+            }
+            if (Value != null)
+            {
+                try
+                {
+                    return Convert.ToInt16(Value is JsonElement ? ((JsonElement)Value).ConvertToObject(typeof(short)) : Value);
+                }
+                catch { }
+            }
+            return null;
+        }
+        set => Value = value;
+    }
 
-    public float? FloatValue { get => Value as float?; set => Value = value; }
+    public int? IntValue
+    {
+        get
+        {
+            if (Value is int value)
+            {
+                return value;
+            }
+            if (Value != null)
+            {
+                try
+                {
+                    return Convert.ToInt32(Value is JsonElement ? ((JsonElement)Value).ConvertToObject(typeof(int)) : Value);
+                }
+                catch { }
+            }
+            return null;
+        }
+        set => Value = value;
+    }
 
-    public double? DoubleValue { get => (Value as double?) ?? FloatValue; set => Value = value; }
+    public Int64? Int64Value
+    {
+        get
+        {
+            if (Value is Int64 value)
+            {
+                return value;
+            }
+            if (Value != null)
+            {
+                try
+                {
+                    return Convert.ToInt64(Value is JsonElement ? ((JsonElement)Value).ConvertToObject(typeof(Int64)) : Value);
+                }
+                catch { }
+            }
+            return null;
+        }
+        set => Value = value;
+    }
 
-    public DateTime? DateTimeValue { get => Value as DateTime?; set => Value = value; }
+    public decimal? DecimalValue
+    {
+        get
+        {
+            if (Value is decimal value)
+            {
+                return value;
+            }
+            if (Value != null)
+            {
+                try
+                {
+                    return Convert.ToDecimal(Value is JsonElement ? ((JsonElement)Value).ConvertToObject(typeof(decimal)) : Value);
+                }
+                catch { }
+            }
+            return null;
+        }
+        set => Value = value;
+    }
 
-    public bool BooleanValue { get => Value as bool? ?? false; set => Value = value; }
+    public float? FloatValue
+    {
+        get
+        {
+            if (Value is float value)
+            {
+                return value;
+            }
+            if (Value != null)
+            {
+                try
+                {
+                    return Convert.ToSingle(Value is JsonElement ? ((JsonElement)Value).ConvertToObject(typeof(float)) : Value);
+                }
+                catch { }
+            }
+            return null;
+        }
+        set => Value = value;
+    }
+
+    public double? DoubleValue
+    {
+        get
+        {
+            if (Value is double value)
+            {
+                return value;
+            }
+            if (Value != null)
+            {
+                try
+                {
+                    return Convert.ToDouble(Value is JsonElement ? ((JsonElement)Value).ConvertToObject(typeof(double)) : Value);
+                }
+                catch { }
+            }
+            return null;
+        }
+        set => Value = value;
+    }
+
+    public DateTime? DateTimeValue
+    {
+        get
+        {
+            if (Value is DateTime value)
+            {
+                return value;
+            }
+            if (Value != null)
+            {
+                try
+                {
+                    return Convert.ToDateTime(Value is JsonElement ? ((JsonElement)Value).ConvertToObject(typeof(DateTime)) : Value);
+                }
+                catch { }
+            }
+            return null;
+        }
+        set => Value = value;
+    }
+
+    public string[] StringArray
+    {
+        get
+        {
+            if (Value is string[])
+            {
+                return (string[])Value;
+            }
+            if (Value is JsonElement)
+            {
+                var list = ((JsonElement)Value).ConvertToObject() as List<object>;
+                if (list != null)
+                {
+                    return list.Select(e => e.ToString()).ToArray();
+                }
+            }
+            return new string[] { };
+        }
+        set { Value = value; }
+    }
+
+    public bool BooleanValue
+    {
+        get
+        {
+            if (Value is bool value)
+            {
+                return value;
+            }
+            if (Value != null)
+            {
+                try
+                {
+                    return Convert.ToBoolean(Value is JsonElement ? ((JsonElement)Value).ConvertToObject(typeof(bool)) : Value);
+                }
+                catch { }
+            }
+            return false;
+        }
+        set => Value = value;
+    }
 
     public event Action<RgfDynamicData> OnAfterChange;
     public event Func<RgfDynamicData, Task> OnAfterChangeAsync;
@@ -206,7 +410,19 @@ public class RgfDynamicData : IEquatable<RgfDynamicData>
             }
             else if (type == typeof(DateTime) || type == typeof(DateTime?))
             {
-                strValue = ((DateTime)Value).ToUniversalTime().ToString("O");
+                DateTime dateTimeValue = (DateTime)Value;
+                if (dateTimeValue.TimeOfDay == TimeSpan.Zero)
+                {
+                    strValue = dateTimeValue.ToString("yyyy-MM-dd");
+                }
+                else
+                {
+                    if (dateTimeValue.Kind == DateTimeKind.Local)
+                    {
+                        dateTimeValue.ToUniversalTime();
+                    }
+                    strValue = dateTimeValue.ToString("O");
+                }
             }
             else
             {
