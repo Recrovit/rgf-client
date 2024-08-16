@@ -5,7 +5,7 @@
         <li>
             <div class="d-flex flex-row align-items-center">
                 <div class="p-1">
-                    <RgfComboBox TValue="RgfFilter.LogicalOperator" @bind-Value="item.LogicalOperator" Disabled="idx == 0" DataSource="LogicalOperators" />
+                    <RgfComboBox TValue="RgfFilter.LogicalOperator" @bind-Value="item.LogicalOperator" Disabled="idx == 0" DataSource="LogicalOperators" Width="fit-content" />
                 </div>
                 <div class="p-1">
                     <RgfButton IconName="bi-trash" CssClass="btn-outline-secondary p-1" OnClick="() => OnRemoveCondition(item)" />
@@ -36,33 +36,33 @@
                             @switch (prop.ClientDataType)
                             {
                                 case ClientDataType.Integer:
-                                    <RgfInputNumber TValue="int?" @bind-Value="item.IntValue1" />
+                                    <RgfInputNumber TValue="int?" @bind-Value="item.DynValue1.IntValue" />
                                     break;
 
                                 case ClientDataType.Decimal:
-                                    <RgfInputNumber TValue="decimal?" @bind-Value="item.DecimalValue1" HideSpinButton="true" />
+                                    <RgfInputNumber TValue="decimal?" @bind-Value="item.DynValue1.DecimalValue" HideSpinButton="true" />
                                     break;
 
                                 case ClientDataType.Double:
-                                    <RgfInputNumber TValue="double?" @bind-Value="item.DoubleValue1" HideSpinButton="true" />
+                                    <RgfInputNumber TValue="double?" @bind-Value="item.DynValue1.DoubleValue" HideSpinButton="true" />
                                     break;
 
                                 case ClientDataType.DateTime:
-                                    <RgfInputDate TValue="DateTime?" DateType="prop.FormType == PropertyFormType.Date ? InputDateType.Date : InputDateType.DateTimeLocal" @bind-Value="item.DateTimeValue1" />
+                                    <RgfInputDate TValue="DateTime?" DateType="prop.FormType == PropertyFormType.Date ? InputDateType.Date : InputDateType.DateTimeLocal" @bind-Value="item.DynValue1.DateTimeValue" />
                                     break;
 
                                 case ClientDataType.Boolean:
-                                    <RgfCheckBox @bind-Value="item.BooleanValue1" />
+                                    <RgfCheckBox @bind-Value="item.DynValue1.BooleanValue" />
                                     break;
 
                                 default:
                                     if (prop.FormType == PropertyFormType.DropDown || prop.FormType == PropertyFormType.ListBox)
                                     {
-                                        <RgfComboBox TValue="string" @bind-Values="item.StringArray1" DataSource="prop.Dictionary" Resizable="true" />
+                                        <RgfListBox TValue="string" @bind-Values="item.DynValue1.StringArray" DataSource="prop.Dictionary" Resizable="true" />
                                     }
                                     else
                                     {
-                                        <RgfInputText @bind-Value="item.StringValue1" />
+                                        <RgfInputText @bind-Value="item.DynValue1.StringValue" />
                                     }
                                     break;
                             }
@@ -74,23 +74,23 @@
                                 @switch (prop.ClientDataType)
                                 {
                                     case ClientDataType.Integer:
-                                        <RgfInputNumber TValue="int?" @bind-Value="item.IntValue2" />
+                                        <RgfInputNumber TValue="int?" @bind-Value="item.DynValue2.IntValue" />
                                         break;
 
                                     case ClientDataType.Decimal:
-                                        <RgfInputNumber TValue="decimal?" @bind-Value="item.DecimalValue2" HideSpinButton="true" />
+                                        <RgfInputNumber TValue="decimal?" @bind-Value="item.DynValue2.DecimalValue" HideSpinButton="true" />
                                         break;
 
                                     case ClientDataType.Double:
-                                        <RgfInputNumber TValue="double?" @bind-Value="item.DoubleValue2" HideSpinButton="true" />
+                                        <RgfInputNumber TValue="double?" @bind-Value="item.DynValue2.DoubleValue" HideSpinButton="true" />
                                         break;
 
                                     case ClientDataType.DateTime:
-                                        <RgfInputDate TValue="DateTime?" DateType="prop.FormType == PropertyFormType.Date ? InputDateType.Date : InputDateType.DateTimeLocal" @bind-Value="item.DateTimeValue2" />
+                                        <RgfInputDate TValue="DateTime?" DateType="prop.FormType == PropertyFormType.Date ? InputDateType.Date : InputDateType.DateTimeLocal" @bind-Value="item.DynValue2.DateTimeValue" />
                                         break;
 
                                     default:
-                                        <RgfInputText @bind-Value="item.StringValue2" />
+                                        <RgfInputText @bind-Value="item.DynValue2.StringValue" />
                                         break;
                                 }
                             </div>

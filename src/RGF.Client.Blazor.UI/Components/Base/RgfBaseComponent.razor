@@ -84,4 +84,18 @@
             _attributes["style"] = style;
         }
     }
+
+    protected string? GetAttribute(string key)
+    {
+        if (_attributes == null)
+        {
+            return null;
+        }
+
+        if (_attributes.TryGetValue(key, out var value))
+        {
+            return value?.ToString();
+        }
+        return null;
+    }
 }

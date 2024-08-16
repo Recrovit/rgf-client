@@ -4,38 +4,12 @@
 }
 @if (!AllowCustom && DataSource != null)
 {
-    if (Values != null)
-    {
-        <InputSelect TValue="TValue[]" Value="@Values" ValueExpression="ValuesExpression" ValueChanged="OnValuesChanged" DisplayName="@DisplayName" AdditionalAttributes="_attributes">
-            @foreach (var option in DataSource)
-            {
-                if (option.Key != null && Values.Any(e => option.Key.Equals(e)))
-                {
-                    <option value="@option.Key" selected>@option.Value</option>
-                }
-                else
-                {
-                    <option value="@option.Key">@option.Value</option>
-                }
-            }
-        </InputSelect>
-    }
-    else
-    {
-        <InputSelect TValue="TValue" Value="@Value" ValueExpression="ValueExpression" ValueChanged="OnValueChanged" DisplayName="@DisplayName" AdditionalAttributes="_attributes">
-            @foreach (var option in DataSource)
-            {
-                if (option.Key?.Equals(Value) == true)
-                {
-                    <option value="@option.Key" selected>@option.Value</option>
-                }
-                else
-                {
-                    <option value="@option.Key">@option.Value</option>
-                }
-            }
-        </InputSelect>
-    }
+    <InputSelect TValue="TValue" Value="@Value" ValueExpression="ValueExpression" ValueChanged="OnValueChanged" DisplayName="@DisplayName" AdditionalAttributes="_attributes">
+        @foreach (var option in DataSource)
+        {
+            <option value="@option.Key" selected="@(option.Key?.Equals(Value) == true)">@option.Value</option>
+        }
+    </InputSelect>
 }
 else
 {
@@ -53,14 +27,7 @@ else
         <datalist id="@_datalistId">
             @foreach (var option in Items)
             {
-                if (option?.Equals(Value) == true)
-                {
-                    <option value="@option" selected></option>
-                }
-                else
-                {
-                    <option value="@option"></option>
-                }
+                <option value="@option" selected="@(option?.Equals(Value) == true)"></option>
             }
         </datalist>
     }
@@ -81,24 +48,6 @@ else
 
     [Parameter]
     public bool AllowCustomAutoSelect { get; set; } = default;
-
-    [Parameter]
-    public bool Multiple { get; set; } = default;
-
-    [Parameter]
-    public TValue[]? Values { get; set; }
-
-    [Parameter]
-    public System.Linq.Expressions.Expression<Func<TValue[]>>? ValuesExpression { get; set; }
-
-    [Parameter]
-    public EventCallback<ChangeEventArgs<TValue[]>> OnValuesChanging { get; set; }
-
-    [Parameter]
-    public EventCallback<TValue[]> ValuesChanged { get; set; }
-
-    [Parameter]
-    public bool Resizable { get; set; } = default;
 
     private string? _datalistId { get; set; }
 
@@ -121,29 +70,7 @@ else
             DataSource = Items.Select(e => new KeyValuePair<TValue, string>(e, e?.ToString() ?? string.Empty)).ToList();
         }
 
-        if (string.IsNullOrEmpty(Id) && Resizable)
-        {
-            Id = GetNextId();
-        }
-
         base.OnParametersSet();
-    }
-
-    protected void OnValuesChanged(TValue[] values)
-    {
-        var arg = new ChangeEventArgs<TValue[]>(Values!, values!);
-        if (OnValuesChanging.HasDelegate)
-        {
-            OnValuesChanging.InvokeAsync(arg);
-        }
-        if (!arg.Cancel)
-        {
-            Values = values;
-            if (ValuesChanged.HasDelegate)
-            {
-                ValuesChanged.InvokeAsync(values);
-            }
-        }
     }
 
     private void OnInput(ChangeEventArgs args)
@@ -166,10 +93,6 @@ else
             if (DataSource != null && !DataSource.Any(e => e.Key?.Equals(Value) == true))
             {
                 await _jsRuntime.InvokeVoidAsync("eval", $"$('#{this.Id}').val('');");
-            }
-            if (this.Resizable)
-            {
-                await _jsRuntime.InvokeVoidAsync("eval", $"$('#{this.Id}').resizable();");
             }
         }
     }

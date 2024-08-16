@@ -1,5 +1,5 @@
 ﻿/*!
-* recrovit-rgf-blazor-ui.js v1.0.6
+* recrovit-rgf-blazor-ui.js v1.1.0
 */
 
 window.Recrovit = window.Recrovit || {};
@@ -87,6 +87,29 @@ Blazor.UI = {
             rgfTable.makeColumnsDragable(function (idx, newIdx) {
                 if (idx != newIdx && idx + 1 != newIdx) {
                     gridRef.invokeMethodAsync('SetColumnPos', idx, newIdx > idx ? newIdx - 1 : newIdx);
+                }
+            });
+        }
+    },
+    ListBox: {
+        resizable: function (listBoxId, width, height) {
+            var element = $(`#${listBoxId}`);
+            if (width == null) {
+                element.width(element.width());
+            }
+            if (height == null) {
+                element.height(element.height());
+            }
+            var outerWidth = element.outerWidth() + 29;
+            var outerHeight = element.outerHeight() + 26;
+            element.resizable({
+                minWidth: 130,
+                minHeight: 61,
+                create: function (event, ui) {
+                    $(this).resizable("resizeTo", { width: outerWidth, height: outerHeight });
+                },
+                stop: function (event, ui) {
+                    $(this).css({ width: '', height: '' });
                 }
             });
         }

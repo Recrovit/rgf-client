@@ -1,0 +1,96 @@
+﻿@if (!string.IsNullOrEmpty(Label))
+{
+    <label for="@Id" class="@($"form-label {LabelCssClass ?? ""}".TrimEnd())">@Label</label>
+}
+<select multiple @onchange="OnValuesChanged" @attributes="_attributes">
+    @foreach (var option in DataSource)
+    {
+        <option value="@option.Key" selected="@(Values?.Any(e => e?.Equals(option.Key) == true) == true)">@option.Value</option>
+    }
+</select>
+
+@typeparam TValue
+@inherits RgfInput<TValue>
+@implements IAsyncDisposable
+@inject IJSRuntime _jsRuntime
+@code {
+
+    [Parameter]
+    public IEnumerable<KeyValuePair<TValue, string>> DataSource { get; set; } = default!;
+
+    [Parameter]
+    public IEnumerable<TValue>? Items { get; set; }
+
+    [Parameter]
+    public bool Multiple { get; set; } = default;
+
+    [Parameter]
+    public TValue[]? Values { get; set; }
+
+    [Parameter]
+    public EventCallback<ChangeEventArgs<TValue[]>> OnValuesChanging { get; set; }
+
+    [Parameter]
+    public EventCallback<TValue[]> ValuesChanged { get; set; }
+
+    [Parameter]
+    public bool Resizable { get; set; } = default;
+
+    private string? _datalistId { get; set; }
+
+    protected override void OnParametersSet()
+    {
+        _baseCssClass = "form-select form-select-sm";
+
+        if (DataSource == null && Items != null)
+        {
+            DataSource = Items.Select(e => new KeyValuePair<TValue, string>(e, e?.ToString() ?? string.Empty)).ToList();
+        }
+
+        if (Resizable && string.IsNullOrEmpty(Id))
+        {
+            Id = GetNextId();
+        }
+
+        base.OnParametersSet();
+    }
+
+    private async Task OnValuesChanged(ChangeEventArgs args)
+    {
+        var values = (args.Value as string[])?.Select(x => (TValue)Convert.ChangeType(x, typeof(TValue))).ToArray() ?? [];
+        var arg = new ChangeEventArgs<TValue[]>(Values!, values!);
+        if (OnValuesChanging.HasDelegate)
+        {
+            await OnValuesChanging.InvokeAsync(arg);
+        }
+        if (!arg.Cancel)
+        {
+            Values = values;
+            if (ValuesChanged.HasDelegate)
+            {
+                await ValuesChanged.InvokeAsync(values);
+            }
+            StateHasChanged();
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await base.OnAfterRenderAsync(firstRender);
+        if (firstRender && this.Id != null)
+        {
+            if (this.Resizable)
+            {
+                await _jsRuntime.InvokeVoidAsync(RGFClientBlazorUIConfiguration.JsBlazorUiNamespace + ".ListBox.resizable", this.Id, this.Width, this.Height);
+            }
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (this.Resizable)
+        {
+            await _jsRuntime.InvokeVoidAsync("eval", $"$('#{this.Id}').resizable('destroy');");
+        }
+    }
+}
