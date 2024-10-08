@@ -216,12 +216,9 @@ public class RgfProperty : IRgfProperty
 
 public class GridColumnSettings : RgfColumnSettings
 {
-    public GridColumnSettings(RgfProperty property)
+    public GridColumnSettings(RgfProperty property) : base(property)
     {
         Property = property;
-        Id = property.Id;
-        ColPos = property.ColPos == 0 ? null : property.ColPos;
-        ColWidth = property.ColWidth == 0 ? null : property.ColWidth;
         CssClass = GetCssClass();
     }
 

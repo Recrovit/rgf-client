@@ -10,6 +10,7 @@ public enum RgfPermissionType
     QuickWatch = 1002,
     PredefFilterAdmin = 1003,
     Export = 1004,
+    PublicGridSetting = 1005,
 
     FEPApprove = 1101,
     FEPReject = 1102,

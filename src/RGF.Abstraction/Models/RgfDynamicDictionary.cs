@@ -229,30 +229,33 @@ public static class RgfDynamicDictionaryExtension
         var invalid = new List<string>();
         var missing = new List<string>();
         var missingPrimitive = new List<string>();
-        IEnumerable<PropertyInfo> properties = dataType.GetProperties(BindingFlags.Public | BindingFlags.Instance).Where(p => p.CanWrite);
-        var names = self.GetDynamicMemberNames().ToArray();
-        foreach (var prop in properties)
+        if (dataRec != null)
         {
-            try
+            IEnumerable<PropertyInfo> properties = dataType.GetProperties(BindingFlags.Public | BindingFlags.Instance).Where(p => p.CanWrite);
+            var names = self.GetDynamicMemberNames().ToArray();
+            foreach (var prop in properties)
             {
-                var name = names.SingleOrDefault(e => e.Equals(prop.Name, comparisonType));
-                if (name != null)
+                try
                 {
-                    var data = self.GetMember(name);
-                    prop.SetValue(dataRec, data);
-                }
-                else
-                {
-                    missing.Add(prop.Name);
-                    if (prop.PropertyType.IsPrimitive)
+                    var name = names.SingleOrDefault(e => e.Equals(prop.Name, comparisonType));
+                    if (name != null)
                     {
-                        missingPrimitive.Add(prop.Name);
+                        var data = self.GetMember(name);
+                        prop.SetValue(dataRec, data);
+                    }
+                    else
+                    {
+                        missing.Add(prop.Name);
+                        if (prop.PropertyType.IsPrimitive)
+                        {
+                            missingPrimitive.Add(prop.Name);
+                        }
                     }
                 }
-            }
-            catch
-            {
-                invalid.Add(prop.Name);
+                catch
+                {
+                    invalid.Add(prop.Name);
+                }
             }
         }
         return (invalid, missing, missingPrimitive);
