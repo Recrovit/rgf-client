@@ -18,3 +18,12 @@ div.spinner-flex {
     height: 100%;
     width: 100%;
 }
+
+div.rgf-cell-tooltip {
+    max-width: 50%;
+}
+
+    div.rgf-cell-tooltip .tooltip-inner {
+        width: fit-content;
+        max-width: 800px;
+    }

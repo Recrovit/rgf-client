@@ -3,37 +3,32 @@
         <FilterConditionComponent FilterComponent="RgfFilterComp" Condition="RgfFilterComp.Condition" />
     </FilterTemplate>
     <FooterTemplate Context="RgfFilterComp">
-        <div class="d-flex flex-row justify-content-start align-items-center">
-            <div class="p-1">
-                <label class="col-form-label text-nowrap">Query timeout</label>
+        <div class="rg-filter-settings">
+            <div class="rg-filter-sqltimeout">
+                <label class="col-form-label text-nowrap pe-1">Query timeout</label>
+                <RgfInputNumber TValue="int?" @bind-Value="RgfFilterComp.PredefinedFilter.QueryTimeout" HideSpinButton="true" Min="0" />
             </div>
-            <div class="p-1">
-                <RgfInputNumber TValue="int?" @bind-Value="RgfFilterComp.PredefinedFilter.QueryTimeout" HideSpinButton="true" Width="3rem" Min="0" />
+            <div class="rg-predef-name input-group input-group-sm">
+                <RgfComboBox TValue="string" Value="@RgfFilterComp.PredefinedFilterName" AllowCustom="true"
+                             DataSource="RgfFilterComp.FilterHandler.PredefinedFilters.Select(e=> new KeyValuePair<string, string>(e.Key, e.Name))"
+                             InputChanged="OnInputChanged" />
             </div>
-
-            <div class="p-1">
-                <RgfComboBox TValue="string" @bind-Value="RgfFilterComp.PredefinedFilterName" AllowCustom="true" AllowCustomAutoSelect="true"
-                             Items="RgfFilterComp.FilterHandler.PredefinedFilters.Select(e=> e.Name)"
-                             OnValueChanging="OnValueChanging" />
-            </div>
-            <div class="p-1">
-                <label class="col-form-label text-nowrap">@RecroDict.GetRgfUiString("Public")</label>
-            </div>
-            <div class="p-1 checkbox-lg">
-                <RgfCheckBox @bind-Value=RgfFilterComp.PredefinedFilter.IsGlobal Disabled="!RgfFilterComp.IsPredefinedFilterAdmin" Reverse="true" />
-            </div>
-            <div class="p-1">
-                <RgfButton IconName="bi-save" CssClass="btn-outline-primary" Title="@RecroDict.GetRgfUiString("Save")"
-                           Disabled="string.IsNullOrEmpty(RgfFilterComp.PredefinedFilter.Name) || !RgfFilterComp.IsPredefinedFilterAdmin && RgfFilterComp.PredefinedFilter.IsGlobal"
-                           OnClick="() => RgfFilterComp.OnSavePredefinedFilter()" />
-            </div>
-            <div class="pt-1 pb-1">
-                <RgfButton IconName="bi-trash" CssClass="btn-outline-primary" Title="@RecroDict.GetRgfUiString("Delete")"
-                           Disabled="string.IsNullOrEmpty(RgfFilterComp.PredefinedFilter.Key) || !RgfFilterComp.IsPredefinedFilterAdmin && RgfFilterComp.PredefinedFilter.IsGlobal"
-                           OnClick="() => RgfFilterComp.OnDeletePredefinedFilter()" />
+            <div class="rg-predef-save">
+                <div class="p-1">
+                    <RgfCheckBox Label="@RecroDict.GetRgfUiString("Public")" Reverse="true" WrapperCssClass="d-flex flex-row-reverse align-items-center"
+                                 @bind-Value="RgfFilterComp.PredefinedFilter.IsGlobal" Disabled="!RgfFilterComp.IsPredefinedFilterAdmin" />
+                </div>
+                <div>
+                    <RgfButton IconName="bi-floppy" CssClass="btn-success" Title="@RecroDict.GetRgfUiString("Save")"
+                               Disabled="string.IsNullOrEmpty(RgfFilterComp.PredefinedFilter.Name) || !RgfFilterComp.IsPredefinedFilterAdmin && RgfFilterComp.PredefinedFilter.IsGlobal"
+                               OnClick="() => RgfFilterComp.OnSavePredefinedFilter()" />
+                    <RgfButton IconName="bi-trash" CssClass="btn-danger" Title="@RecroDict.GetRgfUiString("Delete")"
+                               Disabled="string.IsNullOrEmpty(RgfFilterComp.PredefinedFilter.Key) || !RgfFilterComp.IsPredefinedFilterAdmin && RgfFilterComp.PredefinedFilter.IsGlobal"
+                               OnClick="() => RgfFilterComp.OnDeletePredefinedFilter()" />
+                </div>
             </div>
         </div>
-        <div class="d-flex flex-row justify-content-between align-items-center mt-1">
+        <div class="rg-filter-save">
             <div class="p-1 checkbox-lg">
                 <RgfCheckBox Switch="true" @bind-Value="RgfFilterComp.IsFilterActive" Label="@($"{RecroDict.GetRgfUiString("Off")}/{RecroDict.GetRgfUiString("On")}")" />
             </div>
@@ -60,9 +55,8 @@
 
     private RgfFilterComponent _rgfFilterRef { get; set; } = null!;
 
-    private void OnValueChanging(ChangeEventArgs<string> args)
+    private void OnInputChanged(KeyValuePair<object?, string> item)
     {
-        var filter = _rgfFilterRef.FilterHandler.PredefinedFilters.FirstOrDefault(e => e.Name == args.NewValue);
-        _rgfFilterRef.OnSetPredefinedFilter(filter?.Key ?? args.NewValue);
+        _rgfFilterRef.OnSetPredefinedFilter(item.Key?.ToString(), item.Value);
     }
 }

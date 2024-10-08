@@ -2,7 +2,7 @@
 {
     <label for="@Id" class="@($"form-label {LabelCssClass ?? ""}".TrimEnd())">@Label</label>
 }
-@if (!AllowCustom && DataSource != null)
+@if (!AllowCustom)
 {
     <InputSelect TValue="TValue" Value="@Value" ValueExpression="ValueExpression" ValueChanged="OnValueChanged" DisplayName="@DisplayName" AdditionalAttributes="_attributes">
         @foreach (var option in DataSource)
@@ -13,29 +13,18 @@
 }
 else
 {
-    if (IsNumericType)
-    {
-        <InputNumber TValue="TValue" Value="@Value" ValueExpression="ValueExpression" ValueChanged="OnValueChanged" DisplayName="@DisplayName" AdditionalAttributes="_attributes" />
-    }
-    else
-    {
-        @*<InputText Value="@(Value.ToString())" ValueExpression="() => (string)Convert.ChangeType(Value, typeof(string))" ValueChanged="(value) => OnValueChanged((TValue?)Convert.ChangeType(value, typeof(TValue)))" DisplayName="@DisplayName" AdditionalAttributes="_attributes" />*@
-        <input type="text" value="@Value" @onchange="(arg) => OnValueChanged((TValue?)Convert.ChangeType(arg.Value, typeof(TValue)))" @attributes="_attributes" />
-    }
-    if (Items != null)
-    {
-        <datalist id="@_datalistId">
-            @foreach (var option in Items)
-            {
-                <option value="@option" selected="@(option?.Equals(Value) == true)"></option>
-            }
-        </datalist>
-    }
+    <select value="@Value" @attributes="_attributes">
+        @foreach (var option in DataSource)
+        {
+            <option value="@option.Key" selected="@(option.Key?.Equals(Value) == true)">@option.Value</option>
+        }
+    </select>
 }
 
 @typeparam TValue
 @inherits RgfInput<TValue>
 @inject IJSRuntime _jsRuntime
+@implements IAsyncDisposable
 @code {
     [Parameter]
     public IEnumerable<KeyValuePair<TValue, string>> DataSource { get; set; } = default!;
@@ -44,56 +33,163 @@ else
     public IEnumerable<TValue>? Items { get; set; }
 
     [Parameter]
+    public string? Text { get; set; } = null;
+
+    [Parameter]
+    public EventCallback<string> TextChanged { get; set; }
+
+    [Parameter]
+    public EventCallback<KeyValuePair<object?, string>> InputChanged { get; set; }
+
+    [Parameter]
     public bool AllowCustom { get; set; } = default;
 
     [Parameter]
     public bool AllowCustomAutoSelect { get; set; } = default;
 
-    private string? _datalistId { get; set; }
+    private DotNetObjectReference<RgfComboBox<TValue>>? _selfRef { get; set; }
+
+    protected override void OnInitialized()
+    {
+        this.Id = GetNextId();
+        base.OnInitialized();
+    }
 
     protected override void OnParametersSet()
     {
+        AdditionalAttributes["rgf-bs-combobox"] = "";
         _baseCssClass = "form-select form-select-sm";
 
-        if (AllowCustom)
+        if (DataSource == null)
         {
-            _baseCssClass = "form-control form-control-sm hide-spin-button";
-            _datalistId = Guid.NewGuid().ToString("N");
-            AdditionalAttributes["list"] = _datalistId;
-            if (AllowCustomAutoSelect)
+            if (Items != null)
             {
-                AdditionalAttributes["oninput"] = EventCallback.Factory.Create(this, OnInput);
+                DataSource = Items.Select(e => new KeyValuePair<TValue, string>(e, e?.ToString() ?? string.Empty)).ToList();
             }
-        }
-        else if (DataSource == null && Items != null)
-        {
-            DataSource = Items.Select(e => new KeyValuePair<TValue, string>(e, e?.ToString() ?? string.Empty)).ToList();
+            else
+            {
+                DataSource = [];
+            }
         }
 
         base.OnParametersSet();
     }
 
-    private void OnInput(ChangeEventArgs args)
+    protected override async Task OnParametersSetAsync()
     {
-        if (Items?.Any() == true)
+        await base.OnParametersSetAsync();
+
+        if (_selfRef != null && Text != null)
         {
-            var item = Items.FirstOrDefault(e => e!.Equals(args.Value));
-            if (item != null)
-            {
-                OnValueChanged(item);
-            }
+            await _jsRuntime.InvokeVoidAsync(RGFClientBlazorUIConfiguration.JsBlazorUiNamespace + ".ComboBox.setText", this.Id, this.Text);
         }
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         await base.OnAfterRenderAsync(firstRender);
-        if (firstRender && this.Id != null)
+        if (firstRender)
         {
-            if (DataSource != null && !DataSource.Any(e => e.Key?.Equals(Value) == true))
+            if (!DataSource.Any(e => e.Key?.Equals(Value) == true))
             {
                 await _jsRuntime.InvokeVoidAsync("eval", $"$('#{this.Id}').val('');");
             }
+        }
+        if (AllowCustom && _selfRef == null)
+        {
+            _selfRef = DotNetObjectReference.Create(this);
+            await _jsRuntime.InvokeVoidAsync(RGFClientBlazorUIConfiguration.JsBlazorUiNamespace + ".ComboBox.initialize", _selfRef, this.Id, this.Text, this.Width);
+        }
+    }
+
+    protected async Task OnValueChangedAsync(KeyValuePair<TValue, string> value)
+    {
+        if (Text != value.Value)
+        {
+            Text = value.Value;
+            await TextChanged.InvokeAsync(value.Value);
+        }
+        ValueChanging(value.Key);
+        await InputChanged.InvokeAsync(new KeyValuePair<object?, string>(Value, Text));
+    }
+
+    public bool FindItem(string text, out KeyValuePair<TValue, string> data)
+    {
+        if (text != null)
+        {
+            foreach (var item in DataSource)
+            {
+                if (text.Equals(item.Value?.ToString(), StringComparison.OrdinalIgnoreCase))
+                {
+                    data = item;
+                    return true;
+                }
+            }
+        }
+        data = default;
+        return false;
+    }
+
+    [JSInvokable]
+    public async Task OnSelected(string key)
+    {
+        if (key != null)
+        {
+            foreach (var item in DataSource)
+            {
+                if (key.Equals(item.Key?.ToString(), StringComparison.OrdinalIgnoreCase))
+                {
+                    await OnValueChangedAsync(item);
+                    break;
+                }
+            }
+        }
+    }
+
+    [JSInvokable]
+    public async Task OnEnter(string text)
+    {
+        if (text != null)
+        {
+            if (FindItem(text, out var item))
+            {
+                await OnValueChangedAsync(item);
+                return;
+            }
+            try
+            {
+                var value = (TValue)Convert.ChangeType(text, typeof(TValue));
+                await OnValueChangedAsync(new KeyValuePair<TValue, string>(value, text));
+            }
+            catch { }
+        }
+    }
+
+    [JSInvokable]
+    public async Task OnChanged(string text)
+    {
+        if (AllowCustomAutoSelect)
+        {
+            if (FindItem(text, out var item))
+            {
+                await OnValueChangedAsync(item);
+                return;
+            }
+        }
+        if (Text != text)
+        {
+            Text = text;
+            await TextChanged.InvokeAsync(text);
+            await InputChanged.InvokeAsync(new KeyValuePair<object?, string>(null, text));
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_selfRef != null)
+        {
+            await _jsRuntime.InvokeVoidAsync(RGFClientBlazorUIConfiguration.JsBlazorUiNamespace + ".ComboBox.destroy", this.Id);
+            _selfRef.Dispose();
         }
     }
 }

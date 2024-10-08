@@ -31,13 +31,16 @@
                     int index = 0;
                     foreach (var rowData in RgfGrid.GridData)
                     {
-                        int currIdx = index++;
+                        int rowIdx = index++;
                         var attributes = rowData.Get<RgfDynamicDictionary>("__attributes");
-                        <tr @ref="_rowRef[currIdx]" class="@(attributes?.Get<string>("class"))" style="@(attributes?.Get<string>("style"))" @onclick="(arg) => OnRowClick(arg, rowData, currIdx)">
+                        <tr @ref="_rowRef[rowIdx]" data-row="@rowIdx" class="@(attributes?.Get<string>("class"))" style="@(attributes?.Get<string>("style"))" @onclick="(arg) => OnRowClick(arg, rowData, rowIdx)">
                             @foreach (var prop in EntityDesc.SortedVisibleColumns)
                             {
                                 var propAttributes = attributes?.Get<RgfDynamicDictionary>(prop.Alias);
-                                <td class="@(propAttributes?.Get<string>("class"))" style="@(propAttributes?.Get<string>("style"))">
+                                <td data-cell="@prop.Id"
+                                    class="@(propAttributes?.Get<string>("class"))"
+                                    style="@(propAttributes?.Get<string>("style"))"
+                                    data-bs-toggle="@(propAttributes?.Get<string?>("data-bs-toggle"))">
                                     @RgfGrid.CreateGridColumn(prop, (RgfDynamicDictionary)rowData)
                                 </td>
                             }

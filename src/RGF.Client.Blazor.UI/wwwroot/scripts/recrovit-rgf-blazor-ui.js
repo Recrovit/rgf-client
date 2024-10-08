@@ -1,5 +1,5 @@
 ﻿/*!
-* recrovit-rgf-blazor-ui.js v1.1.0
+* recrovit-rgf-blazor-ui.js v1.3.0
 */
 
 window.Recrovit = window.Recrovit || {};
@@ -89,6 +89,32 @@ Blazor.UI = {
                     gridRef.invokeMethodAsync('SetColumnPos', idx, newIdx > idx ? newIdx - 1 : newIdx);
                 }
             });
+            BlazorGrids.initializeTooltips(gridRef);
+        },
+        initializeTooltips: function (gridRef) {
+            var tooltipTriggerArr = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+            tooltipTriggerArr.forEach(function (element) {
+                var tooltip = new bootstrap.Tooltip(element, {
+                    title: element.innerText,
+                    customClass: 'rgf-cell-tooltip',
+                    trigger: 'hover',
+                    delay: { show: 500 },
+                    html: true
+                });
+                element.addEventListener('show.bs.tooltip', async function () {
+                    if (tooltip.tooltipText == null)
+                    {
+                        var col = $(this).attr('data-cell');
+                        var rowIdx = $(this).parent('tr').attr('data-row');
+                        tooltip.tooltipText = await gridRef.invokeMethodAsync('GetTooltipText', parseInt(rowIdx), parseInt(col));
+                        if (tooltip.tooltipText == null) {
+                            tooltip.tooltipText = this.innerText;
+                        }
+                        tooltip.setContent({ '.tooltip-inner': tooltip.tooltipText })
+                    }
+                    setTimeout(function () { tooltip.hide(); }, 8000);
+                });
+            });
         }
     },
     ListBox: {
@@ -113,5 +139,44 @@ Blazor.UI = {
                 }
             });
         }
+    },
+    ComboBox: {
+        initialize: function (dotNetRef, comboBoxId, value, width) {
+            var combo = $(`#${comboBoxId}`).rgcombobox({
+                value: value,
+                inputClass: 'rgf-combobox-edit form-control form-control-sm',
+                button: '<button class="rgf-combobox-button btn btn-outline-secondary" type="button" rg-combobox=""><i class="bi bi-caret-down-fill"></i></button>',
+                noWrapper: true,
+                calcWidth: false,
+                width: width
+            });
+            combo.rgcombobox('instance').input.autocomplete('widget').css('z-index', 5000);
+            combo.on('change.RGF-Client-Blazor-UI', function (event) {
+                var $this = $(this);
+                if (event.originalEvent?.type == 'keyup' && event.originalEvent?.key == "Enter") {
+                    var text = $this.rgcombobox("instance").input.val();
+                    dotNetRef.invokeMethodAsync('OnEnter', text);
+                }
+                else {
+                    var selected = $this.find(":selected");
+                    if (selected.length == 1) {
+                        var value = selected.val();
+                        dotNetRef.invokeMethodAsync('OnSelected', value);
+                    }
+                    else {
+                        var text = $this.rgcombobox("instance").input.val();
+                        dotNetRef.invokeMethodAsync('OnChanged', text);
+                    }
+                }
+            });
+        },
+        setText: function (comboBoxId, text) {
+            $(`#${comboBoxId}`).rgcombobox("instance").input.val(text);
+        },
+        destroy: function (comboBoxId) {
+            $(`#${comboBoxId}`).off('change.RGF-Client-Blazor-UI').rgcombobox("destroy");
+        }
     }
 };
+
+const BlazorGrids = Blazor.UI.Grid;

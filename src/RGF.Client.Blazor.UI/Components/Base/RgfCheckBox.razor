@@ -1,5 +1,4 @@
-﻿
-<div class="@_formClass">
+﻿<div class="@_formClass">
     <InputCheckbox Value="@Value" ValueExpression="ValueExpression" ValueChanged="OnValueChanged" DisplayName="@DisplayName" AdditionalAttributes="_attributes" />
     @if (!string.IsNullOrEmpty(Label))
     {
@@ -16,23 +15,31 @@
     [Parameter]
     public bool Reverse { get; set; } = default;
 
+    [Parameter]
+    public string? WrapperCssClass { get; set; }
+
     private string _formClass { get; set; } = default!;
 
     protected override void OnParametersSet()
     {
         AdditionalAttributes["rgf-bs-checkbox"] = "";
-        if(Readonly)
+        if (Readonly)
         {
             Disabled = true;
         }
         _formClass = Switch ? "text-nowrap form-check form-switch" : "text-nowrap form-check";
 
-        if(Reverse)
+        if (!string.IsNullOrEmpty(WrapperCssClass))
+        {
+            _formClass += " " + WrapperCssClass;
+        }
+
+        if (Reverse)
         {
             _formClass += " form-check-reverse";
-            if (string.IsNullOrEmpty(LabelCssClass) || !LabelCssClass.Contains("pe-1"))
+            if (LabelCssClass?.Contains("pe-1") != true)
             {
-                LabelCssClass = string.IsNullOrEmpty(LabelCssClass) ? "pe-1" : " pe-1";
+                LabelCssClass = ("pe-1 " + (LabelCssClass ?? "")).Trim();
             }
         }
 

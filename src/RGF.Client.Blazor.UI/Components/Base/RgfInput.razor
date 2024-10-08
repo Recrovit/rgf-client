@@ -25,7 +25,9 @@
         base.OnInitialized();
     }
 
-    protected void OnValueChanged(TValue value)
+    protected void OnValueChanged(TValue value) => ValueChanging(value);
+
+    protected bool ValueChanging(TValue value)
     {
         if (Value == null && value != null || Value?.Equals(value) == false)
         {
@@ -41,7 +43,9 @@
                 {
                     ValueChanged.InvokeAsync(value);
                 }
+                return true;
             }
         }
+        return false;
     }
 }

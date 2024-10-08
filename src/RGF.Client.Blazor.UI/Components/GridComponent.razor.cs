@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.Logging;
 using Microsoft.JSInterop;
 using Recrovit.RecroGridFramework.Abstraction.Contracts.Services;
+using Recrovit.RecroGridFramework.Abstraction.Extensions;
 using Recrovit.RecroGridFramework.Abstraction.Models;
 using Recrovit.RecroGridFramework.Client.Blazor.Components;
 using Recrovit.RecroGridFramework.Client.Events;
@@ -72,6 +73,22 @@ public partial class GridComponent : ComponentBase, IDisposable
     [JSInvokable]
     public Task SetColumnPos(int from, int to) => ListHandler.MoveColumnAsync(from, to);
 
+    [JSInvokable]
+    public string? GetTooltipText(int rowIndex, int colId)
+    {
+        var tooltip = _rgfGridRef.GetColumnData(rowIndex, colId)?.ToString();
+        if (string.IsNullOrEmpty(tooltip))
+        {
+            return null;
+        }
+        var prop = EntityDesc.Properties.FirstOrDefault(e => e.Id == colId);
+        if (prop?.ListType == PropertyListType.String)
+        {
+            tooltip = tooltip?.Replace(Environment.NewLine, "<br>");
+        }
+        return tooltip;
+    }
+
     protected virtual async Task OnChangedGridData(ObservablePropertyEventArgs<List<RgfDynamicDictionary>> args)
     {
         await _jsRuntime.InvokeVoidAsync(RGFClientBlazorUIConfiguration.JsBlazorUiNamespace + ".Grid.deselectAllRow", _tableRef);
@@ -105,11 +122,19 @@ public partial class GridComponent : ComponentBase, IDisposable
                         break;
                 }
             }
+            var attributes = rowData.GetOrNew<RgfDynamicDictionary>("__attributes");
+            var propAttributes = attributes.GetOrNew<RgfDynamicDictionary>(prop.Alias);
             if (propClass != null)
             {
-                var attributes = rowData.GetOrNew<RgfDynamicDictionary>("__attributes");
-                var propAttributes = attributes.GetOrNew<RgfDynamicDictionary>(prop.Alias);
                 propAttributes.Set<string>("class", (old) => string.IsNullOrEmpty(old) ? propClass : $"{old.Trim()} {propClass}");
+            }
+            if (prop.Options?.GetBoolValue("RGO_EnableGridDataTooltip") == true)
+            {
+                var tt = rowData.GetMember(prop.Alias)?.ToString();
+                if (!string.IsNullOrEmpty(tt))
+                {
+                    propAttributes.SetMember("data-bs-toggle", "tooltip");
+                }
             }
         }
         return Task.CompletedTask;

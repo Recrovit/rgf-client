@@ -45,7 +45,7 @@
                         <li>
                             <div class="input-group input-group-sm">
                                 <label class="input-group-text">@RecroDict.GetRgfUiString("ItemsPerPage")</label>
-                                <RgfComboBox TValue="int" Items="@(new int[] { 5, 10, 15, 25 })" AllowCustom="true" Width="@CalcWidth(RgfPager.PageSize)"
+                                <RgfComboBox TValue="int" Items="@(new int[] { 5, 10, 15, 25 })" AllowCustom="true" Width="3rem"
                                              Value="@RgfPager.PageSize" ValueExpression="() => RgfPager.PageSize" ValueChanged="RgfPager.PageSizeChanging" />
                             </div>
                         </li>
