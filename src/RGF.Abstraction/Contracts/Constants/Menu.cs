@@ -3,6 +3,7 @@ namespace Recrovit.RecroGridFramework.Abstraction.Contracts.Constants;
 
 public static class Menu
 {
+    public const string Aggregates = "rg-aggregates";
     public const string ColumnSettings = "rg-sc";
     public const string SaveSettings = "rg-ss";
     public const string ResetSettings = "rg-rs";

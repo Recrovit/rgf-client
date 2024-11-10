@@ -13,7 +13,7 @@ public class RgfGridSetting
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public bool? IsPublic { get; set; }
 
-    [JsonIgnore(Condition = JsonIgnoreCondition.Never)]
+    [JsonIgnore(Condition = JsonIgnoreCondition.Always)]
     public bool IsPublicNonNullable { get => IsPublic ?? false; set { IsPublic = value; } }
 
     public bool IsReadonly { get; set; }

@@ -1,12 +1,19 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.Serialization;
 
 namespace Recrovit.RecroGridFramework.Abstraction.Extensions;
 
-public static class EnumExtension
+public static class EnumExtensions
 {
+    public static Dictionary<TEnum, string> ToDictionary<TEnum>() where TEnum : Enum 
+        => Enum.GetValues(typeof(TEnum)).Cast<TEnum>().ToDictionary(e => e, e => e.ToString());
+
+    public static Dictionary<TEnum?, string> ToNullableDictionary<TEnum>() where TEnum : struct, Enum
+        => Enum.GetValues(typeof(TEnum)).Cast<TEnum>().ToDictionary(e => (TEnum?)e, e => e.ToString());
+
     public static bool IsValid(this Enum enumerator)
     {
         bool defined = Enum.IsDefined(enumerator.GetType(), enumerator);

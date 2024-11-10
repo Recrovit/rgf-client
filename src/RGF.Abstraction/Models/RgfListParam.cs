@@ -1,7 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-using System.Text.Json.Serialization;
+﻿using System.Text.Json.Serialization;
 
 namespace Recrovit.RecroGridFramework.Abstraction.Models;
 
@@ -33,4 +30,9 @@ public class RgfListParam
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public RgfFilter.Condition[] FixFilter { get; set; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public RgfAggregationSettings AggregationSettings { get; set; }
+
+    public RgfListParam ShallowCopy() => (RgfListParam)MemberwiseClone();
 }

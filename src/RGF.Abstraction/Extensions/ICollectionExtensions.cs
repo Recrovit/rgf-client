@@ -1,10 +1,8 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
+﻿using System.Collections.Generic;
 
 namespace Recrovit.RecroGridFramework.Abstraction.Extensions;
 
-public static class ICollectionExtension
+public static class ICollectionExtensions
 {
     public static void AddRange<T>(this ICollection<T> self, IEnumerable<T> source)
     {

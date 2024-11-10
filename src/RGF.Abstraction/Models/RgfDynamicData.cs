@@ -13,19 +13,30 @@ namespace Recrovit.RecroGridFramework.Abstraction.Models;
 public class RgfDynamicData : IEquatable<RgfDynamicData>
 {
     public RgfDynamicData() { }
+
     public RgfDynamicData(object value) : this(null, value) { }
+
     public RgfDynamicData(ClientDataType type, object value, string name = null) : this(name, ConvertToTypedValue(type, value)) { }
+
     public RgfDynamicData(string name, object value) { Name = name; Value = value; }
+
+
+    private readonly object _lock = new object();
+
+    private object _value;
 
     public string Name { get; }
 
-    private readonly object _lock = new object();
-    private object _value;
     public virtual object Value
     {
         get => _value;
         set => SetValue(value);
     }
+
+    public event Action<RgfDynamicData> OnAfterChange;
+
+    public event Func<RgfDynamicData, Task> OnAfterChangeAsync;
+
 
     private void SetValue(object value)
     {
@@ -267,11 +278,9 @@ public class RgfDynamicData : IEquatable<RgfDynamicData>
         set => Value = value;
     }
 
-    public event Action<RgfDynamicData> OnAfterChange;
-    public event Func<RgfDynamicData, Task> OnAfterChangeAsync;
 
-    public object ConvertToTypedValue(ClientDataType type, CultureInfo culture) => ConvertToTypedValue(type, Value, culture);
     public static object ConvertToTypedValue(ClientDataType type, object data) => ConvertToTypedValue(type, data, new CultureInfo("en"));
+
     public static object ConvertToTypedValue(ClientDataType type, object data, CultureInfo culture)
     {
         object value;
@@ -366,7 +375,6 @@ public class RgfDynamicData : IEquatable<RgfDynamicData>
         return value;
     }
 
-    public bool IsNumeric() => IsNumeric(Value);
     public static bool IsNumeric(Type type)
     {
         if (type != null)
@@ -394,6 +402,7 @@ public class RgfDynamicData : IEquatable<RgfDynamicData>
         }
         return false;
     }
+
     public static bool IsNumeric(object value) => value == null ? false : IsNumeric(value.GetType());
 
     public override string ToString() => ToString(new CultureInfo("en"));
@@ -433,7 +442,9 @@ public class RgfDynamicData : IEquatable<RgfDynamicData>
     }
 
     public override int GetHashCode() => Value.ToString().GetHashCode();
+
     public override bool Equals(object other) => Equals(new RgfDynamicData(this.Name, other));
+
     public bool Equals(RgfDynamicData other)
     {
         var otherValue = other?.Value;
@@ -459,6 +470,12 @@ public class RgfDynamicData : IEquatable<RgfDynamicData>
                 return Value.Equals(otherValue);
             }
 
+            var res = TryGetNumericEquality(this.Value, other.Value);
+            if (res != null)
+            {
+                return res.Value;
+            }
+
             bool primitive1 = type.IsPrimitive || Nullable.GetUnderlyingType(type)?.IsPrimitive == true;
             bool primitive2 = otherType.IsPrimitive || Nullable.GetUnderlyingType(otherType)?.IsPrimitive == true;
 
@@ -479,6 +496,41 @@ public class RgfDynamicData : IEquatable<RgfDynamicData>
         }
         return valueIsNull && otherIsnull;
     }
+
+    public static bool? TryGetNumericEquality(object data1, object data2, CultureInfo culture = null)
+    {
+        if (data1 == null || data2 == null)
+        {
+            return null;
+        }
+
+        culture ??= CultureInfo.InvariantCulture;
+
+        if (data1 is string strA)
+        {
+            if(!decimal.TryParse(strA, NumberStyles.Any, culture, out decimal dec))
+            {
+                return null;
+            }
+            data1 = dec;
+        }
+        
+        if (data2 is string strB)
+        {
+            if (!decimal.TryParse(strB, NumberStyles.Any, culture, out decimal dec))
+            {
+                return null;
+            }
+            data2 = dec;
+        }
+
+        if (IsNumeric(data1) && IsNumeric(data2))
+        {
+            return Convert.ToDecimal(data1) == Convert.ToDecimal(data2);
+        }
+
+        return null;
+    }
 }
 
 public static class RgfDynamicDataExtension
@@ -495,4 +547,8 @@ public static class RgfDynamicDataExtension
         }
         return val;
     }
+
+    public static object ConvertToTypedValue(this RgfDynamicData data, ClientDataType type, CultureInfo culture) => RgfDynamicData.ConvertToTypedValue(type, data.Value, culture);
+
+    public static bool IsNumeric(this RgfDynamicData data) => RgfDynamicData.IsNumeric(data.Value);
 }

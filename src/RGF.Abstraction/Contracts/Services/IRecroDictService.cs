@@ -27,7 +27,9 @@ public static class IRecroDictServiceExtension
         return GetItem(dictionary, stringId, $"{scope}.{stringId}");
     }
 
+    public static string GetItem(this IRecroDictService recroDict, ConcurrentDictionary<string, string> dictionary, string stringId, string defaultValue = null) => GetItem(dictionary, stringId, defaultValue);
     public static string GetItem(ConcurrentDictionary<string, string> dictionary, string stringId, string defaultValue = null) => dictionary.TryGetValue(stringId, out var value) ? value : defaultValue;
 
+    public static string GetItem(this IRecroDictService recroDict, Dictionary<string, string> dictionary, string stringId, string defaultValue = null) => GetItem(dictionary, stringId, defaultValue);
     public static string GetItem(Dictionary<string, string> dictionary, string stringId, string defaultValue = null) => dictionary.TryGetValue(stringId, out var value) ? value : defaultValue;
 }

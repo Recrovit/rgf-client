@@ -3,7 +3,7 @@ using System.Collections.Generic;
 
 namespace Recrovit.RecroGridFramework.Abstraction.Extensions;
 
-public static class DictionaryExtension
+public static class DictionaryExtensions
 {
     public static TValue GetOrCreate<TKey, TValue>(this IDictionary<TKey, TValue> self, TKey key, Func<TValue> factory)
     {

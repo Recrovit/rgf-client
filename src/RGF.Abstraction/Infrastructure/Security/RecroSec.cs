@@ -11,6 +11,7 @@ public enum RgfPermissionType
     PredefFilterAdmin = 1003,
     Export = 1004,
     PublicGridSetting = 1005,
+    PublicChartSetting = 1006,
 
     FEPApprove = 1101,
     FEPReject = 1102,

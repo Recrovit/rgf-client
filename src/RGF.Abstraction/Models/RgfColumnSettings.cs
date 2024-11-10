@@ -2,7 +2,7 @@
 
 namespace Recrovit.RecroGridFramework.Abstraction.Models;
 
-public class RgfColumnSettings
+public class RgfColumnSettings : RgfIdAliasPair
 {
     public RgfColumnSettings() { }
 
@@ -14,11 +14,6 @@ public class RgfColumnSettings
         ColWidth = property.ColWidth == 0 ? null : property.ColWidth;
         Sort = property.Sort == 0 ? null : property.Sort;
     }
-
-    public int Id { get; set; }
-
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public string Alias { get; set; }
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public int? ColPos { get; set; }

@@ -1,4 +1,5 @@
 ﻿using Recrovit.RecroGridFramework.Abstraction.Extensions;
+using System;
 using System.Collections.Generic;
 using System.Runtime.Serialization;
 using System.Text.Json.Serialization;
@@ -37,6 +38,8 @@ public enum PropertyFormType
     ListBox = 15,
     [EnumMember(Value = "custom")]
     Custom = 16,
+    [EnumMember(Value = "chartitem")]
+    ChartOnlyData = 17,
 }
 public enum PropertyListType
 {
@@ -65,7 +68,7 @@ public enum ClientDataType
     Boolean = 7,
 }
 
-public static class EnumExtension
+public static class ClientDataTypeExtension
 {
     public static bool IsNumeric(this ClientDataType data)
     {
@@ -114,13 +117,33 @@ public interface IRgfProperty
     int Sort { get; set; }
 }
 
-public class RgfProperty : IRgfProperty
+public class RgfIdAliasPair : ICloneable
 {
+    public RgfIdAliasPair() { }
+
+    public RgfIdAliasPair(int id, string alias)
+    {
+        Id = id;
+        Alias = alias;
+    }
+
+    public RgfIdAliasPair(RgfIdAliasPair rgfIdAliasPair)
+    {
+        Id = rgfIdAliasPair.Id;
+        Alias = rgfIdAliasPair.Alias;
+    }
+
     public int Id { get; set; }
 
-    public string ClientName { get; set; }
-
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string Alias { get; set; }
+
+    public virtual object Clone() => new RgfIdAliasPair(this);
+}
+
+public class RgfProperty : RgfIdAliasPair, IRgfProperty
+{
+    public string ClientName { get; set; }
 
     public string ColTitle { get; set; }
 
@@ -162,6 +185,9 @@ public class RgfProperty : IRgfProperty
     public bool Nullable => Options?.GetBoolValue("RGO_Nullable") ?? false;
 
     [JsonIgnore]
+    public bool IsDynamic => Ex?.Contains("D") == true;
+
+    [JsonIgnore]
     public bool Required => !Nullable;
 
     public ClientDataType ClientDataType
@@ -174,6 +200,7 @@ public class RgfProperty : IRgfProperty
                 case PropertyFormType.RecroGrid:
                 case PropertyFormType.Entity:
                 case PropertyFormType.Custom:
+                case PropertyFormType.ChartOnlyData:
                     return ClientDataType.Undefined;
 
                 case PropertyFormType.Date:

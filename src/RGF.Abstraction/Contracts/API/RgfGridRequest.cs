@@ -1,4 +1,5 @@
 ﻿using Recrovit.RecroGridFramework.Abstraction.Models;
+using System;
 using System.Collections.Generic;
 using System.Text.Json.Serialization;
 
@@ -6,13 +7,19 @@ namespace Recrovit.RecroGridFramework.Abstraction.Contracts.API;
 
 public class RgfGridRequest : RgfSessionParams
 {
+    [Obsolete("Use Manager CreateGridRequest instead")]
     public RgfGridRequest() { }
 
-    public RgfGridRequest(RgfSessionParams param, string entityName = null, RgfListParam listParam = null) : base(param)
+    [Obsolete("Use Manager CreateGridRequest instead", true)]
+    public RgfGridRequest(RgfSessionParams param, string entityName, RgfListParam listParam = null) : base(param)
     {
         EntityName = entityName;
         ListParam = listParam;
     }
+
+    private RgfGridRequest(RgfSessionParams param) : base(param) { }
+
+    public static RgfGridRequest Create(RgfSessionParams param) => new RgfGridRequest(param);
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string EntityName { get; set; }
@@ -39,6 +46,9 @@ public class RgfGridRequest : RgfSessionParams
     public RgfGridSettings GridSettings { get; set; }
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public RgfChartSettings ChartSettings { get; set; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public RgfPredefinedFilter PredefinedFilter { get; set; }
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -46,4 +56,7 @@ public class RgfGridRequest : RgfSessionParams
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string FunctionName { get; set; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public RgfGridRequest ParentGridRequest { get; set; }
 }
