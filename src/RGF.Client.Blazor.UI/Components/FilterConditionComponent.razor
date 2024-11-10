@@ -24,10 +24,14 @@
                 else
                 {
                     <div class="p-1">
-                        <RgfComboBox TValue="int" Value="item.PropertyId" ValueExpression="() => item.PropertyId" DataSource="Columns" ValueChanged="(value) => OnChangeProperty(value, item)" />
+                        <RgfComboBox TValue="int" Value="item.PropertyId" ValueExpression="() => item.PropertyId"
+                                     DataSource="Columns"
+                                     ValueChanged="(value) => OnChangeProperty(value, item)" />
                     </div>
                     <div class="p-1">
-                        <RgfComboBox TValue="RgfFilter.QueryOperator" Value="item.QueryOperator" ValueExpression="() => item.QueryOperator" ValueChanged="(value) => OnChangeQueryOperator(value, item)" DataSource="GetQueryOperators(item)" />
+                        <RgfComboBox TValue="RgfFilter.QueryOperator" Value="item.QueryOperator" ValueExpression="() => item.QueryOperator"
+                                     DataSource="GetQueryOperators(item)"
+                                     ValueChanged="(value) => OnChangeQueryOperator(value, item)" />
                     </div>
                     @if (!(new[] { RgfFilter.QueryOperator.IsNull, RgfFilter.QueryOperator.IsNotNull, RgfFilter.QueryOperator.Exists }.Contains(item.QueryOperator)))
                     {
@@ -36,33 +40,40 @@
                             @switch (prop.ClientDataType)
                             {
                                 case ClientDataType.Integer:
-                                    <RgfInputNumber TValue="int?" @bind-Value="item.DynValue1.IntValue" />
+                                    <RgfInputNumber TValue="int?" @bind-Value="item.DynValue1.IntValue"
+                                                    OnValueChanging="() => FilterComponent.IsFilterActive=true" />
                                     break;
 
                                 case ClientDataType.Decimal:
-                                    <RgfInputNumber TValue="decimal?" @bind-Value="item.DynValue1.DecimalValue" HideSpinButton="true" />
+                                    <RgfInputNumber TValue="decimal?" @bind-Value="item.DynValue1.DecimalValue" HideSpinButton="true"
+                                                    OnValueChanging="() => FilterComponent.IsFilterActive=true" />
                                     break;
 
                                 case ClientDataType.Double:
-                                    <RgfInputNumber TValue="double?" @bind-Value="item.DynValue1.DoubleValue" HideSpinButton="true" />
+                                    <RgfInputNumber TValue="double?" @bind-Value="item.DynValue1.DoubleValue" HideSpinButton="true"
+                                                    OnValueChanging="() => FilterComponent.IsFilterActive=true" />
                                     break;
 
                                 case ClientDataType.DateTime:
-                                    <RgfInputDate TValue="DateTime?" DateType="prop.FormType == PropertyFormType.Date ? InputDateType.Date : InputDateType.DateTimeLocal" @bind-Value="item.DynValue1.DateTimeValue" />
+                                    <RgfInputDate TValue="DateTime?" DateType="prop.FormType == PropertyFormType.Date ? InputDateType.Date : InputDateType.DateTimeLocal" @bind-Value="item.DynValue1.DateTimeValue"
+                                                  OnValueChanging="() => FilterComponent.IsFilterActive=true" />
                                     break;
 
                                 case ClientDataType.Boolean:
-                                    <RgfCheckBox @bind-Value="item.DynValue1.BooleanValue" />
+                                    <RgfCheckBox @bind-Value="item.DynValue1.BooleanValue"
+                                                 OnValueChanging="() => FilterComponent.IsFilterActive=true" />
                                     break;
 
                                 default:
                                     if (prop.FormType == PropertyFormType.DropDown || prop.FormType == PropertyFormType.ListBox)
                                     {
-                                        <RgfListBox TValue="string" @bind-Values="item.DynValue1.StringArray" DataSource="prop.Dictionary" Resizable="true" />
+                                        <RgfListBox TValue="string" @bind-Values="item.DynValue1.StringArray" DataSource="prop.Dictionary" Resizable="true"
+                                                    OnValueChanging="() => FilterComponent.IsFilterActive=true" />
                                     }
                                     else
                                     {
-                                        <RgfInputText @bind-Value="item.DynValue1.StringValue" />
+                                        <RgfInputText @bind-Value="item.DynValue1.StringValue"
+                                                      OnValueChanging="() => FilterComponent.IsFilterActive=true" />
                                     }
                                     break;
                             }
@@ -74,23 +85,28 @@
                                 @switch (prop.ClientDataType)
                                 {
                                     case ClientDataType.Integer:
-                                        <RgfInputNumber TValue="int?" @bind-Value="item.DynValue2.IntValue" />
+                                        <RgfInputNumber TValue="int?" @bind-Value="item.DynValue2.IntValue"
+                                                        OnValueChanging="() => FilterComponent.IsFilterActive=true" />
                                         break;
 
                                     case ClientDataType.Decimal:
-                                        <RgfInputNumber TValue="decimal?" @bind-Value="item.DynValue2.DecimalValue" HideSpinButton="true" />
+                                        <RgfInputNumber TValue="decimal?" @bind-Value="item.DynValue2.DecimalValue" HideSpinButton="true"
+                                                        OnValueChanging="() => FilterComponent.IsFilterActive=true" />
                                         break;
 
                                     case ClientDataType.Double:
-                                        <RgfInputNumber TValue="double?" @bind-Value="item.DynValue2.DoubleValue" HideSpinButton="true" />
+                                        <RgfInputNumber TValue="double?" @bind-Value="item.DynValue2.DoubleValue" HideSpinButton="true"
+                                                        OnValueChanging="() => FilterComponent.IsFilterActive=true" />
                                         break;
 
                                     case ClientDataType.DateTime:
-                                        <RgfInputDate TValue="DateTime?" DateType="prop.FormType == PropertyFormType.Date ? InputDateType.Date : InputDateType.DateTimeLocal" @bind-Value="item.DynValue2.DateTimeValue" />
+                                        <RgfInputDate TValue="DateTime?" DateType="prop.FormType == PropertyFormType.Date ? InputDateType.Date : InputDateType.DateTimeLocal" @bind-Value="item.DynValue2.DateTimeValue"
+                                                      OnValueChanging="() => FilterComponent.IsFilterActive=true" />
                                         break;
 
                                     default:
-                                        <RgfInputText @bind-Value="item.DynValue2.StringValue" />
+                                        <RgfInputText @bind-Value="item.DynValue2.StringValue"
+                                                      OnValueChanging="() => FilterComponent.IsFilterActive=true" />
                                         break;
                                 }
                             </div>

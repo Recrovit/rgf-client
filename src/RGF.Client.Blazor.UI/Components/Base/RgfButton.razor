@@ -32,8 +32,10 @@
     protected override void OnParametersSet()
     {
         _baseCssClass = "btn btn-sm";
-        AdditionalAttributes["type"] = "button";
-
+        if (!AdditionalAttributes.ContainsKey("type"))
+        {
+            AdditionalAttributes["type"] = "button";
+        }
         base.OnParametersSet();
     }
 }

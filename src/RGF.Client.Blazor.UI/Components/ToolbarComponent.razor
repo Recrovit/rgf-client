@@ -5,100 +5,111 @@
                 <div class="d-flex">
                     @if (RgfToolbar.CustomMenu != null)
                     {
-                        <div class="dropdown me-2" role="group">
-                            <div style="position:fixed;z-index:10;">
+                            <div class="dropdown me-2" role="group">
+                                <div style="position:fixed;z-index:10;">
                                 @RgfToolbar.CustomMenu
+                                </div>
+                                <RgfButton IconName="bi-list-task" CssClass="btn-secondary"
+                                           Title="@RecroDict.GetRgfUiString("CustomFunctions")"
+                                           AdditionalAttributes="@(new(){ {"data-bs-toggle","dropdown"}, {"aria-expanded", "false"} })" />
                             </div>
-                            <RgfButton IconName="bi-list-task" CssClass="btn-secondary"
-                                       Title="@RecroDict.GetRgfUiString("CustomFunctions")"
-                                       AdditionalAttributes="@(new(){ {"data-bs-toggle","dropdown"}, {"aria-expanded", "false"} })" />
-                        </div>
                     }
                     @if (Manager.EntityDesc.Options.GetBoolValue("RGO_ClientMode") != true)
                     {
-                        <div class="btn-group me-2" role="group">
-                            <RgfButton IconName="bi-arrow-clockwise" CssClass="btn-secondary"
-                                       Title="@RecroDict.GetRgfUiString("Refresh")"
-                                       OnClick="() => RgfToolbar.OnToolbarCommand(RgfToolbarEventKind.Refresh)" />
+                            <div class="btn-group me-2" role="group">
+                                <RgfButton IconName="bi-arrow-clockwise" CssClass="btn-secondary"
+                                           Title="@RecroDict.GetRgfUiString("Refresh")"
+                                           OnClick="() => RgfToolbar.OnToolbarCommand(RgfToolbarEventKind.Refresh)" />
                             @if (Manager.EntityDesc.Options.GetBoolValue("RGO_NoFilter") != true)
                             {
-                                <RgfButton IconName="@(RgfToolbar.IsFiltered ? "bi-funnel-fill" : "bi-funnel")"
-                                           CssClass="@(RgfToolbar.IsFiltered ? "btn-success" : "btn-secondary")"
-                                           Title="@RecroDict.GetRgfUiString("Filter")"
-                                           OnClick="() => RgfToolbar.OnToolbarCommand(RgfToolbarEventKind.ShowFilter)" />
+                                        <RgfButton IconName="@(RgfToolbar.IsFiltered ? "bi-funnel-fill" : "bi-funnel")"
+                                                   CssClass="@(RgfToolbar.IsFiltered ? "btn-success" : "btn-secondary")"
+                                                   Title="@RecroDict.GetRgfUiString("Filter")"
+                                                   OnClick="() => RgfToolbar.OnToolbarCommand(RgfToolbarEventKind.ShowFilter)" />
                             }
-                        </div>
+                            </div>
                     }
                     <div class="btn-group me-2" role="group">
                         @if (Manager.EntityDesc.Options.GetBoolValue("RGO_NoDetails") != true)
                         {
                             if (RgfToolbar.BasePermissions.Add)
                             {
-                                <RgfButton IconName="bi-plus-lg" CssClass="btn-secondary"
-                                           Title="@RecroDict.GetRgfUiString("New")"
-                                           OnClick="() => RgfToolbar.OnToolbarCommand(RgfToolbarEventKind.Add)" />
+                                        <RgfButton IconName="bi-plus-lg" CssClass="btn-secondary"
+                                                   Title="@RecroDict.GetRgfUiString("New")"
+                                                   OnClick="() => RgfToolbar.OnToolbarCommand(RgfToolbarEventKind.Add)" />
                             }
                             if (RgfToolbar.BasePermissions.Edit)
                             {
-                                <RgfButton IconName="bi-pencil" CssClass="btn-secondary" Disabled="@(!RgfToolbar.IsSingleSelectedRow)"
-                                           Title="@RecroDict.GetRgfUiString("Modify")"
-                                           OnClick="() => RgfToolbar.OnToolbarCommand(RgfToolbarEventKind.Edit)" />
+                                        <RgfButton IconName="bi-pencil" CssClass="btn-secondary" Disabled="@(!RgfToolbar.IsSingleSelectedRow)"
+                                                   Title="@RecroDict.GetRgfUiString("Modify")"
+                                                   OnClick="() => RgfToolbar.OnToolbarCommand(RgfToolbarEventKind.Edit)" />
                             }
                             else if (RgfToolbar.BasePermissions.Read)
                             {
-                                <RgfButton IconName="bi-book" CssClass="btn-secondary" Disabled="@(!RgfToolbar.IsSingleSelectedRow)"
-                                           Title="@RecroDict.GetRgfUiString("Details")"
-                                           OnClick="() => RgfToolbar.OnToolbarCommand(RgfToolbarEventKind.Read)" />
+                                        <RgfButton IconName="bi-book" CssClass="btn-secondary" Disabled="@(!RgfToolbar.IsSingleSelectedRow)"
+                                                   Title="@RecroDict.GetRgfUiString("Details")"
+                                                   OnClick="() => RgfToolbar.OnToolbarCommand(RgfToolbarEventKind.Read)" />
                             }
                         }
                         @if (RgfToolbar.BasePermissions.Delete)
                         {
-                            <RgfButton IconName="bi-trash" CssClass="btn-secondary" Disabled="@(!RgfToolbar.IsSingleSelectedRow)"
-                                       Title="@RecroDict.GetRgfUiString("Delete")"
-                                       OnClick="() => RgfToolbar.OnDelete()" />
+                                <RgfButton IconName="bi-trash" CssClass="btn-secondary" Disabled="@(!RgfToolbar.IsSingleSelectedRow)"
+                                           Title="@RecroDict.GetRgfUiString("Delete")"
+                                           OnClick="() => RgfToolbar.OnDelete()" />
                         }
                     </div>
+                    @if (RgfToolbar.EnableChart)
+                    {
+                            <div class="dropdown me-2" role="group">
+                                <RgfButton IconName="bi-graph-up" CssClass="btn-secondary"
+                                           Title="RecroChart"
+                                           OnClick="() => RgfToolbar.OnToolbarCommand(RgfToolbarEventKind.RecroChart)" />
+                            </div>
+                    }
                     @if (RgfToolbar.SettingsMenu != null)
                     {
-                        <div class="dropdown me-2" role="group">
-                            <div style="position:fixed;z-index:10;">
+                            <div class="dropdown me-2" role="group">
+                                <div style="position:fixed;z-index:10;">
                                 @RgfToolbar.SettingsMenu
+                                </div>
+                                <RgfButton IconName="bi-gear" CssClass="btn-secondary"
+                                            Title="@RecroDict.GetRgfUiString("Settings")"
+                                            AdditionalAttributes="@(new(){ {"data-bs-toggle","dropdown"}, {"aria-expanded", "false"} })" />
                             </div>
-                            <RgfButton IconName="bi-gear" CssClass="btn-secondary"
-                                       Title="@RecroDict.GetRgfUiString("Setup")"
-                                       AdditionalAttributes="@(new(){ {"data-bs-toggle","dropdown"}, {"aria-expanded", "false"} })" />
-                        </div>
                     }
                     @if (RgfToolbar.SelectParam != null && Manager.EntityDesc.Options.GetBoolValue("RGO_SelectMode") == true)
                     {
-                        <div class="btn-group" role="group">
-                            <RgfButton IconName="bi-link" CssClass="@(RgfToolbar.IsSingleSelectedRow ? "btn-success" : "btn-secondary")" Disabled="@(!RgfToolbar.IsSingleSelectedRow)"
-                                       Title="@RecroDict.GetRgfUiString("Select")"
-                                       OnClick="() => RgfToolbar.OnToolbarCommand(RgfToolbarEventKind.Select)" />
-                        </div>
+                            <div class="btn-group" role="group">
+                                <RgfButton IconName="bi-link" CssClass="@(RgfToolbar.IsSingleSelectedRow ? "btn-success" : "btn-secondary")" Disabled="@(!RgfToolbar.IsSingleSelectedRow)"
+                                           Title="@RecroDict.GetRgfUiString("Select")"
+                                           OnClick="() => RgfToolbar.OnToolbarCommand(RgfToolbarEventKind.Select)" />
+                            </div>
                     }
                 </div>
-                <div class="btn-group rg-grid-settings flex-grow-1" role="group" style="max-width:531px;">
-                    <div class="rg-predef-name input-group input-group-sm">
-                        <RgfComboBox TValue="int?" Value="@RgfToolbar.GridSetting.GridSettingsId" Text="@RgfToolbar.GridSetting.SettingsName" AllowCustom="true"
-                                     DataSource="RgfToolbar.GridSettingList.Select(e => new KeyValuePair<int?, string>(e.GridSettingsId, e.SettingsName))"
-                                     InputChanged="OnGridSettingsChanged" />
-                    </div>
-                    <div class="rg-predef-save">
-                        <div class="ps-1 pe-1">
-                            <RgfCheckBox Label="@RecroDict.GetRgfUiString("Public")" Reverse="true" WrapperCssClass="d-flex flex-row-reverse align-items-center"
-                                         @bind-Value="RgfToolbar.GridSetting.IsPublicNonNullable" Disabled="!RgfToolbar.IsPublicGridSettingAllowed || string.IsNullOrEmpty(RgfToolbar.GridSetting.SettingsName)" />
+                @if (Manager.EntityDesc.Options.GetBoolValue("RGO_ClientMode") != true)
+                {
+                        <div class="btn-group rg-grid-settings flex-grow-1" role="group" style="max-width:531px;">
+                            <div class="rg-predef-name input-group input-group-sm">
+                                <RgfComboBox TValue="int?" Value="@RgfToolbar.GridSetting.GridSettingsId" Text="@RgfToolbar.GridSetting.SettingsName" AllowCustom="true"
+                                             DataSource="RgfToolbar.GridSettingList.Select(e => new KeyValuePair<int?, string>(e.GridSettingsId, e.SettingsName))"
+                                             InputChanged="OnGridSettingsChanged" />
+                            </div>
+                            <div class="rg-predef-save">
+                                <div class="ps-1 pe-1">
+                                    <RgfCheckBox Label="@RecroDict.GetRgfUiString("Public")" Reverse="true" WrapperCssClass="d-flex flex-row-reverse align-items-center"
+                                                 @bind-Value="RgfToolbar.GridSetting.IsPublicNonNullable" Disabled="!RgfToolbar.IsPublicGridSettingAllowed || string.IsNullOrEmpty(RgfToolbar.GridSetting.SettingsName)" />
+                                </div>
+                                <div>
+                                    <RgfButton IconName="bi-floppy" CssClass="btn-outline-secondary" Title="@RecroDict.GetRgfUiString("Save")"
+                                               Disabled="string.IsNullOrEmpty(RgfToolbar.GridSetting.SettingsName) || !RgfToolbar.IsPublicGridSettingAllowed && RgfToolbar.GridSetting.IsPublicNonNullable"
+                                               OnClick="(arg) => RgfToolbar.OnSaveGridSettingsAsync()" />
+                                    <RgfButton IconName="bi-trash" CssClass="btn-outline-secondary" Title="@RecroDict.GetRgfUiString("Delete")"
+                                               Disabled="RgfToolbar.GridSetting.GridSettingsId == null || !RgfToolbar.IsPublicGridSettingAllowed && RgfToolbar.GridSetting.IsPublicNonNullable"
+                                               OnClick="(arg) => RgfToolbar.OnDeleteGridSettingsAsync()" />
+                                </div>
+                            </div>
                         </div>
-                        <div class="">
-                            <RgfButton IconName="bi-floppy" CssClass="btn-outline-secondary" Title="@RecroDict.GetRgfUiString("Save")"
-                                       Disabled="string.IsNullOrEmpty(RgfToolbar.GridSetting.SettingsName) || !RgfToolbar.IsPublicGridSettingAllowed && RgfToolbar.GridSetting.IsPublicNonNullable"
-                                       OnClick="() => RgfToolbar.OnSaveGridSettingsAsync()" />
-                            <RgfButton IconName="bi-trash" CssClass="btn-outline-secondary" Title="@RecroDict.GetRgfUiString("Delete")"
-                                       Disabled="RgfToolbar.GridSetting.GridSettingsId == null || !RgfToolbar.IsPublicGridSettingAllowed && RgfToolbar.GridSetting.IsPublicNonNullable"
-                                       OnClick="() => RgfToolbar.OnDeleteGridSettingsAsync()" />
-                        </div>
-                    </div>
-                </div>
+                }
             </div>
         </div>
     </ToolbarTemplate>

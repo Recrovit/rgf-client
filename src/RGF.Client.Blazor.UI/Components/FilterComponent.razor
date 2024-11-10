@@ -21,10 +21,10 @@
                 <div>
                     <RgfButton IconName="bi-floppy" CssClass="btn-success" Title="@RecroDict.GetRgfUiString("Save")"
                                Disabled="string.IsNullOrEmpty(RgfFilterComp.PredefinedFilter.Name) || !RgfFilterComp.IsPredefinedFilterAdmin && RgfFilterComp.PredefinedFilter.IsGlobal"
-                               OnClick="() => RgfFilterComp.OnSavePredefinedFilter()" />
+                               OnClick="(arg) => RgfFilterComp.OnSavePredefinedFilter()" />
                     <RgfButton IconName="bi-trash" CssClass="btn-danger" Title="@RecroDict.GetRgfUiString("Delete")"
                                Disabled="string.IsNullOrEmpty(RgfFilterComp.PredefinedFilter.Key) || !RgfFilterComp.IsPredefinedFilterAdmin && RgfFilterComp.PredefinedFilter.IsGlobal"
-                               OnClick="() => RgfFilterComp.OnDeletePredefinedFilter()" />
+                               OnClick="(arg) => RgfFilterComp.OnDeletePredefinedFilter()" />
                 </div>
             </div>
         </div>

@@ -1,5 +1,5 @@
 ﻿/*!
-* recrovit-rgf-blazor-ui.js v1.3.0
+* recrovit-rgf-blazor-ui.js v1.3.2
 */
 
 window.Recrovit = window.Recrovit || {};
@@ -53,8 +53,8 @@ Blazor.UI = {
                         height: `${dialogPos[1]}px`,
                     });
                     dialog.css({
-                        top: `${dialogPos[2]}px`,
-                        left: `${dialogPos[3]}px`,
+                        top: `${dialogPos[2] < 0 ? 0 : dialogPos[2]}px`,
+                        left: `${dialogPos[3] < 0 ? 0 : dialogPos[3]}px`,
                         margin: '0'
                     });
                     return;
@@ -102,8 +102,7 @@ Blazor.UI = {
                     html: true
                 });
                 element.addEventListener('show.bs.tooltip', async function () {
-                    if (tooltip.tooltipText == null)
-                    {
+                    if (tooltip.tooltipText == null) {
                         var col = $(this).attr('data-cell');
                         var rowIdx = $(this).parent('tr').attr('data-row');
                         tooltip.tooltipText = await gridRef.invokeMethodAsync('GetTooltipText', parseInt(rowIdx), parseInt(col));
@@ -115,6 +114,18 @@ Blazor.UI = {
                     setTimeout(function () { tooltip.hide(); }, 8000);
                 });
             });
+        }
+    },
+    Chart: {
+        initialize: async function (containerId, chartRef) {
+            Blazor.ApexCharts.onResize = async function (element, chartRef) {
+                var container = $(element);
+                var w = Math.round($('div.card-body', container).first().width());
+                var h1 = Math.round(container.height());
+                var h = h1 - Math.round($('div.card-header', container).first().height());
+                await chartRef.invokeMethodAsync('Resize', w - 1, h - 16 - 50);
+            };
+            return await Blazor.ApexCharts.initialize(containerId, chartRef);
         }
     },
     ListBox: {
@@ -145,7 +156,7 @@ Blazor.UI = {
             var combo = $(`#${comboBoxId}`).rgcombobox({
                 value: value,
                 inputClass: 'rgf-combobox-edit form-control form-control-sm',
-                button: '<button class="rgf-combobox-button btn btn-outline-secondary" type="button" rg-combobox=""><i class="bi bi-caret-down-fill"></i></button>',
+                button: '<button class="rgf-combobox-button btn btn-outline-secondary" type="button" rgf-bs-combobox=""><i class="bi bi-caret-down-fill"></i></button>',
                 noWrapper: true,
                 calcWidth: false,
                 width: width

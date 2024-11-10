@@ -18,7 +18,8 @@ else if (_menuItems != null)
         <nav class="navbar navbar-expand-lg bg-body-tertiary ">
             <div class="container-fluid">
                 <div class="navbar-collapse">
-                    <ul class="navbar-nav rgf-menu">
+                    <ul class="navbar-nav rgf-menu"
+                        @onmouseleave="OnMouseLeave">
                         @foreach (var item in _menuItems)
                         {
                             @item
@@ -30,12 +31,27 @@ else if (_menuItems != null)
     }
     else
     {
-        <ul class="rgf-menu dropdown-menu">
-            @foreach (var item in _menuItems)
-            {
-                @item
-            }
-        </ul>
+        @if (!MenuParameters.ContextMenuPosition.IsEmpty)
+        {
+            <ul class="rgf-menu dropdown-menu show"
+                style="position: fixed; top: @(MenuParameters.ContextMenuPosition.Y)px; left: @(MenuParameters.ContextMenuPosition.X)px;"
+                @onmouseleave="OnMouseLeave">
+                @foreach (var item in _menuItems)
+                {
+                    @item
+                }
+            </ul>
+        }
+        else
+        {
+            <ul class="rgf-menu dropdown-menu"
+                @onmouseleave="OnMouseLeave">
+                @foreach (var item in _menuItems)
+                {
+                    @item
+                }
+            </ul>
+        }
     }
 }
 
@@ -74,9 +90,9 @@ else if (_menuItems != null)
             _menuItems = new();
             foreach (var item in MenuParameters.MenuItems)
             {
-                if (MenuParameters.MenuRenderCallback != null)
+                if (MenuParameters.OnMenuRender != null)
                 {
-                    await MenuParameters.MenuRenderCallback.Invoke(item);
+                    await MenuParameters.OnMenuRender.Invoke(item);
                 }
                 _menuItems.Add(MenuParameters.Navbar ? RenderNavItem(item) : RenderMenuItem(item));
             }
@@ -124,8 +140,8 @@ else if (_menuItems != null)
                     builder.AddAttribute(sequence++, nameof(MenuParameters), new RgfMenuParameters()
                         {
                             MenuItems = item.NestedMenu,
-                            MenuRenderCallback = MenuParameters.MenuRenderCallback,
-                            MenuSelectionCallback = MenuParameters.MenuSelectionCallback
+                            OnMenuRender = MenuParameters.OnMenuRender,
+                            OnMenuItemSelect = MenuParameters.OnMenuItemSelect
                         });
                     builder.CloseComponent();
                     break;
@@ -156,12 +172,12 @@ else if (_menuItems != null)
 
                 case RgfMenuType.Function:
                 case RgfMenuType.FunctionForRec:
-                    if (MenuParameters.MenuSelectionCallback != null)
+                    if (MenuParameters.OnMenuItemSelect != null)
                     {
                         builder.OpenElement(sequence++, "button");
                         builder.AddAttribute(sequence++, "type", "button");
                         builder.AddAttribute(sequence++, "class", "dropdown-item");
-                        builder.AddAttribute(sequence++, "onclick", EventCallback.Factory.Create(this, async () => await MenuParameters.MenuSelectionCallback.Invoke(item)));
+                        builder.AddAttribute(sequence++, "onclick", EventCallback.Factory.Create(this, async () => await MenuParameters.OnMenuItemSelect.Invoke(item)));
                         builder.AddContent(sequence++, item.Title);
                         builder.CloseElement();
                     }
@@ -178,8 +194,8 @@ else if (_menuItems != null)
                     builder.AddAttribute(sequence++, nameof(MenuParameters), new RgfMenuParameters()
                         {
                             MenuItems = item.NestedMenu,
-                            MenuRenderCallback = MenuParameters.MenuRenderCallback,
-                            MenuSelectionCallback = MenuParameters.MenuSelectionCallback
+                            OnMenuRender = MenuParameters.OnMenuRender,
+                            OnMenuItemSelect = MenuParameters.OnMenuItemSelect
                         });
                     builder.CloseComponent();
                     break;
@@ -191,4 +207,6 @@ else if (_menuItems != null)
         }
         builder.CloseElement();
     };
+
+    private void OnMouseLeave(MouseEventArgs e) => MenuParameters.OnMouseLeave?.Invoke();
 }

@@ -1,0 +1,98 @@
+﻿@using System.Globalization
+
+<div class="toast-container position-fixed bottom-0 end-0 p-3">
+    @foreach (var toast in toasts.OrderByDescending(t => t.TriggeredAt).ToArray())
+    {
+        if (toast.Delay < 0)
+        {
+            toasts.Remove(toast);
+            continue;
+        }
+        <div class="toast show @GetToastClass(toast.ToastType)" role="alert" aria-live="assertive" aria-atomic="true" style="min-width: 250px;">
+            <div class="toast-header">
+                <strong class="me-auto">@GetToastHeader(toast)</strong>
+                <small class="text-muted">@GetToastTime(toast.TriggeredAt)</small>
+                <button type="button" class="btn-close" @onclick="() => RemoveToast(toast)" aria-label="Close"></button>
+            </div>
+            <div class="toast-body">
+                @((MarkupString)toast.Body)
+            </div>
+        </div>
+    }
+</div>
+
+@inject IRgfEventNotificationService _notificationService
+@inject IRecroSecService _recroSec
+@inject IRecroDictService _recroDict
+@implements IDisposable
+@code {
+
+    private List<RgfToastEvent> toasts = new List<RgfToastEvent>();
+    private IDisposable _toastManager = default!;
+
+    protected override void OnInitialized()
+    {
+        var manager = _notificationService.GetNotificationManager(RgfToastEvent.NotificationManagerScope);
+        _toastManager = manager.Subscribe<RgfToastEvent>(ShowToast);
+    }
+
+    private void ShowToast(IRgfEventArgs<RgfToastEvent> arg)
+    {
+        var toast = arg.Args;
+        if (toast.Delay < 0)
+        {
+            RemoveToast(toast);
+        }
+        else
+        {
+            toasts.Add(toast);
+            if (toast.Delay > 0)
+            {
+                _ = InvokeAsync(async () =>
+                {
+                    await Task.Delay(Math.Max(1000, toast.Delay));
+                    RemoveToast(toast);
+                });
+            }
+        }
+        StateHasChanged();
+    }
+
+    private void RemoveToast(RgfToastEvent toast)
+    {
+        toasts.Remove(toast);
+        StateHasChanged();
+    }
+
+    private string GetToastClass(RgfToastType toastType)
+    {
+        return toastType switch
+        {
+            RgfToastType.Info => "bg-info text-dark",
+            RgfToastType.Warning => "bg-warning text-dark",
+            RgfToastType.Error => "bg-danger text-white",
+            RgfToastType.Success => "bg-success text-white",
+            _ => "bg-light text-dark"
+        };
+    }
+
+    private string GetToastTime(DateTime triggeredAt)
+    {
+        var culture = _recroSec.UserCultureInfo();
+        return (DateTime.Now - triggeredAt).TotalSeconds < 1 ? _recroDict.GetRgfUiString("JustNow") : triggeredAt.ToString("t", culture);
+    }
+
+    private string GetToastHeader(RgfToastEvent toast)
+    {
+        if (string.IsNullOrWhiteSpace(toast.Status))
+        {
+            return toast.Title;
+        }
+        return $"{toast.Status} - {toast.Title}";
+    }
+
+    public void Dispose()
+    {
+        _toastManager?.Dispose();
+    }
+}

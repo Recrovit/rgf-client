@@ -1,0 +1,12 @@
+﻿.rgf-apexchart-content {
+    overflow: auto;
+}
+
+.pie ::deep div.apx-legend-position-right,
+.donut ::deep div.apx-legend-position-right {
+    width: 33%;
+}
+
+.card-body {
+    padding-bottom: 5px;
+}
