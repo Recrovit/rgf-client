@@ -20,6 +20,9 @@ public class RgfChartSetting
     public string SettingsName { get; set; }
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string Remark { get; set; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public bool? IsPublic { get; set; }
 
     [JsonIgnore(Condition = JsonIgnoreCondition.Always)]

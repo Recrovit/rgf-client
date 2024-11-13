@@ -38,6 +38,7 @@ public enum PropertyFormType
     ListBox = 15,
     [EnumMember(Value = "custom")]
     Custom = 16,
+    [Obsolete("Use RGO_AggregationRequired instead", true)]
     [EnumMember(Value = "chartitem")]
     ChartOnlyData = 17,
 }
@@ -200,7 +201,6 @@ public class RgfProperty : RgfIdAliasPair, IRgfProperty
                 case PropertyFormType.RecroGrid:
                 case PropertyFormType.Entity:
                 case PropertyFormType.Custom:
-                case PropertyFormType.ChartOnlyData:
                     return ClientDataType.Undefined;
 
                 case PropertyFormType.Date:
