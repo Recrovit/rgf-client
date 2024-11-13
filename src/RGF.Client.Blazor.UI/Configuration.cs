@@ -80,7 +80,7 @@ public class RGFClientBlazorUIConfiguration
     private static readonly string BootstrapCssId = "rgf-bootstrap";
     private static readonly string BootstrapIconsId = "rgf-bootstrap-icons";
     private static readonly string BlazorUICss = "rgf-client-blazor-ui";
-    private static readonly string BlazorUICssLib = "rgf-client-blazor-ui_lib";
+    private static readonly string BlazorUICssLib = "rgf-client-blazor-ui-lib";
     private static readonly string BootstrapSubmenuCssId = "rgf-bootstrap-submenu";
     private static bool _scriptsLoaded;
 

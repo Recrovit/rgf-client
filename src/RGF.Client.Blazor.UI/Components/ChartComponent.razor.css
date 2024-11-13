@@ -1,5 +1,6 @@
 ﻿.rgf-apexchart-content {
-    overflow: auto;
+    overflow-x: auto;
+    overflow-y: hidden;
 }
 
 .pie ::deep div.apx-legend-position-right,
