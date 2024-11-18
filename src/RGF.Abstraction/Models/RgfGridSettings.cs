@@ -16,7 +16,8 @@ public class RgfGridSetting
     [JsonIgnore(Condition = JsonIgnoreCondition.Always)]
     public bool IsPublicNonNullable { get => IsPublic ?? false; set { IsPublic = value; } }
 
-    public bool IsReadonly { get; set; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public bool? IsReadonly { get; set; }
 }
 
 public class RgfGridSettings : RgfGridSetting
@@ -30,7 +31,8 @@ public class RgfGridSettings : RgfGridSetting
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public RgfFilter.Condition[] Filter { get; set; }
 
-    public int PageSize { get; set; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? PageSize { get; set; }
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public int? SQLTimeout { get; set; }

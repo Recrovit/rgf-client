@@ -30,6 +30,8 @@ public class RgfChartSetting
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public bool? IsReadonly { get; set; }
+
+    public RgfGridSettings ParentGridSettings { get; set; }
 }
 
 public class RgfChartSettings : RgfChartSetting, ICloneable
