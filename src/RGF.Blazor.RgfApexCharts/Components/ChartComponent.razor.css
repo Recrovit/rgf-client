@@ -1,4 +1,9 @@
-﻿::deep div.apx-legend-position-right {
+﻿.rgf-check-stylesheet-rgfcharts {
+    color: rgb(171, 205, 239);
+    clip-path: inset(100px);
+}
+
+::deep div.apx-legend-position-right {
     overflow-y: scroll;
 }
 
