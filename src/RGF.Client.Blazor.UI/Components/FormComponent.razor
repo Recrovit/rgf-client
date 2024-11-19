@@ -1,8 +1,7 @@
 ﻿@using Microsoft.AspNetCore.Components.Forms
 
 <RgfFormComponent @ref="_rgfFormRef" EntityParameters="EntityParameters" FormComponent="this"
-                  FormGroupLayoutTemplate="FormGroupLayoutTemplate"
-                  FormItemLayoutTemplate="FormItemLayoutTemplate">
+                  FormGroupLayoutTemplate="FormGroupLayoutTemplate">
     <FormTemplate Context="RgfForm">
         <EditForm EditContext="RgfForm.CurrentEditContext" class="needs-validation">
             <div class="card">
@@ -107,20 +106,11 @@
     }
 
     public RenderFragment<RgfFormGroupLayoutParameters> FormGroupLayoutTemplate => (param) =>
-    @<div class="row my-2 g-2">
+    @<div class="rg-group row my-2 g-2">
         @foreach (var prop in param.FormGroup.Properties)
     {
         @param.BaseFormComponent.GetFormItemLayoutTemplate(new RgfFormItemParameters(param.BaseFormComponent, param.FormGroup, prop))
     }
-    </div>;
-
-    public RenderFragment<RgfFormItemParameters> FormItemLayoutTemplate => (param) =>
-    @<div name="@param.Property.ClientName" class="@($"{(param.Property.EmbededGrid ? "rg-collection" : "rg-property")} col-{param.Property.FlexColumnWidth ?? param.Group.FlexColumnWidth}")">
-        @if (!string.IsNullOrEmpty(param.Property.PreElement))
-    {
-        @((MarkupString)param.Property.PreElement)
-    }
-        @param.BaseFormComponent.GetFormItemTemplate(param)
     </div>;
 
     private void ActivateTab(int index)

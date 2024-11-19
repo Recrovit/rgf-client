@@ -11,7 +11,7 @@ namespace Recrovit.RecroGridFramework.Client.Blazor.UI;
 
 public class RGFClientBlazorUIConfiguration
 {
-    public static async Task LoadResourcesAsync(IServiceProvider serviceProvider, string themeName, bool shouldLoadBundledStyles = true)
+    public static async Task LoadResourcesAsync(IServiceProvider serviceProvider, string themeName)
     {
         var jsRuntime = serviceProvider.GetRequiredService<IJSRuntime>();
         //await jsRuntime.InvokeAsync<IJSObjectReference>("import", $"{ApiService.BaseAddress}/rgf/resource/lib%2Fjqueryui%2Fjquery-ui.min.js");
@@ -31,10 +31,10 @@ public class RGFClientBlazorUIConfiguration
         await jsRuntime.InvokeVoidAsync("Recrovit.LPUtils.AddStyleSheetLink", $"{RgfClientConfiguration.AppRootPath}_content/{libName}/lib/bootstrap/dist/css/bootstrap.min.css", false, BootstrapCssId);
         await jsRuntime.InvokeVoidAsync("Recrovit.LPUtils.AddStyleSheetLink", $"{RgfClientConfiguration.AppRootPath}_content/{libName}/lib/bootstrap-icons/font/bootstrap-icons.min.css", false, BootstrapIconsId);
         await jsRuntime.InvokeVoidAsync("Recrovit.LPUtils.AddStyleSheetLink", $"{RgfClientConfiguration.AppRootPath}_content/{libName}/css/styles.css", false, BlazorUICss);
-        if (shouldLoadBundledStyles)
-        {
-            await jsRuntime.InvokeVoidAsync("Recrovit.LPUtils.AddStyleSheetLink", $"{RgfClientConfiguration.AppRootPath}_content/{libName}/{libName}.bundle.scp.css", false, BlazorUICssLib);
-        }
+
+        await jsRuntime.InvokeVoidAsync("Recrovit.LPUtils.EnsureStyleSheetLoaded", "rgf-check-stylesheet-client-blazor-ui", "<div class=\"rgf-check-stylesheet-client-blazor-ui\" rgf-bs-root=\"\"></div>",
+            $"{RgfClientConfiguration.AppRootPath}_content/{libName}/{libName}.bundle.scp.css?v={FileVersion}", BlazorUICssLib, "Recrovit.RecroGridFramework.Client.Blazor.bundle.scp.css");
+
         await jsRuntime.InvokeVoidAsync("Recrovit.LPUtils.AddStyleSheetLink", $"{ApiService.BaseAddress}/rgf/resource/bootstrap-submenu.css", false, BootstrapSubmenuCssId);
         await jsRuntime.InvokeVoidAsync("Recrovit.LPUtils.RemoveLinkedFile", "css/bootstrap/bootstrap.min.css", "stylesheet");
 
@@ -85,11 +85,13 @@ public class RGFClientBlazorUIConfiguration
     private static bool _scriptsLoaded;
 
     public static readonly string JsBlazorUiNamespace = "Recrovit.RGF.Blazor.UI";
+
+    public static string FileVersion => Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyFileVersionAttribute>()!.Version;
 }
 
 public static class RGFClientBlazorUIConfigurationExtension
 {
-    public static async Task InitializeRgfUIAsync(this IServiceProvider serviceProvider, string themeName = "light", bool loadResources = true, bool shouldLoadBundledStyles = true)
+    public static async Task InitializeRgfUIAsync(this IServiceProvider serviceProvider, string themeName = "light", bool loadResources = true)
     {
         RgfBlazorConfiguration.RegisterComponent<MenuComponent>(RgfBlazorConfiguration.ComponentType.Menu);
         RgfBlazorConfiguration.RegisterComponent<DialogComponent>(RgfBlazorConfiguration.ComponentType.Dialog);
@@ -97,14 +99,13 @@ public static class RGFClientBlazorUIConfigurationExtension
 
         if (loadResources)
         {
-            await RGFClientBlazorUIConfiguration.LoadResourcesAsync(serviceProvider, themeName, shouldLoadBundledStyles);
+            await RGFClientBlazorUIConfiguration.LoadResourcesAsync(serviceProvider, themeName);
         }
 
-        await serviceProvider.InitializeRGFBlazorApexChartsAsync(loadResources, shouldLoadBundledStyles);
+        await serviceProvider.InitializeRGFBlazorApexChartsAsync(loadResources);
         RgfBlazorConfiguration.RegisterComponent<ChartComponent>(RgfBlazorConfiguration.ComponentType.Chart);
 
-        var ver = Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyFileVersionAttribute>()?.Version;
         var logger = serviceProvider.GetRequiredService<ILogger<RGFClientBlazorUIConfiguration>>();
-        logger?.LogInformation($"RecroGrid Framework Blazor.UI v{ver} initialized.");
+        logger?.LogInformation("RecroGrid Framework Blazor.UI v{Version} initialized.", RGFClientBlazorUIConfiguration.FileVersion);
     }
 }

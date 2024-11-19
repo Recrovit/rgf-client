@@ -1,5 +1,5 @@
 ﻿/*!
-* recrovit-rgf-blazor-ui.js v1.3.2
+* recrovit-rgf-blazor-ui.js v1.4.0
 */
 
 window.Recrovit = window.Recrovit || {};
@@ -13,7 +13,8 @@ Blazor.UI = {
             var dialog = document.getElementById(dialogId);
             //var d = new bootstrap.Modal(`#${dialogId}`, { keyboard: false });
             if (resizable) {
-                $('div.modal-content', dialog).resizable();
+                var dialogContent = $('div.modal-content', dialog).first();
+                Recrovit.LPUtils.ResizableWithResponsiveFlex(dialogContent);
             }
             $('div.modal-dialog', dialog).draggable({ handle: '.modal-header, .dialog-header' });
             if (focusId != null) {

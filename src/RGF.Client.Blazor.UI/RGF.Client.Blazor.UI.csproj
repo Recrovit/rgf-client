@@ -6,13 +6,14 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>Recrovit.RecroGridFramework.Client.Blazor.UI</RootNamespace>
     <AssemblyName>Recrovit.RecroGridFramework.Client.Blazor.UI</AssemblyName>
+    <StaticWebAssetFingerprintingEnabled>false</StaticWebAssetFingerprintingEnabled>
   </PropertyGroup>
 
   <PropertyGroup>
     <Company>Recrovit Kft.</Company>
     <Product>RecroGrid Framework</Product>
     <Copyright>© Recrovit Kft. All rights reserved.</Copyright>
-    <Version>8.11.0</Version>
+    <Version>8.12.0</Version>
     <FileVersion>$(Version).1$([System.DateTime]::Now.ToString(MMdd))</FileVersion>
     <InformationalVersion>$(FileVersion)</InformationalVersion>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
@@ -38,8 +39,8 @@
   </ItemGroup>
 
   <ItemGroup Condition="'$(Configuration)'=='Release'">
-    <PackageReference Include="Recrovit.RecroGridFramework.Blazor.RgfApexCharts" Version="8.2.0" />
-    <PackageReference Include="Recrovit.RecroGridFramework.Client.Blazor" Version="8.11.0" />
+    <PackageReference Include="Recrovit.RecroGridFramework.Blazor.RgfApexCharts" Version="8.2.1" />
+    <PackageReference Include="Recrovit.RecroGridFramework.Client.Blazor" Version="8.12.0" />
     <Content Update="wwwroot\scripts\recrovit-rgf-blazor-ui.js" CopyToPublishDirectory="Never" />
   </ItemGroup>
 
@@ -51,6 +52,7 @@
     <None Update="Components\Base\RgfCheckBox.razor.css" CssScope="rgf-bs-checkbox" />
     <None Update="Components\Base\RgfComboBox.razor.css" CssScope="rgf-bs-combobox" />
     <None Update="Components\ChartComponent.razor.css" CssScope="rgf-bs-apexcharts" />
+    <None Update="Components\RgfRootComponent.razor.css" CssScope="rgf-bs-root" />
     <None Update="Components\DialogComponent.razor.css" CssScope="rgf-bs-dialog" />
   </ItemGroup>
 
