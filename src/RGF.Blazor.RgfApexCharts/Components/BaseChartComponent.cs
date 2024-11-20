@@ -79,6 +79,8 @@ public abstract class BaseChartComponent : ComponentBase
 
     protected readonly string ContainerId;
 
+    public IEnumerable<string> ColorPalettes => RgfColorPalettes.ColorPalettes.Keys.Concat(Enum.GetValues(typeof(PaletteType)).Cast<PaletteType>().Select(p => p.ToString()));
+
     protected RecroChartTab ActiveTabIndex { get; set; } = RecroChartTab.Grid;
 
     protected bool SettingsAccordionActive { get; set; } = true;
@@ -106,7 +108,7 @@ public abstract class BaseChartComponent : ComponentBase
     protected void Initialize(RgfChartSettings chartSetting)
     {
         ApexChartSettings.Options.Theme.Mode = Enum.TryParse(chartSetting.Theme, out Mode mode) ? mode : Mode.Light;
-        ApexChartSettings.Options.Theme.Palette = Enum.TryParse(chartSetting.Palette, out PaletteType palette) ? palette : PaletteType.Palette1;
+        ChangePalette(chartSetting.Palette);
         ApexChartSettings.Options.Chart.Stacked = chartSetting.Stacked;
         ApexChartSettings.Options.PlotOptions.Bar.Horizontal = chartSetting.Horizontal;
         ChangeChartType(chartSetting.SeriesType);
@@ -350,10 +352,25 @@ public abstract class BaseChartComponent : ComponentBase
         return TryUpdateChart();
     }
 
-    protected Task ChangePalette(PaletteType? value)
+    protected virtual Task ChangePalette(string palette)
     {
-        _chartSettings.Palette = value?.ToString();
-        ApexChartSettings.Options.Theme.Palette = value;
+        if (!string.IsNullOrEmpty(palette) && Enum.TryParse(palette, out PaletteType acPalette))
+        {
+            ApexChartSettings.Options.Theme.Palette = acPalette;
+            ApexChartSettings.Options.Colors = [];
+        }
+        else
+        {
+            if (string.IsNullOrEmpty(palette) || !RgfColorPalettes.ColorPalettes.TryGetValue(palette, out var rgfPalette))
+            {
+                var firstPalette = RgfColorPalettes.ColorPalettes.First();
+                palette = firstPalette.Key;
+                rgfPalette = firstPalette.Value;
+            }
+            ApexChartSettings.Options.Theme.Palette = null;
+            ApexChartSettings.Options.Colors = rgfPalette;
+        }
+        _chartSettings.Palette = palette;
         return TryUpdateChart();
     }
 
