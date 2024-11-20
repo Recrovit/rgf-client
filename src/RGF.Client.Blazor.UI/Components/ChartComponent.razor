@@ -139,9 +139,9 @@
                                 <div class="col-sm-3">
                                     <div class="input-group">
                                         <div class="input-group-text">@RgfCharComp.GetRecroDictChart("Palette")</div>
-                                        <RgfComboBox TValue="PaletteType?"
-                                                     DataSource="EnumExtensions.ToNullableDictionary<PaletteType>()"
-                                                     Value="ApexChartSettings.Options.Theme.Palette" ValueExpression="() => ApexChartSettings.Options.Theme.Palette"
+                                        <RgfComboBox TValue="string"
+                                                     Items="ColorPalettes"
+                                                     Value="RgfCharComp.ChartSettings.Palette" ValueExpression="() => RgfCharComp.ChartSettings.Palette"
                                                      ValueChanged="ChangePalette" />
                                     </div>
                                 </div>
