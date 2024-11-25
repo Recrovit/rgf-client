@@ -9,7 +9,7 @@
                 <RgfInputNumber TValue="int?" @bind-Value="RgfFilterComp.PredefinedFilter.QueryTimeout" HideSpinButton="true" Min="0" />
             </div>
             <div class="rg-predef-name input-group input-group-sm">
-                <RgfComboBox TValue="string" Value="@RgfFilterComp.PredefinedFilterName" AllowCustom="true"
+                <RgfComboBox TValue="string" Value="@RgfFilterComp.PredefinedFilterName" Text="@RgfFilterComp.PredefinedFilterName" AllowCustom="true"
                              DataSource="RgfFilterComp.FilterHandler.PredefinedFilters.Select(e=> new KeyValuePair<string, string>(e.Key, e.Name))"
                              InputChanged="OnInputChanged" />
             </div>
