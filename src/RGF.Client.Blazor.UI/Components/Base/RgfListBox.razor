@@ -90,7 +90,7 @@
     {
         if (this.Resizable)
         {
-            await _jsRuntime.InvokeVoidAsync("eval", $"$('#{this.Id}').resizable('destroy');");
+            await _jsRuntime.InvokeVoidAsync(RGFClientBlazorUIConfiguration.JsBlazorUiNamespace + ".ListBox.resizableDestroy", this.Id);
         }
     }
 }

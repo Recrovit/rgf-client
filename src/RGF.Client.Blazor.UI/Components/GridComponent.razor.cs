@@ -38,6 +38,7 @@ public partial class GridComponent : ComponentBase, IDisposable
         base.OnInitialized();
         _selfRef = DotNetObjectReference.Create(this);
         GridParameters.EventDispatcher.Subscribe(RgfListEventKind.CreateRowData, OnCreateAttributes);
+        GridParameters.EnableMultiRowSelection ??= true;
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -74,9 +75,10 @@ public partial class GridComponent : ComponentBase, IDisposable
     public Task SetColumnPos(int from, int to) => ListHandler.MoveColumnAsync(from, to);
 
     [JSInvokable]
-    public string? GetTooltipText(int rowIndex, int colId)
+    public string? GetTooltipText(int relativeRowIndex, int colId)
     {
-        var tooltip = _rgfGridRef.GetColumnData(rowIndex, colId)?.ToString();
+        var absoluteRowIndex = ListHandler.ToAbsoluteRowIndex(relativeRowIndex);
+        var tooltip = _rgfGridRef.GetColumnData(absoluteRowIndex, colId)?.ToString();
         if (string.IsNullOrEmpty(tooltip))
         {
             return null;
@@ -91,7 +93,10 @@ public partial class GridComponent : ComponentBase, IDisposable
 
     protected virtual async Task OnChangedGridData(ObservablePropertyEventArgs<List<RgfDynamicDictionary>> args)
     {
-        await _jsRuntime.InvokeVoidAsync(RGFClientBlazorUIConfiguration.JsBlazorUiNamespace + ".Grid.deselectAllRow", _tableRef);
+        if (GridParameters.EnableMultiRowSelection != true)
+        {
+            await _jsRuntime.InvokeVoidAsync(RGFClientBlazorUIConfiguration.JsBlazorUiNamespace + ".Grid.deselectAllRow", _tableRef);
+        }
     }
 
     protected virtual Task OnCreateAttributes(IRgfEventArgs<RgfListEventArgs> arg)
@@ -185,21 +190,56 @@ public partial class GridComponent : ComponentBase, IDisposable
         await ListHandler.SetSortAsync(dict);
     }
 
-    protected virtual async Task OnRowClick(MouseEventArgs args, RgfDynamicDictionary rowData, int rowIndex)
+    protected virtual async Task OnRowClick(MouseEventArgs args, RgfDynamicDictionary rowData, int relativeRowIndex)
     {
         if (args.Detail == 1)
         {
             if (_rgfGridRef.SelectedItems.Any())
             {
-                bool deselect = _rgfGridRef.SelectedItems[0] == rowData;
-                await _jsRuntime.InvokeVoidAsync(RGFClientBlazorUIConfiguration.JsBlazorUiNamespace + ".Grid.deselectAllRow", _tableRef);
-                await _rgfGridRef.RowDeselectHandlerAsync(rowData);
-                if (deselect)
+                int absoluteRowIndex = ListHandler.GetAbsoluteRowIndex(rowData);
+                int selectedItemsCount = _rgfGridRef.SelectedItems.Count;
+                bool deselect = _rgfGridRef.SelectedItems.ContainsKey(absoluteRowIndex);
+                if (GridParameters.EnableMultiRowSelection == true && (args.CtrlKey || args.ShiftKey))
                 {
-                    return;
+                    if (args.ShiftKey)
+                    {
+                        int minIdx = _rgfGridRef.SelectedItems.Keys.Where(key => key < absoluteRowIndex).DefaultIfEmpty(-1).Max();
+                        if (minIdx >= 0)
+                        {
+                            for (int i = minIdx + 1; i < absoluteRowIndex; i++)
+                            {
+                                var data = await ListHandler.EnsureVisibleAsync(i);
+                                if (data != null)
+                                {
+                                    await _rgfGridRef.RowSelectHandlerAsync(data);
+                                    int idx = ListHandler.GetRelativeRowIndex(data);
+                                    await _jsRuntime.InvokeVoidAsync(RGFClientBlazorUIConfiguration.JsBlazorUiNamespace + ".Grid.selectRow", _rowRef[idx], idx);
+                                }
+                            }
+                        }
+                    }
+                    else if (deselect)
+                    {
+                        await _rgfGridRef.RowDeselectHandlerAsync(rowData);
+                        int rowIndex = Manager.ListHandler.ToRelativeRowIndex(absoluteRowIndex);
+                        if (rowIndex != -1)
+                        {
+                            await _jsRuntime.InvokeVoidAsync(RGFClientBlazorUIConfiguration.JsBlazorUiNamespace + ".Grid.deselectRow", _rowRef[rowIndex], rowIndex);
+                        }
+                        return;
+                    }
+                }
+                else
+                {
+                    await _rgfGridRef.RowDeselectHandlerAsync(null);
+                    await _jsRuntime.InvokeVoidAsync(RGFClientBlazorUIConfiguration.JsBlazorUiNamespace + ".Grid.deselectAllRow", _tableRef);
+                    if (deselect && selectedItemsCount == 1)
+                    {
+                        return;
+                    }
                 }
             }
-            await _jsRuntime.InvokeVoidAsync(RGFClientBlazorUIConfiguration.JsBlazorUiNamespace + ".Grid.selectRow", _rowRef[rowIndex], rowIndex);
+            await _jsRuntime.InvokeVoidAsync(RGFClientBlazorUIConfiguration.JsBlazorUiNamespace + ".Grid.selectRow", _rowRef[relativeRowIndex], relativeRowIndex);
             await _rgfGridRef.RowSelectHandlerAsync(rowData);
         }
         else
@@ -211,7 +251,7 @@ public partial class GridComponent : ComponentBase, IDisposable
     private async Task OnSetFormItem(IRgfEventArgs<RgfToolbarEventArgs> arg)
     {
         var data = _rgfGridRef.SelectedItems.Single();
-        int rowIndex = Manager.ListHandler.GetRelativeRowIndex(data);
+        int rowIndex = Manager.ListHandler.ToRelativeRowIndex(data.Key);
         if (rowIndex != -1)
         {
             await _jsRuntime.InvokeVoidAsync(RGFClientBlazorUIConfiguration.JsBlazorUiNamespace + ".Grid.deselectAllRow", _tableRef);

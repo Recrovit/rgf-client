@@ -1,5 +1,5 @@
 ﻿/*!
-* recrovit-rgf-blazor-ui.js v1.4.0
+* recrovit-rgf-blazor-ui.js v1.5.0
 */
 
 window.Recrovit = window.Recrovit || {};
@@ -11,11 +11,6 @@ Blazor.UI = {
     Dialog: {
         initialize: function (dialogId, resizable, uniqueName, focusId) {
             var dialog = document.getElementById(dialogId);
-            //var d = new bootstrap.Modal(`#${dialogId}`, { keyboard: false });
-            if (resizable) {
-                var dialogContent = $('div.modal-content', dialog).first();
-                Recrovit.LPUtils.ResizableWithResponsiveFlex(dialogContent);
-            }
             $('div.modal-dialog', dialog).draggable({ handle: '.modal-header, .dialog-header' });
             if (focusId != null) {
                 document.getElementById(focusId).focus();
@@ -25,6 +20,13 @@ Blazor.UI = {
             }
             $('div.modal-dialog', dialog).height('auto');
             Blazor.UI.Dialog.loadDialogPos(uniqueName, dialogId, true);
+            if (resizable) {
+                var dialogContent = $('div.modal-content', dialog).first();
+                Recrovit.LPUtils.ResizableWithResponsiveFlex(dialogContent);
+                window.setTimeout(function () {
+                    Recrovit.LPUtils.ResizeResponsiveFlex(dialogContent);
+                }, 1000);
+            }
         },
         saveDialogPos: function (name, dialogId) {
             const key = `RGF.DialogPos.${name}`;
@@ -74,11 +76,14 @@ Blazor.UI = {
     },
     Grid: {
         selectRow: function (row, idx) {
-            //$(table).find('tr').eq(idx).addClass('table-active');
-            $(row).addClass('table-active');
+            //$(table).find('tr').eq(idx).addClass('table-primary');
+            $(row).addClass('table-primary');
+        },
+        deselectRow: function (row, idx) {
+            $(row).removeClass('table-primary');
         },
         deselectAllRow: function (table) {
-            $('tr', table).removeClass('table-active');
+            $('tr.table-primary', table).removeClass('table-primary');
         },
         initializeTable: function (gridRef, table) {
             var rgfTable = new Recrovit.WebCli.RgfTable(table);
@@ -90,25 +95,31 @@ Blazor.UI = {
                     gridRef.invokeMethodAsync('SetColumnPos', idx, newIdx > idx ? newIdx - 1 : newIdx);
                 }
             });
-            BlazorGrids.initializeTooltips(gridRef);
+            BlazorGrids.initializeTooltips(gridRef, table);
         },
-        initializeTooltips: function (gridRef) {
-            var tooltipTriggerArr = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
-            tooltipTriggerArr.forEach(function (element) {
-                var tooltip = new bootstrap.Tooltip(element, {
-                    title: element.innerText,
+        initializeTooltips: function (gridRef, table) {
+            $('td', table).each(function () {
+                var element = $(this);
+                element.off('show.bs.tooltip');
+                bootstrap.Tooltip.getInstance(element[0])?.dispose();
+            });
+            var tooltipTriggerArr = $('td[data-bs-toggle="tooltip"]', table);
+            tooltipTriggerArr.each(function () {
+                var element = $(this);
+                var tooltip = new bootstrap.Tooltip(element[0], {
+                    title: element.text(),
                     customClass: 'rgf-cell-tooltip',
                     trigger: 'hover',
                     delay: { show: 500 },
                     html: true
                 });
-                element.addEventListener('show.bs.tooltip', async function () {
+                element.on('show.bs.tooltip', async function () {
                     if (tooltip.tooltipText == null) {
-                        var col = $(this).attr('data-cell');
-                        var rowIdx = $(this).parent('tr').attr('data-row');
+                        var col = element.attr('data-cell');
+                        var rowIdx = element.closest('tr').attr('data-row');
                         tooltip.tooltipText = await gridRef.invokeMethodAsync('GetTooltipText', parseInt(rowIdx), parseInt(col));
                         if (tooltip.tooltipText == null) {
-                            tooltip.tooltipText = this.innerText;
+                            tooltip.tooltipText = element.text();
                         }
                         tooltip.setContent({ '.tooltip-inner': tooltip.tooltipText })
                     }
@@ -150,6 +161,9 @@ Blazor.UI = {
                     $(this).css({ width: '', height: '' });
                 }
             });
+        },
+        resizableDestroy: function (listBoxId) {
+            $(`#${listBoxId}`).resizable('destroy');
         }
     },
     ComboBox: {
@@ -184,6 +198,9 @@ Blazor.UI = {
         },
         setText: function (comboBoxId, text) {
             $(`#${comboBoxId}`).rgcombobox("instance").input.val(text);
+        },
+        clearText: function (comboBoxId) {
+            $(`#${comboBoxId}`).val('');
         },
         destroy: function (comboBoxId) {
             $(`#${comboBoxId}`).off('change.RGF-Client-Blazor-UI').rgcombobox("destroy");

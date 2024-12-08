@@ -38,6 +38,15 @@
                                 <RgfInputNumber Value="RgfPager.ItemCount" ValueExpression="() => RgfPager.ItemCount" Readonly="true" Width="@CalcWidth(RgfPager.ItemCount)" />
                             </div>
                         </li>
+                        @if (RgfPager.SelectedItemCount > 1)
+                        {
+                            <li>
+                                <div class="input-group input-group-sm">
+                                    <label class="input-group-text">@RecroDict.GetRgfUiString("SelectedItemCount")</label>
+                                    <RgfInputNumber Value="RgfPager.SelectedItemCount" ValueExpression="() => RgfPager.SelectedItemCount" Readonly="true" Width="@CalcWidth(RgfPager.SelectedItemCount)" />
+                                </div>
+                            </li>
+                        }
                     }
 
                     if (Manager.EntityDesc.Options.GetBoolValue("RGO_ClientMode") != true)
@@ -81,5 +90,5 @@
     private void OnShowPreviousPage(MouseEventArgs args) => _rgfPagerRef.PageChanging(_rgfPagerRef.CurrentPage - 1);
     private void OnShowLastPage(MouseEventArgs args) => _rgfPagerRef.PageChanging(_rgfPagerRef.TotalPages);
 
-    private string CalcWidth(int page) => page < 100 ? "54px" : page < 1E4 ? "74px" : "114px";
+    private string CalcWidth(int page) => page < 10000 ? "54px" : page < 1E7 ? "74px" : "114px";
 }

@@ -92,7 +92,7 @@ else
         {
             if (!DataSource.Any(e => e.Key?.Equals(Value) == true))
             {
-                await _jsRuntime.InvokeVoidAsync("eval", $"$('#{this.Id}').val('');");
+                await _jsRuntime.InvokeVoidAsync(RGFClientBlazorUIConfiguration.JsBlazorUiNamespace + ".ComboBox.clearText", this.Id);
             }
         }
         if (AllowCustom && _selfRef == null)

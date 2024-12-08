@@ -107,6 +107,7 @@
     {
         base.OnInitialized();
         DialogParameters.Destroy = Destroy;
+        DialogParameters.Refresh = StateHasChanged;
     }
 
     protected override void OnParametersSet()

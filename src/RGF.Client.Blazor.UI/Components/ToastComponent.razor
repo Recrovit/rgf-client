@@ -27,16 +27,16 @@
 @implements IDisposable
 @code {
 
-    private List<RgfToastEvent> toasts = new List<RgfToastEvent>();
+    private List<RgfToastEventArgs> toasts = new List<RgfToastEventArgs>();
     private IDisposable _toastManager = default!;
 
     protected override void OnInitialized()
     {
-        var manager = _notificationService.GetNotificationManager(RgfToastEvent.NotificationManagerScope);
-        _toastManager = manager.Subscribe<RgfToastEvent>(ShowToast);
+        var manager = _notificationService.GetNotificationManager(RgfToastEventArgs.NotificationManagerScope);
+        _toastManager = manager.Subscribe<RgfToastEventArgs>(ShowToast);
     }
 
-    private void ShowToast(IRgfEventArgs<RgfToastEvent> arg)
+    private void ShowToast(IRgfEventArgs<RgfToastEventArgs> arg)
     {
         var toast = arg.Args;
         if (toast.Delay < 0)
@@ -58,7 +58,7 @@
         StateHasChanged();
     }
 
-    private void RemoveToast(RgfToastEvent toast)
+    private void RemoveToast(RgfToastEventArgs toast)
     {
         toasts.Remove(toast);
         StateHasChanged();
@@ -82,7 +82,7 @@
         return (DateTime.Now - triggeredAt).TotalSeconds < 1 ? _recroDict.GetRgfUiString("JustNow") : triggeredAt.ToString("t", culture);
     }
 
-    private string GetToastHeader(RgfToastEvent toast)
+    private string GetToastHeader(RgfToastEventArgs toast)
     {
         if (string.IsNullOrWhiteSpace(toast.Status))
         {

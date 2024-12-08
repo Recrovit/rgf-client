@@ -1,10 +1,6 @@
-﻿table.recro-grid {
-    --bs-table-active-bg: rgba(var(--bs-primary-rgb), 0.5)
+﻿table.recro-grid td > div.cell-content {
+    width: 40px;
 }
-
-    table.recro-grid td > div.cell-content {
-        width: 40px;
-    }
 
 div.spinner-container {
     display: inline-block;

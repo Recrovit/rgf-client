@@ -1,5 +1,5 @@
 ﻿
-<button @attributes="_attributes" @onclick="OnClick">
+<button @attributes="_attributes" @onclick="OnClick" @oncontextmenu="OnContextMenu" @oncontextmenu:preventDefault="@OnContextMenu.HasDelegate">
     @if (IconName != null)
     {
         <i class="@($"bi {IconName}")"></i>
@@ -25,6 +25,9 @@
 
     [Parameter]
     public EventCallback<MouseEventArgs> OnClick { get; set; }
+
+    [Parameter]
+    public EventCallback<MouseEventArgs> OnContextMenu { get; set; }
 
     [Parameter]
     public RenderFragment? ChildContent { get; set; }

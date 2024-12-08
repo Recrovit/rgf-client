@@ -1,5 +1,6 @@
 ﻿
-<RgfGridComponent @ref="_rgfGridRef" EntityParameters="EntityParameters" GridComponent="this">
+<RgfGridComponent @ref="_rgfGridRef" EntityParameters="EntityParameters" GridComponent="this"
+                  ColumnTemplate="ColumnTemplate">
     <GridTemplate Context="RgfGrid">
         @if (_rgfGridRef.IsProcessing)
         {
@@ -36,8 +37,13 @@
                     {
                         int rowIdx = index++;
                         var attributes = rowData.Get<RgfDynamicDictionary>("__attributes");
+                        string? rowClass = attributes?.Get<string>("class");
+                        if (_rgfGridRef.SelectedItems.ContainsKey(ListHandler.GetAbsoluteRowIndex(rowData)))
+                        {
+                            rowClass = rowClass == null ? "table-primary" : rowClass + " table-primary";
+                        }
                         <tr @ref="_rowRef[rowIdx]" data-row="@rowIdx"
-                            class="@(attributes?.Get<string>("class"))"
+                            class="@rowClass"
                             style="@(attributes?.Get<string>("style"))"
                             @onclick="(arg) => OnRowClick(arg, rowData, rowIdx)">
                             @foreach (var prop in EntityDesc.SortedVisibleColumns)
@@ -47,7 +53,7 @@
                                     class="@(propAttributes?.Get<string>("class"))"
                                     style="@(propAttributes?.Get<string>("style"))"
                                     data-bs-toggle="@(propAttributes?.Get<string?>("data-bs-toggle"))">
-                                    @RgfGrid.CreateGridColumn(prop, (RgfDynamicDictionary)rowData)
+                                    @RgfGrid.CreateGridColumn(prop, rowData)
                                 </td>
                             }
                         </tr>
@@ -70,4 +76,18 @@
 
     private IRgManager Manager => EntityParameters.Manager!;
     private RgfGridParameters GridParameters { get => EntityParameters.GridParameters; }
+
+    public RenderFragment<RgfGridColumnParameters> ColumnTemplate => (param) =>
+    {
+        if (param.PropDesc.FormType == PropertyFormType.CheckBox)
+        {
+            var objData = param.RowData.GetItemData(param.PropDesc.Alias);
+            if (objData.Value != null)
+            {
+                var cssClass = objData.BooleanValue ? "bi bi-check-circle text-success" : "bi bi-dash-circle text-danger";
+                return@<div class="text-center"><i class="@cssClass"></i></div>;
+            }
+        }
+        return param.BaseGridComponent.DefaultColumnTemplate(param);
+    };
 }
