@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Globalization;
 
 namespace Recrovit.RecroGridFramework.Abstraction.Extensions;
 
@@ -58,5 +59,16 @@ public static class DictionaryExtensions
     {
         var value = self.GetStringValue(key);
         return value != null && (value.Equals(bool.TrueString, StringComparison.OrdinalIgnoreCase) || value == "1");
+    }
+
+    public static DateTime? GetDateTimeValue<TKey, TValue>(this IDictionary<TKey, TValue> self, TKey key, string cultureName = null)
+    {
+        var culture = cultureName == null ? CultureInfo.InvariantCulture : new CultureInfo(cultureName);
+        if (self.TryGetValue(key, out var val) &&
+            DateTime.TryParse(val.ToString(), culture, DateTimeStyles.AllowWhiteSpaces, out DateTime dateTimeValue))
+        {
+            return dateTimeValue;
+        }
+        return null;
     }
 }
