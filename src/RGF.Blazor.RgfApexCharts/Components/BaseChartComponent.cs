@@ -221,7 +221,7 @@ public abstract class BaseChartComponent : ComponentBase
         {
             return false;
         }
-        var toast = RgfToastEvent.CreateActionEvent(RecroDict.GetRgfUiString("Request"), Manager.EntityDesc.MenuTitle, RgfChartRef.GetRecroDictChart("DataSet"), delay: 0);
+        var toast = RgfToastEventArgs.CreateActionEvent(RecroDict.GetRgfUiString("Request"), Manager.EntityDesc.MenuTitle, RgfChartRef.GetRecroDictChart("DataSet"), delay: 0);
         await Manager.ToastManager.RaiseEventAsync(toast, this);
 
         var success = await RgfChartRef.CreateChartDataAsyc();
@@ -229,10 +229,10 @@ public abstract class BaseChartComponent : ComponentBase
         {
             // Switch to this tab because the error message appears here
             ActiveTabIndex = RecroChartTab.Grid;
-            await Manager.ToastManager.RaiseEventAsync(RgfToastEvent.RemoveToast(toast), this);
+            await Manager.ToastManager.RaiseEventAsync(RgfToastEventArgs.RemoveToast(toast), this);
             return false;
         }
-        await Manager.ToastManager.RaiseEventAsync(RgfToastEvent.RecreateToastWithStatus(toast, RecroDict.GetRgfUiString("Processed"), RgfToastType.Success, delay: 2000), this);
+        await Manager.ToastManager.RaiseEventAsync(RgfToastEventArgs.RecreateToastWithStatus(toast, RecroDict.GetRgfUiString("Processed"), RgfToastType.Success, delay: 2000), this);
         ApexChartSettings.Title = "";
         ApexChartSettings.Series.Clear();
         await ApexChartRef.UpdateChart();
@@ -250,17 +250,17 @@ public abstract class BaseChartComponent : ComponentBase
 
         if (RgfChartRef?.DataStatus != RgfProcessingStatus.Valid)
         {
-            await Manager.ToastManager.RaiseEventAsync(new RgfToastEvent(RecroDict.GetRgfUiString("Warning"), RecroDict.GetRgfUiString("InvalidState"), RgfToastType.Warning), this);
+            await Manager.ToastManager.RaiseEventAsync(new RgfToastEventArgs(RecroDict.GetRgfUiString("Warning"), RecroDict.GetRgfUiString("InvalidState"), RgfToastType.Warning), this);
             return;
         }
 
         RgfChartRef.ChartStatus = RgfProcessingStatus.InProgress;// Prevents the chart from being redrawn when the data is updated
         try
         {
-            RgfToastEvent toast;
+            RgfToastEventArgs toast;
             if (currentStatus == RgfProcessingStatus.Invalid)
             {
-                toast = RgfToastEvent.CreateActionEvent(RecroDict.GetRgfUiString("Request"), Manager.EntityDesc.MenuTitle, "Render", delay: 0);
+                toast = RgfToastEventArgs.CreateActionEvent(RecroDict.GetRgfUiString("Request"), Manager.EntityDesc.MenuTitle, "Render", delay: 0);
                 await Manager.ToastManager.RaiseEventAsync(toast, this);
                 StateHasChanged();
                 await Task.Delay(50);
@@ -268,11 +268,11 @@ public abstract class BaseChartComponent : ComponentBase
             }
             else
             {
-                toast = RgfToastEvent.CreateActionEvent(RecroDict.GetRgfUiString("Request"), Manager.EntityDesc.MenuTitle, RecroDict.GetRgfUiString("Redraw"), delay: 0);
+                toast = RgfToastEventArgs.CreateActionEvent(RecroDict.GetRgfUiString("Request"), Manager.EntityDesc.MenuTitle, RecroDict.GetRgfUiString("Redraw"), delay: 0);
                 await Manager.ToastManager.RaiseEventAsync(toast, this);
                 await ApexChartRef.UpdateChart();
             }
-            await Manager.ToastManager.RaiseEventAsync(RgfToastEvent.RecreateToastWithStatus(toast, RecroDict.GetRgfUiString("Processed"), RgfToastType.Success, 2000), this);
+            await Manager.ToastManager.RaiseEventAsync(RgfToastEventArgs.RecreateToastWithStatus(toast, RecroDict.GetRgfUiString("Processed"), RgfToastType.Success, 2000), this);
             RgfChartRef.ChartStatus = RgfProcessingStatus.Valid;
         }
         catch

@@ -13,7 +13,7 @@
     <Company>Recrovit Kft.</Company>
     <Product>RecroGrid Framework</Product>
     <Copyright>© Recrovit Kft. All rights reserved.</Copyright>
-    <Version>8.3.0</Version>
+    <Version>8.4.0</Version>
     <FileVersion>$(Version).1$([System.DateTime]::Now.ToString(MMdd))</FileVersion>
     <InformationalVersion>$(FileVersion)</InformationalVersion>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
@@ -26,7 +26,8 @@
     <Description>RecroGrid Framework Blazor ApexCharts.</Description>
     <PackageTags>RecroGrid Framework Blazor ApexCharts</PackageTags>
     <RepositoryUrl>https://github.com/RecroGridFramework/RGF.Blazor.RgfApexCharts.git</RepositoryUrl>
-    <PackageLicenseExpression>GPL-3.0-only</PackageLicenseExpression>
+    <PackageLicenseExpression>LGPL-3.0-only</PackageLicenseExpression>
+    <PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
     <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
 
@@ -43,7 +44,7 @@
   </ItemGroup>
 
   <ItemGroup Condition="'$(Configuration)'=='Release'">
-    <PackageReference Include="Recrovit.RecroGridFramework.Client.Blazor" Version="8.12.1" />
+    <PackageReference Include="Recrovit.RecroGridFramework.Client.Blazor" Version="8.13.0" />
     <Content Update="wwwroot\scripts\recrovit-rgf-blazor.js" CopyToPublishDirectory="Never" />
   </ItemGroup>
 
