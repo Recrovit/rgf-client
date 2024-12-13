@@ -1,5 +1,5 @@
 ﻿
-<button @attributes="_attributes" @onclick="OnClick" @oncontextmenu="OnContextMenu" @oncontextmenu:preventDefault="@OnContextMenu.HasDelegate">
+<button @ref="_elementReference" @attributes="_attributes" @onclick="OnClick" @oncontextmenu="OnContextMenu" @oncontextmenu:preventDefault="@OnContextMenu.HasDelegate">
     @if (IconName != null)
     {
         <i class="@($"bi {IconName}")"></i>

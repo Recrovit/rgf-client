@@ -1,5 +1,5 @@
 ﻿<div class="@_formClass">
-    <InputCheckbox Value="@Value" ValueExpression="ValueExpression" ValueChanged="OnValueChanged" DisplayName="@DisplayName" AdditionalAttributes="_attributes" />
+    <InputCheckbox @ref="_inputRef" Value="@Value" ValueExpression="ValueExpression" ValueChanged="OnValueChanged" DisplayName="@DisplayName" AdditionalAttributes="_attributes" />
     @if (!string.IsNullOrEmpty(Label))
     {
         <label for="@Id" class="@($"form-check-label {LabelCssClass ?? ""}".TrimEnd())">@Label</label>
@@ -17,6 +17,8 @@
 
     [Parameter]
     public string? WrapperCssClass { get; set; }
+
+    private InputCheckbox? _inputRef { get; set; }
 
     private string _formClass { get; set; } = default!;
 
@@ -46,5 +48,11 @@
         _baseCssClass = "form-check-input form-check";
 
         base.OnParametersSet();
+    }
+
+    protected override Task OnAfterRenderAsync(bool firstRender)
+    {
+        _elementReference = _inputRef?.Element;
+        return base.OnAfterRenderAsync(firstRender);
     }
 }

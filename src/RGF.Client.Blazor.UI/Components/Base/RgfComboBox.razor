@@ -4,7 +4,11 @@
 }
 @if (!AllowCustom)
 {
-    <InputSelect TValue="TValue" Value="@Value" ValueExpression="ValueExpression" ValueChanged="OnValueChanged" DisplayName="@DisplayName" AdditionalAttributes="_attributes">
+    <InputSelect @ref="_inputRef" TValue="TValue" Value="@Value" ValueExpression="ValueExpression" ValueChanged="OnValueChanged" DisplayName="@DisplayName" AdditionalAttributes="_attributes">
+        @if (IncludeEmptyItem && !DataSource.Any(e => string.IsNullOrEmpty(e.Value?.ToString())))
+        {
+            <option value=""></option>
+        }
         @foreach (var option in DataSource)
         {
             <option value="@option.Key" selected="@(option.Key?.Equals(Value) == true)">@option.Value</option>
@@ -23,7 +27,6 @@ else
 
 @typeparam TValue
 @inherits RgfInput<TValue>
-@inject IJSRuntime _jsRuntime
 @implements IAsyncDisposable
 @code {
     [Parameter]
@@ -42,12 +45,17 @@ else
     public EventCallback<KeyValuePair<object?, string>> InputChanged { get; set; }
 
     [Parameter]
-    public bool AllowCustom { get; set; } = default;
+    public bool AllowCustom { get; set; } = false;
 
     [Parameter]
-    public bool AllowCustomAutoSelect { get; set; } = default;
+    public bool AllowCustomAutoSelect { get; set; } = false;
+
+    [Parameter]
+    public bool IncludeEmptyItem { get; set; } = false;
 
     private DotNetObjectReference<RgfComboBox<TValue>>? _selfRef { get; set; }
+
+    private InputSelect<TValue>? _inputRef { get; set; }
 
     protected override void OnInitialized()
     {
@@ -87,7 +95,13 @@ else
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        if (!AllowCustom)
+        {
+            _elementReference = _inputRef?.Element;
+        }
+
         await base.OnAfterRenderAsync(firstRender);
+
         if (firstRender)
         {
             if (!DataSource.Any(e => e.Key?.Equals(Value) == true))
@@ -95,10 +109,15 @@ else
                 await _jsRuntime.InvokeVoidAsync(RGFClientBlazorUIConfiguration.JsBlazorUiNamespace + ".ComboBox.clearText", this.Id);
             }
         }
-        if (AllowCustom && _selfRef == null)
+
+        if (AllowCustom)
         {
-            _selfRef = DotNetObjectReference.Create(this);
-            await _jsRuntime.InvokeVoidAsync(RGFClientBlazorUIConfiguration.JsBlazorUiNamespace + ".ComboBox.initialize", _selfRef, this.Id, this.Text, this.Width);
+            if (_selfRef == null)
+            {
+                _selfRef = DotNetObjectReference.Create(this);
+                await _jsRuntime.InvokeVoidAsync(RGFClientBlazorUIConfiguration.JsBlazorUiNamespace + ".ComboBox.initialize", _selfRef, this.Id, this.Text, this.Width);
+            }
+            await _jsRuntime.InvokeVoidAsync(RGFClientBlazorUIConfiguration.JsBlazorUiNamespace + ".Base.tooltip", $"#{this.Id} + input", Tooltip ?? "", TooltipPlacement, "rgf-base-tooltip");
         }
     }
 

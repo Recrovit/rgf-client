@@ -6,11 +6,11 @@
                 {
                     <li class="@(RgfPager.CurrentPage == 1 ? "page-item disabled" : "page-item")">
                         <RgfButton IconName="bi-chevron-double-left" CssClass="page-link"
-                                   Title="@RecroDict.GetRgfUiString("First")" OnClick="OnShowFirstPage" />
+                                   Tooltip="@RecroDict.GetRgfUiString("First")" OnClick="OnShowFirstPage" />
                     </li>
                     <li class="@(RgfPager.CurrentPage == 1 ? "page-item disabled" : "page-item")">
                         <RgfButton IconName="bi-chevron-left" CssClass="page-link"
-                                   Title="@RecroDict.GetRgfUiString("Prev")" OnClick="OnShowPreviousPage" />
+                                   Tooltip="@RecroDict.GetRgfUiString("Prev")" OnClick="OnShowPreviousPage" />
                     </li>
                     <li>
                         <RgfInputNumber TValue="int" Value="@RgfPager.CurrentPage" ValueExpression="() => RgfPager.CurrentPage" ValueChanged="RgfPager.PageChanging"
@@ -18,13 +18,13 @@
                     </li>
                     <li class="@(RgfPager.CurrentPage == RgfPager.TotalPages ? "page-item disabled" : "page-item")">
                         <RgfButton IconName="bi-chevron-right" CssClass="page-link"
-                                   Title="@RecroDict.GetRgfUiString("Next")" OnClick="OnShowNextPage" />
+                                   Tooltip="@RecroDict.GetRgfUiString("Next")" OnClick="OnShowNextPage" />
                     </li>
                     @if (RgfPager.ItemCount > 0)
                     {
                         <li class="@(RgfPager.CurrentPage == RgfPager.TotalPages ? "page-item disabled" : "page-item")">
                             <RgfButton IconName="bi-chevron-double-right" CssClass="page-link"
-                                       Title="@RecroDict.GetRgfUiString("Last")" OnClick="OnShowLastPage" />
+                                       Tooltip="@RecroDict.GetRgfUiString("Last")" OnClick="OnShowLastPage" />
                         </li>
                         <li>
                             <div class="input-group input-group-sm">

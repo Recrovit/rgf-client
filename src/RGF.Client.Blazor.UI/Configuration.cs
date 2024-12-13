@@ -21,8 +21,9 @@ public class RGFClientBlazorUIConfiguration
         if (jquiVer < 0)
         {
             await jsRuntime.InvokeAsync<IJSObjectReference>("import", $"{RgfClientConfiguration.AppRootPath}_content/{bname}/lib/jqueryui/jquery-ui.min.js");
-            await jsRuntime.InvokeVoidAsync("Recrovit.LPUtils.AddStyleSheetLink", $"{RgfClientConfiguration.AppRootPath}_content/{bname}/lib/jqueryui/themes/base/jquery-ui.min.css", false, JqueryUiCssId);
         }
+        await jsRuntime.InvokeVoidAsync("Recrovit.LPUtils.AddStyleSheetLink", $"{RgfClientConfiguration.AppRootPath}_content/{bname}/lib/jqueryui/themes/base/jquery-ui.min.css", false, JqueryUiCssId);
+
         var libName = Assembly.GetExecutingAssembly().GetName().Name;
         if (!_scriptsLoaded)
         {

@@ -15,6 +15,11 @@ div.spinner-flex {
     width: 100%;
 }
 
+div.rgf-base-tooltip .tooltip-inner {
+    width: fit-content;
+    max-width: 400px;
+}
+
 div.rgf-cell-tooltip {
     max-width: 50%;
 }

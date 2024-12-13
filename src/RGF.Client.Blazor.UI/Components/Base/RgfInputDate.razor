@@ -2,7 +2,7 @@
 {
     <label for="@Id" class="@($"form-label {LabelCssClass ?? ""}".TrimEnd())">@Label</label>
 }
-<InputDate TValue="TValue" Type="DateType" Value="@Value" ValueExpression="ValueExpression" ValueChanged="OnValueChanged" DisplayName="@DisplayName" AdditionalAttributes="_attributes" />
+<InputDate @ref="_inputRef" TValue="TValue" Type="DateType" Value="@Value" ValueExpression="ValueExpression" ValueChanged="OnValueChanged" DisplayName="@DisplayName" AdditionalAttributes="_attributes" />
 
 @typeparam TValue
 @inherits RgfInput<TValue>
@@ -11,10 +11,18 @@
     [Parameter]
     public InputDateType DateType { get; set; } = InputDateType.Date;
 
+    private InputDate<TValue>? _inputRef { get; set; }
+
     protected override void OnParametersSet()
     {
         _baseCssClass = "form-control form-control-sm";
 
         base.OnParametersSet();
+    }
+
+    protected override Task OnAfterRenderAsync(bool firstRender)
+    {
+        _elementReference = _inputRef?.Element;
+        return base.OnAfterRenderAsync(firstRender);
     }
 }

@@ -4,11 +4,11 @@
 }
 @if (Multiline)
 {
-    <InputTextArea Value="@Value" ValueExpression="ValueExpression" ValueChanged="OnValueChanged" DisplayName="@DisplayName" AdditionalAttributes="_attributes" />
+    <InputTextArea @ref="_inputAreaRef" Value="@Value" ValueExpression="ValueExpression" ValueChanged="OnValueChanged" DisplayName="@DisplayName" AdditionalAttributes="_attributes" />
 }
 else
 {
-    <InputText Value="@Value" ValueExpression="ValueExpression" ValueChanged="OnValueChanged" DisplayName="@DisplayName" AdditionalAttributes="_attributes" />
+    <InputText @ref="_inputRef" Value="@Value" ValueExpression="ValueExpression" ValueChanged="OnValueChanged" DisplayName="@DisplayName" AdditionalAttributes="_attributes" />
 }
 
 @inherits RgfInput<string>
@@ -22,6 +22,9 @@ else
 
     [Parameter]
     public int? MaxLength { get; set; }
+
+    private InputTextArea? _inputAreaRef { get; set; }
+    private InputText? _inputRef { get; set; }
 
     protected override void OnParametersSet()
     {
@@ -38,5 +41,11 @@ else
         }
 
         base.OnParametersSet();
+    }
+
+    protected override Task OnAfterRenderAsync(bool firstRender)
+    {
+        _elementReference = Multiline ? _inputAreaRef?.Element : _inputRef?.Element;
+        return base.OnAfterRenderAsync(firstRender);
     }
 }

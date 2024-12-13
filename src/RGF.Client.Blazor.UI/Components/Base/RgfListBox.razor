@@ -2,7 +2,7 @@
 {
     <label for="@Id" class="@($"form-label {LabelCssClass ?? ""}".TrimEnd())">@Label</label>
 }
-<select multiple @onchange="OnValuesChanged" @attributes="_attributes">
+<select @ref="_elementReference" multiple @onchange="OnValuesChanged" @attributes="_attributes">
     @foreach (var option in DataSource)
     {
         <option value="@option.Key" selected="@(Values?.Any(e => e?.Equals(option.Key) == true) == true)">@option.Value</option>
@@ -12,7 +12,6 @@
 @typeparam TValue
 @inherits RgfInput<TValue>
 @implements IAsyncDisposable
-@inject IJSRuntime _jsRuntime
 @code {
 
     [Parameter]

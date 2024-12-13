@@ -18,7 +18,7 @@ else if (_menuItems != null)
         <nav class="navbar navbar-expand-lg bg-body-tertiary ">
             <div class="container-fluid">
                 <div class="navbar-collapse">
-                    <ul class="navbar-nav rgf-menu"
+                    <ul @ref="_elementReference" class="navbar-nav rgf-menu"
                         @onmouseleave="OnMouseLeave">
                         @foreach (var item in _menuItems)
                         {
@@ -33,7 +33,7 @@ else if (_menuItems != null)
     {
         @if (!MenuParameters.ContextMenuPosition.IsEmpty)
         {
-            <ul class="rgf-menu dropdown-menu show"
+            <ul @ref="_elementReference" class="rgf-menu dropdown-menu show"
                 style="position: fixed; top: @(MenuParameters.ContextMenuPosition.Y)px; left: @(MenuParameters.ContextMenuPosition.X)px;"
                 @onmouseleave="OnMouseLeave">
                 @foreach (var item in _menuItems)
@@ -44,7 +44,7 @@ else if (_menuItems != null)
         }
         else
         {
-            <ul class="rgf-menu dropdown-menu"
+            <ul @ref="_elementReference" class="rgf-menu dropdown-menu"
                 @onmouseleave="OnMouseLeave">
                 @foreach (var item in _menuItems)
                 {
@@ -63,6 +63,11 @@ else if (_menuItems != null)
 
     [Inject]
     private IRgfMenuService _menuService { get; set; } = null!;
+
+    [Inject]
+    protected IJSRuntime _jsRuntime { get; set; } = null!;
+
+    private ElementReference? _elementReference;
 
     private bool _initialized = false;
 
@@ -208,5 +213,12 @@ else if (_menuItems != null)
         builder.CloseElement();
     };
 
-    private void OnMouseLeave(MouseEventArgs e) => MenuParameters.OnMouseLeave?.Invoke();
+    private async Task OnMouseLeave(MouseEventArgs args)
+    {
+        bool success = MenuParameters.OnMouseLeave?.Invoke() ?? true;
+        if (success && MenuParameters.HideOnMouseLeave == true && _elementReference != null)
+        {
+            await _jsRuntime.InvokeVoidAsync(RGFClientBlazorUIConfiguration.JsBlazorUiNamespace + ".Menu.hide", _elementReference);
+        }
+    }
 }

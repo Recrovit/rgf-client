@@ -210,43 +210,46 @@
 
     <FooterTemplate Context="RgfCharComp">
         <div class="d-flex flex-wrap justify-content-between align-items-center">
-            <div class="btn-group d-flex flex-grow-1 pe-4" role="group">
+            <div class="btn-group d-flex flex-grow-1" role="group">
                 <div class="rg-predef-name input-group input-group-sm">
-                    <RgfComboBox Label="@RecroDict.GetRgfUiString("Name")" LabelCssClass="col-form-label pe-1"
-                                 TValue="int?" Value="@RgfCharComp.ChartSettings.ChartSettingsId" Text="@RgfCharComp.ChartSettings.SettingsName" AllowCustom="true"
+                    <RgfComboBox TValue="int?" Value="@RgfCharComp.ChartSettings.ChartSettingsId" Text="@RgfCharComp.ChartSettings.SettingsName" AllowCustom="true"
+                                 Tooltip="@RecroDict.GetRgfUiString("SavedName")"
                                  DataSource="RgfCharComp.ChartSettingList.Select(e => new KeyValuePair<int?, string>(e.ChartSettingsId, e.SettingsName))"
-                                 InputChanged="OnChartSettingsChanged" />
+                                 InputChanged="(arg) => OnChartSettingsChanged(arg.Key as int?, arg.Value)" />
                 </div>
                 <div class="rg-predef-save">
-                    <div class="ps-1 pe-1">
-                        <RgfCheckBox Label="@RecroDict.GetRgfUiString("Public")" Reverse="true" WrapperCssClass="d-flex flex-row-reverse align-items-center"
-                                     @bind-Value="RgfCharComp.ChartSettings.IsPublicNonNullable" Disabled="!RgfCharComp.IsPublicChartSettingAllowed || string.IsNullOrEmpty(RgfCharComp.ChartSettings.SettingsName)" />
+                    <div class="ps-1" style="width:max-content;">
+                        <RgfComboBox TValue="string" @bind-Value="RgfCharComp.ChartSettings.RoleId" DataSource="RecroSec.Roles" IncludeEmptyItem="true"
+                                     Tooltip="@RecroDict.GetRgfUiString("RoleVisibilitySettingTooltip")"
+                                     Disabled="RgfCharComp.ChartSettings.IsReadonly == true || !RgfCharComp.IsPublicChartSettingAllowed || string.IsNullOrEmpty(RgfCharComp.ChartSettings.SettingsName)" />
                     </div>
-                    <div>
-                        <RgfButton IconName="bi-floppy" CssClass="btn-success" Title="@RecroDict.GetRgfUiString("Save")"
-                                   Disabled="string.IsNullOrEmpty(RgfCharComp.ChartSettings.SettingsName)"
+                    <div class="px-1">
+                        <RgfButton IconName="bi-floppy" CssClass="btn-success" Tooltip="@RecroDict.GetRgfUiString("SaveChartSettings")"
+                                   Disabled="RgfCharComp.ChartSettings.IsReadonly == true || string.IsNullOrEmpty(RgfCharComp.ChartSettings.SettingsName) || !RgfCharComp.IsPublicChartSettingAllowed && RgfCharComp.ChartSettings.RoleId != null"
                                    OnClick="(arg) => RgfCharComp.SaveChartSettingsAsync()" />
-                        <RgfButton IconName="bi-trash" CssClass="btn-danger" Title="@RecroDict.GetRgfUiString("Delete")"
-                                   Disabled="RgfCharComp.ChartSettings.ChartSettingsId == null || !RgfCharComp.IsPublicChartSettingAllowed && RgfCharComp.ChartSettings.IsPublicNonNullable"
+                        <RgfButton IconName="bi-trash" CssClass="btn-danger" Tooltip="@RecroDict.GetRgfUiString("DeleteSavedSettings")"
+                                   Disabled="RgfCharComp.ChartSettings.IsReadonly == true || RgfCharComp.ChartSettings.ChartSettingsId == null || !RgfCharComp.IsPublicChartSettingAllowed && RgfCharComp.ChartSettings.RoleId != null"
                                    OnClick="(arg) => RgfCharComp.OnDeleteChartSettingsAsync()" />
                     </div>
                 </div>
             </div>
+        </div>
+        <div class="d-flex flex-wrap justify-content-end align-items-center">
             <div id="gombok" class="d-flex">
                 <div class="p-1">
-                    <RgfButton CssClass="btn-primary" MinWidth="4rem" Label="@RecroDict.GetRgfUiString("Redraw")" Disabled="RgfCharComp.ChartStatus != RgfProcessingStatus.Valid"
+                    <RgfButton CssClass="btn-primary" MinWidth="5rem" Label="@RecroDict.GetRgfUiString("Redraw")" Disabled="RgfCharComp.ChartStatus != RgfProcessingStatus.Valid"
                                OnClick="(arg) => OnRedraw()" />
                 </div>
                 <div class="p-1">
-                    <RgfButton CssClass="btn-primary" MinWidth="4rem" Label="@RgfCharComp.GetRecroDictChart("CreateChart")" Disabled="RgfCharComp.ChartStatus != RgfProcessingStatus.Invalid || RgfCharComp.DataStatus == RgfProcessingStatus.InProgress"
+                    <RgfButton CssClass="btn-primary" MinWidth="5rem" Label="@RgfCharComp.GetRecroDictChart("CreateChart")" Disabled="RgfCharComp.ChartStatus != RgfProcessingStatus.Invalid || RgfCharComp.DataStatus == RgfProcessingStatus.InProgress"
                                OnClick="(arg) => OnCreateChart()" />
                 </div>
                 <div class="p-1">
-                    <RgfButton CssClass="btn-primary" MinWidth="4rem" Label="@RgfCharComp.GetRecroDictChart("DataSet")" Disabled="RgfCharComp.DataStatus != RgfProcessingStatus.Invalid"
+                    <RgfButton CssClass="btn-primary" MinWidth="5rem" Label="@RgfCharComp.GetRecroDictChart("DataSet")" Disabled="RgfCharComp.DataStatus != RgfProcessingStatus.Invalid"
                                OnClick="(arg) => OnGetData()" />
                 </div>
                 <div class="p-1">
-                    <RgfButton CssClass="btn-secondary" MinWidth="4rem" Label="@RecroDict.GetRgfUiString("Close")"
+                    <RgfButton CssClass="btn-secondary" MinWidth="5rem" Label="@RecroDict.GetRgfUiString("Close")"
                                OnClick="RgfCharComp.OnClose" />
                 </div>
             </div>
@@ -255,6 +258,7 @@
 </RgfChartComponent>
 
 @inherits BaseChartComponent
+@inject IRecroSecService RecroSec
 @code {
 
     private readonly string _tabsId = RgfBaseComponent.GetNextId();

@@ -1,5 +1,5 @@
 ﻿/*!
-* recrovit-rgf-blazor-ui.js v1.5.0
+* recrovit-rgf-blazor-ui.js v1.6.0
 */
 
 window.Recrovit = window.Recrovit || {};
@@ -8,6 +8,33 @@ window.Recrovit.RGF.Blazor = window.Recrovit.RGF.Blazor || {};
 var Blazor = window.Recrovit.RGF.Blazor;
 
 Blazor.UI = {
+    Base: {
+        tooltip: function (element, text, placement, cssClass) {
+            var $element = $(element);
+            if ($element.length !== 1) return null;
+
+            var tooltipInstance = bootstrap.Tooltip.getInstance($element[0]);
+            if ($element.is(':disabled') || !text) {
+                if (tooltipInstance) {
+                    tooltipInstance.dispose();
+                }
+                return null;
+            }
+            if (!tooltipInstance) {
+                tooltipInstance = new bootstrap.Tooltip($element[0], {
+                    title: text,
+                    customClass: cssClass,
+                    placement: placement || 'top',
+                    trigger: 'hover',
+                    html: true,
+                    delay: { show: 500 }
+                });
+            } else {
+                tooltipInstance.setContent({ '.tooltip-inner': text });
+            }
+            return tooltipInstance;
+        }
+    },
     Dialog: {
         initialize: function (dialogId, resizable, uniqueName, focusId) {
             var dialog = document.getElementById(dialogId);
@@ -204,6 +231,11 @@ Blazor.UI = {
         },
         destroy: function (comboBoxId) {
             $(`#${comboBoxId}`).off('change.RGF-Client-Blazor-UI').rgcombobox("destroy");
+        }
+    },
+    Menu: {
+        hide: function (element) {
+            $(element).removeClass('show').addClass('hide');
         }
     }
 };

@@ -1,9 +1,8 @@
-﻿
-@if (!string.IsNullOrEmpty(Label))
+﻿@if (!string.IsNullOrEmpty(Label))
 {
     <label for="@Id" class="@($"form-label {LabelCssClass ?? ""}".TrimEnd())">@Label</label>
 }
-<InputNumber TValue="TValue" Value="@Value" ValueExpression="ValueExpression" ValueChanged="OnValueChanged" DisplayName="@DisplayName" AdditionalAttributes="_attributes" />
+<InputNumber @ref="_inputRef" TValue="TValue" Value="@Value" ValueExpression="ValueExpression" ValueChanged="OnValueChanged" DisplayName="@DisplayName" AdditionalAttributes="_attributes" />
 
 @typeparam TValue
 @inherits RgfInput<TValue>
@@ -17,6 +16,8 @@
 
     [Parameter]
     public int? Max { get; set; }
+
+    private InputNumber<TValue>? _inputRef { get; set; }
 
     protected override void OnParametersSet()
     {
@@ -37,5 +38,11 @@
         }
 
         base.OnParametersSet();
+    }
+
+    protected override Task OnAfterRenderAsync(bool firstRender)
+    {
+        _elementReference = _inputRef?.Element;
+        return base.OnAfterRenderAsync(firstRender);
     }
 }
