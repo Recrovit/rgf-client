@@ -49,7 +49,7 @@ public class RgfGridRequest : RgfSessionParams
     public RgfChartSettings ChartSettings { get; set; }
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public RgfPredefinedFilter PredefinedFilter { get; set; }
+    public RgfFilterSettings FilterSettings { get; set; }
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Dictionary<string, object> CustomParams { get; set; }

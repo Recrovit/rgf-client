@@ -17,6 +17,8 @@ public interface IRecroSecService
 
     ClaimsPrincipal CurrentUser { get; }
 
+    Dictionary<string, string> Roles { get; }
+
     Task<string> GetAccessTokenAsync();
 
     string UserLanguage { get; }

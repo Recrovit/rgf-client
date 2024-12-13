@@ -7,20 +7,24 @@ namespace Recrovit.RecroGridFramework.Abstraction.Models;
 
 public class RgfAggregationSettings : ICloneable
 {
+    public RgfAggregationSettings() { }
+
+    internal RgfAggregationSettings(RgfAggregationSettings source)
+    {
+        Columns = source.Columns.Select(c => new RgfAggregationColumn(c)).ToList();
+        Groups = source.Groups.Select(g => new RgfIdAliasPair(g)).ToList();
+        SubGroup = source.SubGroup.Select(s => new RgfIdAliasPair(s)).ToList();
+    }
+
     public List<RgfAggregationColumn> Columns { get; set; } = new();
 
     public List<RgfIdAliasPair> Groups { get; set; } = new();
 
     public List<RgfIdAliasPair> SubGroup { get; set; } = new();
 
-    public virtual object Clone()
-    {
-        var clone = new RgfAggregationSettings();
-        clone.Columns = Columns.Select(c => c.Clone() as RgfAggregationColumn).ToList();
-        clone.Groups = Groups.Select(g => g.Clone() as RgfIdAliasPair).ToList();
-        clone.SubGroup = SubGroup.Select(s => s.Clone() as RgfIdAliasPair).ToList();
-        return clone;
-    }
+    public virtual object Clone() => DeepCopy(this);
+
+    public static RgfAggregationSettings DeepCopy(RgfAggregationSettings source) => source == null ? null : new RgfAggregationSettings(source);
 }
 
 public class RgfAggregationColumn : RgfIdAliasPair
@@ -29,13 +33,15 @@ public class RgfAggregationColumn : RgfIdAliasPair
 
     public RgfAggregationColumn() { }
 
-    public RgfAggregationColumn(RgfAggregationColumn aggregationColumn) : base(aggregationColumn) 
+    internal RgfAggregationColumn(RgfAggregationColumn source) : base(source)
     {
-        Aggregate = aggregationColumn.Aggregate;
+        Aggregate = source.Aggregate;
     }
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string Aggregate { get; set; }
 
-    public override object Clone() => new RgfAggregationColumn(this);
+    public override object Clone() => DeepCopy(this);
+
+    public static RgfAggregationColumn DeepCopy(RgfAggregationColumn source) => source == null ? null : new RgfAggregationColumn(source);
 }

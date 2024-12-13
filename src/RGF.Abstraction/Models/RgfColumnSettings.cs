@@ -15,6 +15,13 @@ public class RgfColumnSettings : RgfIdAliasPair
         Sort = property.Sort == 0 ? null : property.Sort;
     }
 
+    internal RgfColumnSettings(RgfColumnSettings columnSettings) : base(columnSettings)
+    {
+        ColPos = columnSettings.ColPos;
+        ColWidth = columnSettings.ColWidth;
+        Sort = columnSettings.Sort;
+    }
+
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public int? ColPos { get; set; }
 
@@ -23,4 +30,8 @@ public class RgfColumnSettings : RgfIdAliasPair
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public int? Sort { get; set; }
+
+    public override object Clone() => DeepCopy(this);
+
+    public static RgfColumnSettings DeepCopy(RgfColumnSettings source) => source == null ? null : new RgfColumnSettings(source);
 }

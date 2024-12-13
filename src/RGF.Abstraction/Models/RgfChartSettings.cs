@@ -11,8 +11,19 @@ public enum RgfChartSeriesType
     Donut = 4
 }
 
-public class RgfChartSetting
+public class RgfChartSetting : ICloneable
 {
+    public RgfChartSetting() { }
+
+    internal RgfChartSetting(RgfChartSetting chartSetting)
+    {
+        ChartSettingsId = chartSetting.ChartSettingsId;
+        SettingsName = chartSetting.SettingsName;
+        RoleId = chartSetting.RoleId;
+        IsReadonly = chartSetting.IsReadonly;
+        ParentGridSettings = new RgfGridSettings(chartSetting.ParentGridSettings);
+    }
+
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public int? ChartSettingsId { get; set; }
 
@@ -23,20 +34,35 @@ public class RgfChartSetting
     public string Remark { get; set; }
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public bool? IsPublic { get; set; }
-
-    [JsonIgnore(Condition = JsonIgnoreCondition.Always)]
-    public bool IsPublicNonNullable { get => IsPublic ?? false; set { IsPublic = value; } }
+    public string RoleId { get; set; }
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public bool? IsReadonly { get; set; }
 
     public RgfGridSettings ParentGridSettings { get; set; }
+
+    public virtual object Clone() => DeepCopy(this);
+
+    public static RgfChartSetting DeepCopy(RgfChartSetting source) => source == null ? null : new RgfChartSetting(source);
 }
 
-public class RgfChartSettings : RgfChartSetting, ICloneable
+public class RgfChartSettings : RgfChartSetting
 {
     public RgfChartSettings() { }
+
+    internal RgfChartSettings(RgfChartSettings chartSettings) : base(chartSettings)
+    {
+        AggregationSettings = new RgfAggregationSettings(chartSettings.AggregationSettings);
+        SeriesType = chartSettings.SeriesType;
+        Height = chartSettings.Height;
+        Width = chartSettings.Width;
+        ShowDataLabels = chartSettings.ShowDataLabels;
+        Legend = chartSettings.Legend;
+        Stacked = chartSettings.Stacked;
+        Horizontal = chartSettings.Horizontal;
+        Theme = chartSettings.Theme;
+        Palette = chartSettings.Palette;
+    }
 
     public RgfAggregationSettings AggregationSettings { get; set; } = new();
 
@@ -60,10 +86,7 @@ public class RgfChartSettings : RgfChartSetting, ICloneable
 
     public string Palette { get; set; }
 
-    public virtual object Clone()
-    {
-        var clone = (RgfChartSettings)MemberwiseClone();
-        clone.AggregationSettings = (RgfAggregationSettings)this.AggregationSettings.Clone();
-        return clone;
-    }
+    public override object Clone() => DeepCopy(this);
+
+    public static RgfChartSettings DeepCopy(RgfChartSettings source) => source == null ? null : new RgfChartSettings(source);
 }

@@ -1,6 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Text;
 
 namespace Recrovit.RecroGridFramework.Abstraction.Infrastructure.Security;
 
@@ -8,7 +6,7 @@ public enum RgfPermissionType
 {
     QueryString = 1001,
     QuickWatch = 1002,
-    PredefFilterAdmin = 1003,
+    PublicFilterSetting = 1003,
     Export = 1004,
     PublicGridSetting = 1005,
     PublicChartSetting = 1006,

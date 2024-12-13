@@ -5,20 +5,20 @@ using System.Text.Json.Serialization;
 
 namespace Recrovit.RecroGridFramework.Abstraction.Models;
 
-public class RgfGridSetting : ICloneable
+public class RgfFilterSetting : ICloneable
 {
-    public RgfGridSetting() { }
+    public RgfFilterSetting() { }
 
-    internal RgfGridSetting(RgfGridSetting gridSetting)
+    internal RgfFilterSetting(RgfFilterSetting filterSetting)
     {
-        GridSettingsId = gridSetting.GridSettingsId;
-        SettingsName = gridSetting.SettingsName;
-        RoleId = gridSetting.RoleId;
-        IsReadonly = gridSetting.IsReadonly;
+        FilterSettingsId = filterSetting.FilterSettingsId;
+        SettingsName = filterSetting.SettingsName;
+        RoleId = filterSetting.RoleId;
+        IsReadonly = filterSetting.IsReadonly;
     }
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public int? GridSettingsId { get; set; }
+    public int? FilterSettingsId { get; set; }
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string SettingsName { get; set; }
@@ -31,42 +31,30 @@ public class RgfGridSetting : ICloneable
 
     public virtual object Clone() => DeepCopy(this);
 
-    public static RgfGridSetting DeepCopy(RgfGridSetting source) => source == null ? null : new RgfGridSetting(source);
+    public static RgfFilterSetting DeepCopy(RgfFilterSetting source) => source == null ? null : new RgfFilterSetting(source);
 }
 
-public class RgfGridSettings : RgfGridSetting
+public class RgfFilterSettings : RgfFilterSetting
 {
-    public RgfGridSettings() { }
+    public RgfFilterSettings() { }
 
-    internal RgfGridSettings(RgfGridSettings source) : base(source)
+    internal RgfFilterSettings(RgfFilterSettings source) : base(source)
     {
-        ColumnSettings = source.ColumnSettings?.Select(x => new RgfColumnSettings(x)).ToArray();
-        Sort = source.Sort?.Select(e => e.ToArray()).ToArray();
         if (source.Conditions?.Any() == true)
         {
             var conditionsJson = JsonSerializer.Serialize(source.Conditions, new JsonSerializerOptions { DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull });
             Conditions = JsonSerializer.Deserialize<RgfFilter.Condition[]>(conditionsJson);
         }
-        PageSize = source.PageSize;
         SQLTimeout = source.SQLTimeout;
     }
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public RgfColumnSettings[] ColumnSettings { get; set; }
-
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public int[][] Sort { get; set; }
-
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public RgfFilter.Condition[] Conditions { get; set; }
-
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public int? PageSize { get; set; }
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public int? SQLTimeout { get; set; }
 
     public override object Clone() => DeepCopy(this);
 
-    public static RgfGridSettings DeepCopy(RgfGridSettings source) => source == null ? null : new RgfGridSettings(source);
+    public static RgfFilterSettings DeepCopy(RgfFilterSettings source) => source == null ? null : new RgfFilterSettings(source);
 }

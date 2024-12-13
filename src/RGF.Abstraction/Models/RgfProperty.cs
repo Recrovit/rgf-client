@@ -139,7 +139,9 @@ public class RgfIdAliasPair : ICloneable
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string Alias { get; set; }
 
-    public virtual object Clone() => new RgfIdAliasPair(this);
+    public virtual object Clone() => DeepCopy(this);
+
+    public static RgfIdAliasPair DeepCopy(RgfIdAliasPair source) => source == null ? null : new RgfIdAliasPair(source);
 }
 
 public class RgfProperty : RgfIdAliasPair, IRgfProperty
