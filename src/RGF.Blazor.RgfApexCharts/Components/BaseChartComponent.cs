@@ -396,9 +396,9 @@ public abstract class BaseChartComponent : ComponentBase
         SettingsAccordionActive = !SettingsAccordionActive;
     }
 
-    protected async Task OnChartSettingsChanged(KeyValuePair<object?, string> arg)
+    protected async Task OnChartSettingsChanged(int? id, string name)
     {
-        var res = await RgfChartRef.OnSetChartSettingAsync(arg.Key?.ToString(), arg.Value);
+        var res = await RgfChartRef.OnSetChartSettingAsync(id, name);
         if (res)
         {
             RgfChartRef.SetDataStatus(RgfProcessingStatus.Invalid);
