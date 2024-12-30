@@ -15,16 +15,42 @@ div.spinner-flex {
     width: 100%;
 }
 
-div.rgf-base-tooltip .tooltip-inner {
+.rgf-bs-icon-sm {
+    padding: 0px 2px 0px 2px;
+}
+
+    .rgf-bs-icon-sm.btn:focus,
+    .rgf-bs-icon-sm.btn:active,
+    .rgf-bs-icon-sm.btn:focus:active {
+        outline: none;
+        box-shadow: none;
+    }
+
+.rgf-maxw-50 {
+    max-width: 50%;
+}
+
+.rgf-tooltip-400 .tooltip-inner {
     width: fit-content;
     max-width: 400px;
 }
 
-div.rgf-cell-tooltip {
-    max-width: 50%;
+.rgf-tooltip-600 .tooltip-inner {
+    width: fit-content;
+    max-width: 600px;
 }
 
-    div.rgf-cell-tooltip .tooltip-inner {
-        width: fit-content;
-        max-width: 800px;
-    }
+.rgf-tooltip-800 .tooltip-inner {
+    width: fit-content;
+    max-width: 800px;
+}
+
+div.rgf-tree-tooltip .rgf-tooltip-title {
+    min-width: 150px;
+    padding: 0px 0px 0px 5px;
+}
+
+div.rgf-tree-tooltip .rgf-tooltip-data {
+    min-width: 250px;
+    padding: 0px 5px 0px 0px;
+}

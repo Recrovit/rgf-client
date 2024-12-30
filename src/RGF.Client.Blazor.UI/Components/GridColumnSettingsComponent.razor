@@ -1,4 +1,4 @@
-﻿<RgfGridColumnSettingsComponent @ref="_rgfColSettingsRef" BaseGridComponent="BaseGridComponent">
+﻿<RgfGridColumnSettingsComponent @ref="_rgfColSettingsRef" BaseDataComponent="BaseDataComponent">
     <SettingsTemplate Context="RgfColSettings">
         <table class="tablesorter">
             <thead>
@@ -30,7 +30,7 @@
 @code {
 
     [Parameter, EditorRequired]
-    public RgfGridComponent BaseGridComponent { get; set; } = null!;
+    public RgfDataComponentBase BaseDataComponent { get; set; } = null!;
 
     private RgfGridColumnSettingsComponent _rgfColSettingsRef { get; set; } = null!;
 

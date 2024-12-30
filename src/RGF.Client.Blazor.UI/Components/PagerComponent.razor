@@ -1,76 +1,100 @@
 ﻿<RgfPagerComponent @ref="_rgfPagerRef" EntityParameters="EntityParameters">
     <PagerTemplate Context="RgfPager">
-        <div class="bg-body-secondary p-1">
-            <ul class="pagination pagination-sm mb-0">
-                @if (RgfPager.ItemCount != 0)
-                {
-                    <li class="@(RgfPager.CurrentPage == 1 ? "page-item disabled" : "page-item")">
-                        <RgfButton IconName="bi-chevron-double-left" CssClass="page-link"
-                                   Tooltip="@RecroDict.GetRgfUiString("First")" OnClick="OnShowFirstPage" />
-                    </li>
-                    <li class="@(RgfPager.CurrentPage == 1 ? "page-item disabled" : "page-item")">
-                        <RgfButton IconName="bi-chevron-left" CssClass="page-link"
-                                   Tooltip="@RecroDict.GetRgfUiString("Prev")" OnClick="OnShowPreviousPage" />
-                    </li>
-                    <li>
-                        <RgfInputNumber TValue="int" Value="@RgfPager.CurrentPage" ValueExpression="() => RgfPager.CurrentPage" ValueChanged="RgfPager.PageChanging"
-                                        HideSpinButton="true" Min="1" Max="RgfPager.TotalPages" Width="@CalcWidth(RgfPager.CurrentPage)" />
-                    </li>
-                    <li class="@(RgfPager.CurrentPage == RgfPager.TotalPages ? "page-item disabled" : "page-item")">
-                        <RgfButton IconName="bi-chevron-right" CssClass="page-link"
-                                   Tooltip="@RecroDict.GetRgfUiString("Next")" OnClick="OnShowNextPage" />
-                    </li>
-                    @if (RgfPager.ItemCount > 0)
+        @if (EntityParameters.DisplayMode == RfgDisplayMode.Tree)
+        {
+            if (RgfPager.TotalPages > 0)
+            {
+                <RgfButton IconName="bi-chevron-left" CssClass="btn-outline-secondary rgf-bs-icon-sm me-1"
+                           Disabled="RgfPager.CurrentPage == 1"
+                           Tooltip="@RecroDict.GetRgfUiString("Prev")" OnClick="OnShowPreviousPage" />
+
+                <span>@($"{RgfPager.CurrentPage} / {RgfPager.TotalPages}")</span>
+
+                <RgfButton IconName="bi-chevron-right" CssClass="btn-outline-secondary rgf-bs-icon-sm ms-1"
+                           Disabled="RgfPager.CurrentPage == RgfPager.TotalPages"
+                           Tooltip="@RecroDict.GetRgfUiString("Next")" OnClick="OnShowNextPage" />
+            }
+            else
+            {
+                <span>0 / 0</span>
+            }
+        }
+        else
+        {
+            <div class="bg-body-secondary p-1">
+                <ul class="pagination pagination-sm mb-0">
+                    @if (RgfPager.ItemCount != 0)
                     {
-                        <li class="@(RgfPager.CurrentPage == RgfPager.TotalPages ? "page-item disabled" : "page-item")">
-                            <RgfButton IconName="bi-chevron-double-right" CssClass="page-link"
-                                       Tooltip="@RecroDict.GetRgfUiString("Last")" OnClick="OnShowLastPage" />
+                        <li class="@(RgfPager.CurrentPage == 1 ? "page-item disabled" : "page-item")">
+                            <RgfButton IconName="bi-chevron-double-left" CssClass="page-link"
+                                       Tooltip="@RecroDict.GetRgfUiString("First")" OnClick="OnShowFirstPage" />
+                        </li>
+                        <li class="@(RgfPager.CurrentPage == 1 ? "page-item disabled" : "page-item")">
+                            <RgfButton IconName="bi-chevron-left" CssClass="page-link"
+                                       Tooltip="@RecroDict.GetRgfUiString("Prev")" OnClick="OnShowPreviousPage" />
                         </li>
                         <li>
-                            <div class="input-group input-group-sm">
-                                <label class="input-group-text">@RecroDict.GetRgfUiString("PageCount")</label>
-                                <RgfInputNumber Value="RgfPager.TotalPages" ValueExpression="() => RgfPager.TotalPages" Readonly="true" Width="@CalcWidth(RgfPager.TotalPages)" />
-                            </div>
+                            <RgfInputNumber TValue="int" Value="@RgfPager.CurrentPage" ValueExpression="() => RgfPager.CurrentPage" ValueChanged="RgfPager.PageChanging"
+                                            HideSpinButton="true" Min="1" Max="RgfPager.TotalPages" Width="@CalcWidth(RgfPager.CurrentPage)" />
                         </li>
+                        <li class="@(RgfPager.CurrentPage == RgfPager.TotalPages ? "page-item disabled" : "page-item")">
+                            <RgfButton IconName="bi-chevron-right" CssClass="page-link"
+                                       Tooltip="@RecroDict.GetRgfUiString("Next")" OnClick="OnShowNextPage" />
+                        </li>
+                        @if (RgfPager.ItemCount > 0)
+                        {
+                            <li class="@(RgfPager.CurrentPage == RgfPager.TotalPages ? "page-item disabled" : "page-item")">
+                                <RgfButton IconName="bi-chevron-double-right" CssClass="page-link"
+                                           Tooltip="@RecroDict.GetRgfUiString("Last")" OnClick="OnShowLastPage" />
+                            </li>
+                            <li>
+                                <div class="input-group input-group-sm">
+                                    <label class="input-group-text">@RecroDict.GetRgfUiString("PageCount")</label>
+                                    <RgfInputNumber Value="RgfPager.TotalPages" ValueExpression="() => RgfPager.TotalPages" Readonly="true" Width="@CalcWidth(RgfPager.TotalPages)" />
+                                </div>
+                            </li>
+                            <li>
+                                <div class="input-group input-group-sm">
+                                    <label class="input-group-text">@RecroDict.GetRgfUiString("ItemCount")</label>
+                                    <RgfInputNumber Value="RgfPager.ItemCount" ValueExpression="() => RgfPager.ItemCount" Readonly="true" Width="@CalcWidth(RgfPager.ItemCount)" />
+                                </div>
+                            </li>
+                            @if (RgfPager.SelectedItemCount > 1)
+                            {
+                                <li>
+                                    <div class="input-group input-group-sm">
+                                        <label class="input-group-text">@RecroDict.GetRgfUiString("SelectedItemCount")</label>
+                                        <RgfInputNumber Value="RgfPager.SelectedItemCount" ValueExpression="() => RgfPager.SelectedItemCount" Readonly="true" Width="@CalcWidth(RgfPager.SelectedItemCount)" />
+                                    </div>
+                                </li>
+                            }
+                        }
+
+                        if (Manager.EntityDesc.Options.GetBoolValue("RGO_ClientMode") != true)
+                        {
+                            <li>
+                                <div class="input-group input-group-sm">
+                                    <label class="input-group-text">@RecroDict.GetRgfUiString("ItemsPerPage")</label>
+                                    <RgfComboBox TValue="int" Items="@(new int[] { 5, 10, 15, 25 })" AllowCustom="true" Text="@(_tmpPageSize ?? RgfPager.PageSize.ToString())" Width="3rem"
+                                                 Value="@RgfPager.PageSize" ValueExpression="() => RgfPager.PageSize"
+                                                 ValueChanged="OnPageValueChanged"
+                                                 InputChanged="(arg) => _tmpPageSize = arg.Value" />
+                                </div>
+                            </li>
+                        }
+                    }
+                    else
+                    {
                         <li>
                             <div class="input-group input-group-sm">
                                 <label class="input-group-text">@RecroDict.GetRgfUiString("ItemCount")</label>
                                 <RgfInputNumber Value="RgfPager.ItemCount" ValueExpression="() => RgfPager.ItemCount" Readonly="true" Width="@CalcWidth(RgfPager.ItemCount)" />
                             </div>
                         </li>
-                        @if (RgfPager.SelectedItemCount > 1)
-                        {
-                            <li>
-                                <div class="input-group input-group-sm">
-                                    <label class="input-group-text">@RecroDict.GetRgfUiString("SelectedItemCount")</label>
-                                    <RgfInputNumber Value="RgfPager.SelectedItemCount" ValueExpression="() => RgfPager.SelectedItemCount" Readonly="true" Width="@CalcWidth(RgfPager.SelectedItemCount)" />
-                                </div>
-                            </li>
-                        }
                     }
-
-                    if (Manager.EntityDesc.Options.GetBoolValue("RGO_ClientMode") != true)
-                    {
-                        <li>
-                            <div class="input-group input-group-sm">
-                                <label class="input-group-text">@RecroDict.GetRgfUiString("ItemsPerPage")</label>
-                                <RgfComboBox TValue="int" Items="@(new int[] { 5, 10, 15, 25 })" AllowCustom="true" Text="@RgfPager.PageSize.ToString()" Width="3rem"
-                                             Value="@RgfPager.PageSize" ValueExpression="() => RgfPager.PageSize" ValueChanged="RgfPager.PageSizeChanging" />
-                            </div>
-                        </li>
-                    }
-                }
-                else
-                {
-                    <li>
-                        <div class="input-group input-group-sm">
-                            <label class="input-group-text">@RecroDict.GetRgfUiString("ItemCount")</label>
-                            <RgfInputNumber Value="RgfPager.ItemCount" ValueExpression="() => RgfPager.ItemCount" Readonly="true" Width="@CalcWidth(RgfPager.ItemCount)" />
-                        </div>
-                    </li>
-                }
-            </ul>
-        </div>
+                </ul>
+            </div>
+        }
     </PagerTemplate>
 </RgfPagerComponent>
 
@@ -84,6 +108,7 @@
     private RgfPagerParameters PagerParameters { get => EntityParameters.PagerParameters; }
 
     private RgfPagerComponent _rgfPagerRef { get; set; } = null!;
+    private string? _tmpPageSize = null;
 
     private void OnShowFirstPage(MouseEventArgs args) => _rgfPagerRef.PageChanging(1);
     private void OnShowNextPage(MouseEventArgs args) => _rgfPagerRef.PageChanging(_rgfPagerRef.CurrentPage + 1);
@@ -91,4 +116,10 @@
     private void OnShowLastPage(MouseEventArgs args) => _rgfPagerRef.PageChanging(_rgfPagerRef.TotalPages);
 
     private string CalcWidth(int page) => page < 10000 ? "54px" : page < 1E7 ? "74px" : "114px";
+
+    protected void OnPageValueChanged(int value)
+    {
+        _tmpPageSize = value.ToString();
+        _rgfPagerRef.PageSizeChanging(value);
+    }
 }

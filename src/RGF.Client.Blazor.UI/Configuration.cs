@@ -34,7 +34,7 @@ public class RGFClientBlazorUIConfiguration
         await jsRuntime.InvokeVoidAsync("Recrovit.LPUtils.AddStyleSheetLink", $"{RgfClientConfiguration.AppRootPath}_content/{libName}/css/styles.css", false, BlazorUICss);
 
         await jsRuntime.InvokeVoidAsync("Recrovit.LPUtils.EnsureStyleSheetLoaded", "rgf-check-stylesheet-client-blazor-ui", "<div class=\"rgf-check-stylesheet-client-blazor-ui\" rgf-bs-root=\"\"></div>",
-            $"{RgfClientConfiguration.AppRootPath}_content/{libName}/{libName}.bundle.scp.css?v={FileVersion}", BlazorUICssLib, "Recrovit.RecroGridFramework.Client.Blazor.bundle.scp.css");
+            $"{RgfClientConfiguration.AppRootPath}_content/{libName}/{libName}.bundle.scp.css?v={Version}", BlazorUICssLib, "Recrovit.RecroGridFramework.Client.Blazor.bundle.scp.css");
 
         await jsRuntime.InvokeVoidAsync("Recrovit.LPUtils.AddStyleSheetLink", $"{ApiService.BaseAddress}/rgf/resource/bootstrap-submenu.css", false, BootstrapSubmenuCssId);
         await jsRuntime.InvokeVoidAsync("Recrovit.LPUtils.RemoveLinkedFile", "css/bootstrap/bootstrap.min.css", "stylesheet");
@@ -77,17 +77,20 @@ public class RGFClientBlazorUIConfiguration
         await RgfApexChartsConfiguration.UnloadResourcesAsync(jsRuntime);
     }
 
-    private static readonly string JqueryUiCssId = "rgf-jquery-ui";
-    private static readonly string BootstrapCssId = "rgf-bootstrap";
-    private static readonly string BootstrapIconsId = "rgf-bootstrap-icons";
-    private static readonly string BlazorUICss = "rgf-client-blazor-ui";
-    private static readonly string BlazorUICssLib = "rgf-client-blazor-ui-lib";
-    private static readonly string BootstrapSubmenuCssId = "rgf-bootstrap-submenu";
+    private const string JqueryUiCssId = "rgf-jquery-ui";
+    private const string BootstrapCssId = "rgf-bootstrap";
+    private const string BootstrapIconsId = "rgf-bootstrap-icons";
+    private const string BlazorUICss = "rgf-client-blazor-ui";
+    private const string BlazorUICssLib = "rgf-client-blazor-ui-lib";
+    private const string BootstrapSubmenuCssId = "rgf-bootstrap-submenu";
+
     private static bool _scriptsLoaded;
 
-    public static readonly string JsBlazorUiNamespace = "Recrovit.RGF.Blazor.UI";
+    public const string JsBlazorUiNamespace = "Recrovit.RGF.Blazor.UI";
 
-    public static string FileVersion => Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyFileVersionAttribute>()!.Version;
+    public static string Version => _version.Value;
+
+    private static readonly Lazy<string> _version = new Lazy<string>(() => Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyFileVersionAttribute>()!.Version);
 }
 
 public static class RGFClientBlazorUIConfigurationExtension
@@ -107,6 +110,6 @@ public static class RGFClientBlazorUIConfigurationExtension
         RgfBlazorConfiguration.RegisterComponent<ChartComponent>(RgfBlazorConfiguration.ComponentType.Chart);
 
         var logger = serviceProvider.GetRequiredService<ILogger<RGFClientBlazorUIConfiguration>>();
-        logger?.LogInformation("RecroGrid Framework Blazor.UI v{Version} initialized.", RGFClientBlazorUIConfiguration.FileVersion);
+        logger?.LogInformation("RecroGrid Framework Blazor.UI v{Version} initialized.", RGFClientBlazorUIConfiguration.Version);
     }
 }

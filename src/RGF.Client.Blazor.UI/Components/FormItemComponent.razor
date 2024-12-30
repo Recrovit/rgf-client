@@ -16,7 +16,8 @@
                     <div class="input-group input-group-sm">
                         <RgfInputText @bind-Value="ItemData.StringValue"
                                       Readonly="Property.Readonly" Disabled="Property.Disabled"
-                                      CssClass="@RgfFormItem.CssClass" Id="@Id" />
+                                      CssClass="@RgfFormItem.CssClass" Id="@Id"
+                                      Tooltip="@Tooltip" />
                         <RgfButton IconName="bi-search" CssClass="button.IsPrimary"
                                    OnClick="async () => await RgfFormItem.FindEntityAsync(ItemData.StringValue, false)"
                                    OnContextMenu="async () => await RgfFormItem.FindEntityAsync(ItemData.StringValue, true)" />
@@ -30,21 +31,24 @@
                             <RgfInputNumber @bind-Value="ItemData.IntValue"
                                             TValue="int?" HideSpinButton="true"
                                             Readonly="Property.Readonly" Disabled="Property.Disabled"
-                                            CssClass="@RgfFormItem.CssClass" Id="@Id" />
+                                            CssClass="@RgfFormItem.CssClass" Id="@Id"
+                                            Tooltip="@Tooltip" />
                             break;
 
                         case ClientDataType.Decimal:
                             <RgfInputNumber @bind-Value="ItemData.DecimalValue"
                                             TValue="decimal?" HideSpinButton="true"
                                             Readonly="Property.Readonly" Disabled="Property.Disabled"
-                                            CssClass="@RgfFormItem.CssClass" Id="@Id" />
+                                            CssClass="@RgfFormItem.CssClass" Id="@Id"
+                                            Tooltip="@Tooltip" />
                             break;
 
                         case ClientDataType.Double:
                             <RgfInputNumber @bind-Value="ItemData.DoubleValue"
                                             TValue="double?" HideSpinButton="true"
                                             Readonly="Property.Readonly" Disabled="Property.Disabled"
-                                            CssClass="@RgfFormItem.CssClass" Id="@Id" />
+                                            CssClass="@RgfFormItem.CssClass" Id="@Id"
+                                            Tooltip="@Tooltip" />
                             break;
 
                         default:
@@ -52,7 +56,8 @@
                                           Password="PropertyDesc.PasswordType"
                                           Readonly="Property.Readonly" Disabled="Property.Disabled"
                                           MaxLength="Property.PropertyDesc.MaxLength"
-                                          CssClass="@RgfFormItem.CssClass" Id="@Id" />
+                                          CssClass="@RgfFormItem.CssClass" Id="@Id"
+                                          Tooltip="@Tooltip" />
                             break;
                     }
                 }
@@ -63,7 +68,8 @@
                               Multiline="true"
                               Readonly="Property.Readonly" Disabled="Property.Disabled"
                               MaxLength="Property.PropertyDesc.MaxLength"
-                              CssClass="@RgfFormItem.CssClass" Id="@Id" />
+                              CssClass="@RgfFormItem.CssClass" Id="@Id"
+                              Tooltip="@Tooltip" />
                 break;
 
             case PropertyFormType.CheckBox:
@@ -74,14 +80,16 @@
                         <RgfCheckBox @bind-Value="@ItemData.BooleanValue"
                                      Label="@Property.Label" LabelCssClass="rg-label"
                                      Readonly="Property.Readonly" Disabled="Property.Disabled"
-                                     CssClass="@RgfFormItem.CssClass" />
+                                     CssClass="@RgfFormItem.CssClass"
+                                     Tooltip="@Tooltip" />
                     </div>
                 }
                 else
                 {
                     <RgfComboBox TValue="string" DataSource="Property.AvailableDictionary" @bind-Value="ItemData.StringValue"
                                  Readonly="Property.Readonly" Disabled="Property.Disabled"
-                                 CssClass="@RgfFormItem.CssClass" Id="@Id" />
+                                 CssClass="@RgfFormItem.CssClass" Id="@Id"
+                                 Tooltip="@Tooltip" />
                 }
                 break;
 
@@ -89,20 +97,25 @@
                 <RgfInputDate @bind-Value="ItemData.DateTimeValue"
                               TValue="DateTime?"
                               Readonly="Property.Readonly" Disabled="Property.Disabled"
-                              CssClass="@RgfFormItem.CssClass" Id="@Id" />
+                              CssClass="@RgfFormItem.CssClass" Id="@Id"
+                              Tooltip="@Tooltip" />
                 break;
 
             case PropertyFormType.DateTime:
                 <RgfInputDate @bind-Value="ItemData.DateTimeValue"
                               TValue="DateTime?" DateType="InputDateType.DateTimeLocal"
                               Readonly="Property.Readonly" Disabled="Property.Disabled"
-                              CssClass="@RgfFormItem.CssClass" Id="@Id" />
+                              CssClass="@RgfFormItem.CssClass" Id="@Id"
+                              Tooltip="@Tooltip" />
                 break;
 
             case PropertyFormType.StaticText:
-                <div class="@RgfFormItem.CssClass" style="@Property.Style">
+                <RgfHtml TagName="div"
+                         CssClass="@RgfFormItem.CssClass"
+                         Style="@Property.Style"
+                         Tooltip="@Tooltip">
                     @(ItemData.StringValue)
-                </div>
+                </RgfHtml>
                 break;
 
             case PropertyFormType.ImageInDB:
@@ -110,9 +123,12 @@
                 break;
 
             case PropertyFormType.RecroDict:
-                <div class="@RgfFormItem.CssClass" style="@Property.Style">
+                <RgfHtml TagName="div"
+                         CssClass="@RgfFormItem.CssClass"
+                         Style="@Property.Style"
+                         Tooltip="@Tooltip">
                     @((MarkupString)ItemData.StringValue)
-                </div>
+                </RgfHtml>
                 break;
 
             case PropertyFormType.HtmlEditor:
@@ -120,7 +136,8 @@
                               Multiline="true"
                               Readonly="Property.Readonly" Disabled="Property.Disabled"
                               MaxLength="Property.PropertyDesc.MaxLength"
-                              CssClass="@RgfFormItem.CssClass" Id="@Id" />
+                              CssClass="@RgfFormItem.CssClass" Id="@Id"
+                              Tooltip="@Tooltip" />
                 break;
 
             case PropertyFormType.RecroGrid:
@@ -137,7 +154,7 @@
                     {
                         if (_embeddedGrid == null)
                         {
-                            _embeddedGrid = RgfEntityComponent.Create(new RgfEntityParameters(Property.ForeignEntity.EntityName, BaseFormComponent.Manager.SessionParams) { GridId = ItemData.StringValue });
+                            _embeddedGrid = RgfEntityComponent.Create(new RgfEntityParameters(Property.ForeignEntity.EntityName, BaseFormComponent.Manager.SessionParams) { GridId = ItemData.StringValue, DisplayMode = RfgDisplayMode.Grid });
                         }
                         @_embeddedGrid
                     }
@@ -169,6 +186,7 @@
     protected RgfDynamicData ItemData => FormItemParameters.ItemData;
 
     protected RgfProperty PropertyDesc => Property.PropertyDesc;
+    private string? Tooltip => BaseFormComponent.PropertyTooltips.GetTooltip(Property.Id);
     private RenderFragment? _embeddedGrid;
 
     protected string Id { get; set; } = RgfBaseComponent.GetNextId();

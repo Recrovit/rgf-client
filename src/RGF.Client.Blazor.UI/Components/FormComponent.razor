@@ -5,6 +5,10 @@
     <FormTemplate Context="RgfForm">
         <EditForm EditContext="RgfForm.CurrentEditContext" class="needs-validation">
             <div class="card">
+                @if (RgfForm.IsFormDataBeingSet)
+                {
+                    <SpinnerComponent ContainerClass="spinner-flex" Style="width: 3rem; height: 3rem;" />
+                }
                 <div class="dialog-header card-header">
                     <ul class="nav nav-tabs card-header-tabs" id="@_tabsId" role="tablist">
                         @for (var idx = 0; idx < RgfForm.FormData.FormTabs.Count; idx++)
@@ -21,7 +25,7 @@
                         }
                     </ul>
                 </div>
-                <div class="card-body">
+                <div class="@(_rgfFormRef.IsFormDataBeingSet ? "card-body opacity-50" : "card-body")">
                     <div class="tab-content">
                         @for (var idx = 0; idx < RgfForm.FormData.FormTabs.Count; idx++)
                         {
@@ -88,10 +92,10 @@
         if (rowIndex != -1)
         {
             var buttons = new List<ButtonParameters>() {
-                new("bi-chevron-double-left", RecroDict.GetRgfUiString("First"), async (arg) => await _rgfFormRef.FirstFormItemAsync(), "btn-secondary") { Disabled = rowIndex <= 0 },
-                new("bi-chevron-left", RecroDict.GetRgfUiString("Prev"), async (arg) => await _rgfFormRef.PrevFormItemAsync(), "btn-secondary") { Disabled = rowIndex <= 0 },
-                new("bi-chevron-right", RecroDict.GetRgfUiString("Next"), async (arg) => await _rgfFormRef.NextFormItemAsync(), "btn-secondary") { Disabled = rowIndex + 1 >= Manager.ItemCount.Value },
-                new("bi-chevron-double-right", RecroDict.GetRgfUiString("Last"), async (arg) => await _rgfFormRef.LastFormItemAsync(), "btn-secondary") { Disabled = rowIndex + 1 >= Manager.ItemCount.Value } };
+                 new("bi-chevron-double-left", RecroDict.GetRgfUiString("First"), async (arg) => await _rgfFormRef.FirstFormItemAsync(), "btn-secondary") { Disabled = rowIndex <= 0 },
+                 new("bi-chevron-left", RecroDict.GetRgfUiString("Prev"), async (arg) => await _rgfFormRef.PrevFormItemAsync(), "btn-secondary") { Disabled = rowIndex <= 0 },
+                 new("bi-chevron-right", RecroDict.GetRgfUiString("Next"), async (arg) => await _rgfFormRef.NextFormItemAsync(), "btn-secondary") { Disabled = rowIndex + 1 >= Manager.ItemCount.Value },
+                 new("bi-chevron-double-right", RecroDict.GetRgfUiString("Last"), async (arg) => await _rgfFormRef.LastFormItemAsync(), "btn-secondary") { Disabled = rowIndex + 1 >= Manager.ItemCount.Value } };
             FormParameters.DialogParameters.LeftButtons = buttons;
         }
         else

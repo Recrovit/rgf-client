@@ -1,0 +1,74 @@
+﻿<div class="tree-node" data-row="@Node.AbsoluteRowIndex">
+    @if (Node.Children?.Count > 0 || Node.Property?.ListType == PropertyListType.RecroGrid)
+    {
+        <RgfButton IconName="@(Node.IsExpanded ? "bi-chevron-down" : "bi-chevron-right")"
+                   CssClass="@($"rgf-bs-icon-sm me-1 tree-toggle-icon {(Node.IsExpanded ? "btn-secondary" : "btn-light")}")" AdditionalAttributes="@(new(){ {"rgf-bs-tree",""} })"
+                   OnClick="(arg) => Node.IsExpanded = !Node.IsExpanded" />
+
+        @if (Node.Property?.ListType == PropertyListType.RecroGrid)
+        {
+            <RgfButton IconName="bi-bar-chart-steps"
+                       CssClass="@($"rgf-bs-icon-sm me-1 {(Node.EntityParameters?.DisplayMode == RfgDisplayMode.Tree ? "btn-success" : "btn-secondary")}")"
+                       Disabled="@(Node.EntityParameters?.Manager == null)"
+                       Tooltip="TreeView"
+                       OnClick="OnEmbedded" />
+        }
+    }
+
+    @if (Node.Property != null && Node.Property.ListType != PropertyListType.RecroGrid)
+    {
+        var attributes = Node.RowData.Get<RgfDynamicDictionary>("__attributes");
+        var propAttributes = attributes?.Get<RgfDynamicDictionary>(Node.Property.Alias);
+        var selected = TreeComponent.SelectedItems.ContainsKey(Manager.ListHandler.GetAbsoluteRowIndex(Node.RowData)) ? "table-primary" : null;
+        <RgfHtml TagName="div"
+                 CssClass="@("data-node table d-inline tree-tooltip".EnsureContains(selected, ' ').EnsureContains(attributes?.Get<string>("class"), ' '))" AdditionalAttributes="@(new(){ {"rgf-bs-tree",""} })"
+                 TooltipOptions="@(new RgfTooltipOptions(Node.TooltipText) { CustomClass = "rgf-tooltip-600"})"
+                 OnClick="OnClickData">
+            <RgfHtml TagName="div"
+                     CssClass="@("d-inline".EnsureContains(propAttributes?.Get<string>("class"), ' '))" AdditionalAttributes="@(new(){ {"rgf-bs-tree",""} })"
+                     Style="@(propAttributes?.Get<string>("style"))">
+                @TreeComponent.RenderContentItem(Node.Property, Node.RowData)
+            </RgfHtml>
+            @foreach (var prop in Manager.EntityDesc.SortedVisibleColumns.Take(TreeComponent.TreeViewColumnCount()).Skip(1).ToArray())
+            {
+                <i class="bi bi-three-dots-vertical"></i>
+                var propAttr = attributes?.Get<RgfDynamicDictionary>(prop.Alias);
+                <RgfHtml TagName="div"
+                         CssClass="@("d-inline".EnsureContains(propAttr?.Get<string>("class"), ' '))" AdditionalAttributes="@(new(){ {"rgf-bs-tree",""} })"
+                         Style="@(propAttr?.Get<string>("style"))">
+                    @TreeComponent.RenderContentItem(prop, Node.RowData)
+                </RgfHtml>
+            }
+        </RgfHtml>
+    }
+    else
+    {
+        <span>@(Node.Property?.ColTitle ?? "?")</span>
+    }
+
+    @if (Node.Children?.Count > 0 || Node.Property?.ListType == PropertyListType.RecroGrid)
+    {
+        <div class="collapse show @(Node.IsExpanded ? "expanded" : "")">
+            @if (Node.Children != null)
+            {
+                @foreach (var child in Node.Children)
+                {
+                    <TreeNodeComponent TreeComponent="TreeComponent" @key="@($"{child.AbsoluteRowIndex}-{child.Property?.Id}")" Node="child" />
+                }
+            }
+            @if (Node.Property?.ListType == PropertyListType.RecroGrid && Node.IsExpanded && Node.EmbeddedGrid != null)
+            {
+                @Node.EmbeddedGrid
+            }
+        </div>
+    }
+</div>
+
+@code {
+
+    [Parameter, EditorRequired]
+    public RgfTreeComponent TreeComponent { get; set; } = default!;
+
+    [Parameter, EditorRequired]
+    public RgfTreeNodeParameters Node { get; set; } = default!;
+}

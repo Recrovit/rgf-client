@@ -27,7 +27,6 @@ else
 
 @typeparam TValue
 @inherits RgfInput<TValue>
-@implements IAsyncDisposable
 @code {
     [Parameter]
     public IEnumerable<KeyValuePair<TValue, string>> DataSource { get; set; } = default!;
@@ -117,7 +116,10 @@ else
                 _selfRef = DotNetObjectReference.Create(this);
                 await _jsRuntime.InvokeVoidAsync(RGFClientBlazorUIConfiguration.JsBlazorUiNamespace + ".ComboBox.initialize", _selfRef, this.Id, this.Text, this.Width);
             }
-            await _jsRuntime.InvokeVoidAsync(RGFClientBlazorUIConfiguration.JsBlazorUiNamespace + ".Base.tooltip", $"#{this.Id} + input", Tooltip ?? "", TooltipPlacement, "rgf-base-tooltip");
+            if (TooltipOptions != null)
+            {
+                await _jsRuntime.InvokeVoidAsync(RGFClientBlazorUIConfiguration.JsBlazorUiNamespace + ".Base.tooltip", $"#{this.Id} + input", TooltipOptions);
+            }
         }
     }
 
@@ -203,12 +205,13 @@ else
         }
     }
 
-    public async ValueTask DisposeAsync()
+    public override async ValueTask DisposeAsync()
     {
         if (_selfRef != null)
         {
             await _jsRuntime.InvokeVoidAsync(RGFClientBlazorUIConfiguration.JsBlazorUiNamespace + ".ComboBox.destroy", this.Id);
             _selfRef.Dispose();
         }
+        await base.DisposeAsync();
     }
 }

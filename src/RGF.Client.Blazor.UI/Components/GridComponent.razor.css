@@ -1,3 +1,19 @@
-﻿table.recro-grid.table td {
+﻿table.recro-grid.table th {
+    vertical-align: top;
+}
+
+table.recro-grid.table td {
     user-select: none;
 }
+
+.quick-filter {
+    transition: height 0.5s ease;
+}
+
+    .quick-filter .active {
+        border-color: var(--bs-success);
+    }
+
+    .quick-filter .inactive {
+        border-color: var(--bs-danger);
+    }

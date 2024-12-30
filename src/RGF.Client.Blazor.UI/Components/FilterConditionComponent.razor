@@ -24,12 +24,12 @@
                 else
                 {
                     <div class="p-1">
-                        <RgfComboBox TValue="int" Value="item.PropertyId" ValueExpression="() => item.PropertyId"
+                        <RgfComboBox TValue="int" Value="item.PropertyId" ValueExpression="() => item.PropertyId" Disabled="item.IsQuickFilter"
                                      DataSource="Columns"
                                      ValueChanged="(value) => OnChangeProperty(value, item)" />
                     </div>
                     <div class="p-1">
-                        <RgfComboBox TValue="RgfFilter.QueryOperator" Value="item.QueryOperator" ValueExpression="() => item.QueryOperator"
+                        <RgfComboBox TValue="RgfFilter.QueryOperator" Value="item.QueryOperator" ValueExpression="() => item.QueryOperator" Disabled="item.IsQuickFilter"
                                      DataSource="GetQueryOperators(item)"
                                      ValueChanged="(value) => OnChangeQueryOperator(value, item)" />
                     </div>
@@ -40,27 +40,27 @@
                             @switch (prop.ClientDataType)
                             {
                                 case ClientDataType.Integer:
-                                    <RgfInputNumber TValue="int?" @bind-Value="item.DynValue1.IntValue"
+                                    <RgfInputNumber TValue="int?" @bind-Value="item.DynValue1.IntValue" Disabled="item.IsQuickFilter"
                                                     OnValueChanging="() => FilterComponent.IsFilterActive=true" />
                                     break;
 
                                 case ClientDataType.Decimal:
-                                    <RgfInputNumber TValue="decimal?" @bind-Value="item.DynValue1.DecimalValue" HideSpinButton="true"
+                                    <RgfInputNumber TValue="decimal?" @bind-Value="item.DynValue1.DecimalValue" HideSpinButton="true" Disabled="item.IsQuickFilter"
                                                     OnValueChanging="() => FilterComponent.IsFilterActive=true" />
                                     break;
 
                                 case ClientDataType.Double:
-                                    <RgfInputNumber TValue="double?" @bind-Value="item.DynValue1.DoubleValue" HideSpinButton="true"
+                                    <RgfInputNumber TValue="double?" @bind-Value="item.DynValue1.DoubleValue" HideSpinButton="true" Disabled="item.IsQuickFilter"
                                                     OnValueChanging="() => FilterComponent.IsFilterActive=true" />
                                     break;
 
                                 case ClientDataType.DateTime:
-                                    <RgfInputDate TValue="DateTime?" DateType="prop.FormType == PropertyFormType.Date ? InputDateType.Date : InputDateType.DateTimeLocal" @bind-Value="item.DynValue1.DateTimeValue"
+                                    <RgfInputDate TValue="DateTime?" DateType="prop.FormType == PropertyFormType.Date ? InputDateType.Date : InputDateType.DateTimeLocal" @bind-Value="item.DynValue1.DateTimeValue" Disabled="item.IsQuickFilter"
                                                   OnValueChanging="() => FilterComponent.IsFilterActive=true" />
                                     break;
 
                                 case ClientDataType.Boolean:
-                                    <RgfCheckBox @bind-Value="item.DynValue1.BooleanValue"
+                                    <RgfCheckBox @bind-Value="item.DynValue1.BooleanValue" Disabled="item.IsQuickFilter"
                                                  OnValueChanging="() => FilterComponent.IsFilterActive=true" />
                                     break;
 
@@ -72,7 +72,7 @@
                                     }
                                     else
                                     {
-                                        <RgfInputText @bind-Value="item.DynValue1.StringValue"
+                                        <RgfInputText @bind-Value="item.DynValue1.StringValue" Disabled="item.IsQuickFilter"
                                                       OnValueChanging="() => FilterComponent.IsFilterActive=true" />
                                     }
                                     break;

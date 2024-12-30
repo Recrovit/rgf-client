@@ -1,5 +1,5 @@
 ﻿/*!
-* recrovit-rgf-blazor-ui.js v1.6.0
+* recrovit-rgf-blazor-ui.js v1.7.0
 */
 
 window.Recrovit = window.Recrovit || {};
@@ -9,12 +9,12 @@ var Blazor = window.Recrovit.RGF.Blazor;
 
 Blazor.UI = {
     Base: {
-        tooltip: function (element, text, placement, cssClass) {
+        tooltip: function (element, options) {
             var $element = $(element);
             if ($element.length !== 1) return null;
 
             var tooltipInstance = bootstrap.Tooltip.getInstance($element[0]);
-            if ($element.is(':disabled') || !text) {
+            if ($element.is(':disabled') || !options) {
                 if (tooltipInstance) {
                     tooltipInstance.dispose();
                 }
@@ -22,15 +22,15 @@ Blazor.UI = {
             }
             if (!tooltipInstance) {
                 tooltipInstance = new bootstrap.Tooltip($element[0], {
-                    title: text,
-                    customClass: cssClass,
-                    placement: placement || 'top',
-                    trigger: 'hover',
-                    html: true,
+                    title: options.title,
+                    customClass: options.customClass || 'rgf-tooltip-400',
+                    placement: options.placement || 'top',
+                    trigger: options.trigger || 'hover',
+                    html: options.allowHtml,
                     delay: { show: 500 }
                 });
             } else {
-                tooltipInstance.setContent({ '.tooltip-inner': text });
+                tooltipInstance.setContent({ '.tooltip-inner': options.title });
             }
             return tooltipInstance;
         }
@@ -135,7 +135,7 @@ Blazor.UI = {
                 var element = $(this);
                 var tooltip = new bootstrap.Tooltip(element[0], {
                     title: element.text(),
-                    customClass: 'rgf-cell-tooltip',
+                    customClass: 'rgf-tooltip-800 rgf-maxw-50',
                     trigger: 'hover',
                     delay: { show: 500 },
                     html: true
@@ -235,7 +235,7 @@ Blazor.UI = {
     },
     Menu: {
         hide: function (element) {
-            $(element).removeClass('show').addClass('hide');
+            $(element).removeClass('show');
         }
     }
 };

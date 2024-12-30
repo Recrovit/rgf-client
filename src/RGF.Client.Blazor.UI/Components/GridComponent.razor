@@ -1,8 +1,7 @@
-﻿
-<RgfGridComponent @ref="_rgfGridRef" EntityParameters="EntityParameters" GridComponent="this"
+﻿<RgfGridComponent @ref="_rgfGridRef" EntityParameters="EntityParameters" GridComponent="this"
                   ColumnTemplate="ColumnTemplate">
     <GridTemplate Context="RgfGrid">
-        @if (_rgfGridRef.IsProcessing)
+        @if (RgfGrid.IsProcessing)
         {
             <SpinnerComponent ContainerClass="spinner-flex" Style="width: 3rem; height: 3rem;" />
         }
@@ -12,10 +11,10 @@
                     @foreach (var prop in EntityDesc.SortedVisibleColumns)
                     {
                         <th scope="col" title="@prop.ColTitle"
-                            class="@($"rg-col-{prop.Id}") bg-body-tertiary"
-                            style="@(prop.ColWidth > 0 ? $"width:{prop.ColWidth}px" : null)"
-                            @oncontextmenu="(arg) => RgfGrid.ShowHeaderMenu(prop.Id, new((int)arg.ClientX, (int)arg.ClientY))" @oncontextmenu:preventDefault>
-                            <div class="d-flex justify-content-between align-items-center pe-0">
+                            class="@($"rg-col-{prop.Id} {(Manager.IsColumnFiltered(prop) ? "table-success" : "bg-body-tertiary")}") "
+                            style="@(prop.ColWidth > 0 ? $"width:{prop.ColWidth}px" : null)">
+                            <div class="d-flex justify-content-between align-items-center pe-0"
+                                 @oncontextmenu="(arg) => RgfGrid.ShowHeaderMenu(prop.Id, new((int)arg.ClientX, (int)arg.ClientY))" @oncontextmenu:preventDefault>
                                 <div class="p-1">@prop.ColTitle</div>
                                 @if (prop.Orderable && Manager.EntityDesc.Options.GetBoolValue("RGO_ClientMode") != true)
                                 {
@@ -26,11 +25,53 @@
                                     </RgfButton>
                                 }
                             </div>
+                            @if (EntityParameters.ToolbarParameters.QuickFilterEnabled)
+                            {
+                                var clientDataType = (new[] { PropertyFormType.TextBox, PropertyFormType.TextBoxMultiLine }).Contains(prop.FormType) ? prop.ClientDataType : ClientDataType.Undefined;
+                                if (clientDataType != ClientDataType.Undefined)
+                                {
+                                    var data = _quickFilters.GetItemData(prop.Id.ToString());
+                                    var cssClass = clientDataType switch
+                                    {
+                                        ClientDataType.Integer or ClientDataType.Decimal or ClientDataType.Double or ClientDataType.String =>
+                                        string.IsNullOrEmpty(data.StringValue) ? null : (Manager.IsColumnFiltered(prop, data.StringValue) ? "active" : "inactive"),
+                                        _ => null
+                                    };
+                                    <div class="quick-filter">
+                                        @switch (clientDataType)
+                                        {
+                                            case ClientDataType.Integer:
+                                                <RgfInputNumber TValue="int?" Value="data.IntValue" ValueExpression="() => data.IntValue"
+                                                                CssClass="@cssClass" AdditionalAttributes="@(new(){ {"rgf-bs-grid",""} })"
+                                                                ValueChanged="(arg) => OnQuickFilterChanged(prop, arg)" />
+                                                break;
+
+                                            case ClientDataType.Decimal:
+                                                <RgfInputNumber TValue="decimal?" Value="data.DecimalValue" ValueExpression="() => data.DecimalValue" HideSpinButton="true"
+                                                                CssClass="@cssClass" AdditionalAttributes="@(new(){ {"rgf-bs-grid",""} })"
+                                                                ValueChanged="(arg) => OnQuickFilterChanged(prop, arg)" />
+                                                break;
+
+                                            case ClientDataType.Double:
+                                                <RgfInputNumber TValue="double?" Value="data.DoubleValue" ValueExpression="() => data.DoubleValue" HideSpinButton="true"
+                                                                CssClass="@cssClass" AdditionalAttributes="@(new(){ {"rgf-bs-grid",""} })"
+                                                                ValueChanged="(arg) => OnQuickFilterChanged(prop, arg)" />
+                                                break;
+
+                                            case ClientDataType.String:
+                                                <RgfInputText Value="@data.StringValue" ValueExpression="() => data.StringValue"
+                                                              CssClass="@cssClass" AdditionalAttributes="@(new(){ {"rgf-bs-grid",""} })"
+                                                              ValueChanged="(arg) => OnQuickFilterChanged(prop, arg)" />
+                                                break;
+                                        }
+                                    </div>
+                                }
+                            }
                         </th>
                     }
                 </tr>
             </thead>
-            <tbody class="@(_rgfGridRef.IsProcessing ? "opacity-50" : null)">
+            <tbody class="@(RgfGrid.IsProcessing ? "opacity-50" : null)">
                 @{
                     int index = 0;
                     foreach (var rowData in RgfGrid.GridData)
@@ -38,7 +79,7 @@
                         int rowIdx = index++;
                         var attributes = rowData.Get<RgfDynamicDictionary>("__attributes");
                         string? rowClass = attributes?.Get<string>("class");
-                        if (_rgfGridRef.SelectedItems.ContainsKey(ListHandler.GetAbsoluteRowIndex(rowData)))
+                        if (RgfGrid.SelectedItems.ContainsKey(ListHandler.GetAbsoluteRowIndex(rowData)))
                         {
                             rowClass = rowClass == null ? "table-primary" : rowClass + " table-primary";
                         }
@@ -53,7 +94,7 @@
                                     class="@(propAttributes?.Get<string>("class"))"
                                     style="@(propAttributes?.Get<string>("style"))"
                                     data-bs-toggle="@(propAttributes?.Get<string?>("data-bs-toggle"))">
-                                    @RgfGrid.CreateGridColumn(prop, rowData)
+                                    @RgfGrid.RenderContentItem(prop, rowData)
                                 </td>
                             }
                         </tr>
@@ -64,10 +105,9 @@
     </GridTemplate>
 
     <ColumnSettingsTemplate>
-        <GridColumnSettingsComponent BaseGridComponent="context" />
+        <GridColumnSettingsComponent BaseDataComponent="context" />
     </ColumnSettingsTemplate>
 </RgfGridComponent>
-
 
 @code {
 
@@ -76,6 +116,15 @@
 
     private IRgManager Manager => EntityParameters.Manager!;
     private RgfGridParameters GridParameters { get => EntityParameters.GridParameters; }
+
+    private RgfDynamicDictionary _quickFilters = new RgfDynamicDictionary();
+
+    public async Task OnQuickFilterChanged(RgfProperty property, object? value)
+    {
+        _quickFilters.SetMember(property.Id.ToString(), value);
+        var handler = await Manager.GetFilterHandlerAsync();
+        await handler.SetQuickFilterAsync(property, value);
+    }
 
     public RenderFragment<RgfGridColumnParameters> ColumnTemplate => (param) =>
     {
@@ -88,6 +137,6 @@
                 return@<div class="text-center"><i class="@cssClass"></i></div>;
             }
         }
-        return param.BaseGridComponent.DefaultColumnTemplate(param);
+        return param.DataComponentBase.DefaultColumnTemplate(param);
     };
 }

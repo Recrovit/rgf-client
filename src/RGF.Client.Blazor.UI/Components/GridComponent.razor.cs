@@ -39,6 +39,7 @@ public partial class GridComponent : ComponentBase, IDisposable
         _selfRef = DotNetObjectReference.Create(this);
         GridParameters.EventDispatcher.Subscribe(RgfListEventKind.CreateRowData, OnCreateAttributes);
         GridParameters.EnableMultiRowSelection ??= true;
+        EntityParameters.ToolbarParameters.EventDispatcher.Subscribe([RgfToolbarEventKind.Read, RgfToolbarEventKind.Edit], OnSetFormItem);
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -47,7 +48,6 @@ public partial class GridComponent : ComponentBase, IDisposable
         if (firstRender)
         {
             _disposables.Add(_rgfGridRef.GridDataSource.OnAfterChange(this, OnChangedGridData));
-            _rgfGridRef.EntityParameters.ToolbarParameters.EventDispatcher.Subscribe([RgfToolbarEventKind.Read, RgfToolbarEventKind.Edit], OnSetFormItem);
         }
         await _jsRuntime.InvokeVoidAsync(RGFClientBlazorUIConfiguration.JsBlazorUiNamespace + ".Grid.initializeTable", _selfRef, _tableRef);
     }
@@ -65,7 +65,7 @@ public partial class GridComponent : ComponentBase, IDisposable
             _disposables = null!;
         }
         GridParameters.EventDispatcher.Unsubscribe(RgfListEventKind.CreateRowData, OnCreateAttributes);
-        _rgfGridRef.EntityParameters.ToolbarParameters.EventDispatcher.Unsubscribe([RgfToolbarEventKind.Read, RgfToolbarEventKind.Edit], OnSetFormItem);
+        EntityParameters.ToolbarParameters.EventDispatcher.Unsubscribe([RgfToolbarEventKind.Read, RgfToolbarEventKind.Edit], OnSetFormItem);
     }
 
     [JSInvokable]
@@ -131,7 +131,7 @@ public partial class GridComponent : ComponentBase, IDisposable
             var propAttributes = attributes.GetOrNew<RgfDynamicDictionary>(prop.Alias);
             if (propClass != null)
             {
-                propAttributes.Set<string>("class", (old) => string.IsNullOrEmpty(old) ? propClass : $"{old.Trim()} {propClass}");
+                propAttributes.Set<string>("class", (old) => string.IsNullOrEmpty(old) ? propClass : old.EnsureContains(propClass, ' '));
             }
             if (prop.Options?.GetBoolValue("RGO_EnableGridDataTooltip") == true)
             {

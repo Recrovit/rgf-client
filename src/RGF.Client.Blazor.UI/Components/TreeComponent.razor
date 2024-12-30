@@ -1,0 +1,27 @@
+﻿<RgfTreeComponent EntityParameters="EntityParameters" TreeComponent="this">
+    <TreeTemplate Context="RgfTree">
+        @if (RgfTree.IsProcessing)
+        {
+            <SpinnerComponent ContainerClass="spinner-flex" Style="width: 3rem; height: 3rem;" />
+        }
+        <div class="rgf-tree @(RgfTree.IsProcessing ? "opacity-50" : null)">
+            @{
+                foreach (var rowData in RgfTree.GridData)
+                {
+                    <TreeNodeComponent TreeComponent="RgfTree" Node="RgfTree.GetNodeParameters(rowData)" />
+                }
+            }
+        </div>
+    </TreeTemplate>
+
+    <ColumnSettingsTemplate>
+        <GridColumnSettingsComponent BaseDataComponent="context" />
+    </ColumnSettingsTemplate>
+</RgfTreeComponent>
+
+
+@code {
+
+    [Parameter, EditorRequired]
+    public RgfEntityParameters EntityParameters { get; set; } = null!;
+}

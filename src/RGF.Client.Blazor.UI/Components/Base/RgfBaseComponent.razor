@@ -1,7 +1,11 @@
-﻿@code {
+﻿@implements IAsyncDisposable
+@code {
 
     [Parameter]
     public string? CssClass { get; set; }
+
+    [Parameter]
+    public string? Style { get; set; }
 
     [Parameter]
     public string? Label { get; set; }
@@ -16,7 +20,7 @@
     public string? Tooltip { get; set; }
 
     [Parameter]
-    public string? TooltipPlacement { get; set; }
+    public RgfTooltipOptions? TooltipOptions { get; set; }
 
     [Parameter]
     public string? DisplayName { get; set; }
@@ -40,6 +44,9 @@
     public string? Id { get; set; }
 
     [Parameter]
+    public string? Role { get; set; }
+
+    [Parameter]
     public Dictionary<string, object> AdditionalAttributes { get; set; } = new();
 
     [Inject]
@@ -61,37 +68,62 @@
             _attributes.AddRange(AdditionalAttributes);
         }
 
-        _attributes["class"] = string.IsNullOrEmpty(CssClass) ? _baseCssClass : $"{_baseCssClass} {CssClass}";
+        var classAttr = (string.IsNullOrEmpty(CssClass) ? _baseCssClass : $"{_baseCssClass} {CssClass}")?.Trim() ?? string.Empty;
+        if (AdditionalAttributes?.TryGetValue("class", out var c) == true && c is string addClass)
+        {
+            classAttr = classAttr.EnsureContains(addClass, ' ');
+        }
+        if (!string.IsNullOrWhiteSpace(classAttr))
+        {
+            _attributes["class"] = classAttr;
+        }
 
         if (Id != null) { _attributes["id"] = Id; }
         if (!string.IsNullOrEmpty(Title)) { _attributes["title"] = Title; }
+        if (!string.IsNullOrEmpty(Role)) { _attributes["role"] = Role; }
         if (Readonly) { _attributes["readonly"] = ""; }
         if (Disabled) { _attributes["disabled"] = ""; }
 
-        if (Width != null || Height != null || MinWidth != null)
+        string styleAttr = Style?.Trim() ?? string.Empty;
+        if (styleAttr.Length > 0 && !styleAttr.EndsWith(";"))
         {
-            string style = string.Empty;
-            if (AdditionalAttributes?.TryGetValue("style", out var s) == true)
+            styleAttr += ";";
+        }
+        if (Width != null)
+        {
+            styleAttr += $"width:{Width};";
+        }
+        if (MinWidth != null)
+        {
+            styleAttr += $"min-width:{MinWidth};";
+        }
+        if (Height != null)
+        {
+            styleAttr += $"height:{Height};";
+        }
+        if (AdditionalAttributes?.TryGetValue("style", out var s) == true && s is string addStyle)
+        {
+            if (!addStyle.EndsWith(";"))
             {
-                style = s?.ToString() ?? string.Empty;
-                if (style.Length > 0 && !style.EndsWith(";"))
-                {
-                    style += ";";
-                }
+                addStyle += ";";
             }
-            if (Width != null)
+            styleAttr += addStyle;
+        }
+        if (!string.IsNullOrWhiteSpace(styleAttr))
+        {
+            _attributes["style"] = styleAttr;
+        }
+
+        if (Tooltip != null)
+        {
+            if (TooltipOptions == null)
             {
-                style += $"width:{Width};";
+                TooltipOptions = new RgfTooltipOptions(Tooltip);
             }
-            if (MinWidth != null)
+            else
             {
-                style += $"min-width:{MinWidth};";
+                TooltipOptions.Title = Tooltip;
             }
-            if (Height != null)
-            {
-                style += $"height:{Height};";
-            }
-            _attributes["style"] = style;
         }
     }
 
@@ -99,9 +131,9 @@
     {
         await base.OnAfterRenderAsync(firstRender);
 
-        if (_elementReference != null && (!firstRender || !string.IsNullOrWhiteSpace(Tooltip)))
+        if (_elementReference != null && (!firstRender || TooltipOptions != null))
         {
-            await _jsRuntime.InvokeVoidAsync(RGFClientBlazorUIConfiguration.JsBlazorUiNamespace + ".Base.tooltip", _elementReference, Tooltip ?? "", TooltipPlacement, "rgf-base-tooltip");
+            await _jsRuntime.InvokeVoidAsync(RGFClientBlazorUIConfiguration.JsBlazorUiNamespace + ".Base.tooltip", _elementReference, TooltipOptions);
         }
     }
 
@@ -117,5 +149,13 @@
             return value?.ToString();
         }
         return null;
+    }
+
+    public virtual async ValueTask DisposeAsync()
+    {
+        if (_elementReference != null && TooltipOptions != null)
+        {
+            await _jsRuntime.InvokeVoidAsync(RGFClientBlazorUIConfiguration.JsBlazorUiNamespace + ".Base.tooltip", _elementReference, TooltipOptions);
+        }
     }
 }

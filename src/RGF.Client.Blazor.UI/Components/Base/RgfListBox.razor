@@ -11,7 +11,6 @@
 
 @typeparam TValue
 @inherits RgfInput<TValue>
-@implements IAsyncDisposable
 @code {
 
     [Parameter]
@@ -85,11 +84,12 @@
         }
     }
 
-    public async ValueTask DisposeAsync()
+    public override async ValueTask DisposeAsync()
     {
         if (this.Resizable)
         {
             await _jsRuntime.InvokeVoidAsync(RGFClientBlazorUIConfiguration.JsBlazorUiNamespace + ".ListBox.resizableDestroy", this.Id);
         }
+        await base.DisposeAsync();
     }
 }
