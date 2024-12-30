@@ -13,14 +13,16 @@ public class RgfForm
     {
         if (xmlString != null)
         {
-            var serializer = new XmlSerializer(typeof(RgfForm));
-            using (var reader = new StringReader(xmlString))
+            try
             {
+                var serializer = new XmlSerializer(typeof(RgfForm));
+                using var reader = new StringReader(xmlString);
                 tabs = serializer.Deserialize(reader) as RgfForm;
-                if (tabs != null)
-                {
-                    return true;
-                }
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"Error during deserialization: {ex.Message}");
             }
         }
         tabs = null;

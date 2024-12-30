@@ -1,5 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
 using System.Threading;
@@ -13,26 +12,24 @@ public interface IRgfApiRequest
 
     string Query { get; }
 
-    Version Version { get; }
-
     bool AuthClient { get; }
 
     HttpContent Content { get; }
 
-    Dictionary<string, string> HeaderParam { get; }
+    Dictionary<string, string> AdditionalHeaders { get; }
 
     CancellationToken CancellationToken { get; }
 }
 
 public class ApiRequest : IRgfApiRequest
 {
-    public ApiRequest(string uri, HttpContent content = null, Dictionary<string, string> query = null, Dictionary<string, string> headerParam = null, CancellationToken cancellationToken = default, Version version = null, bool authClient = true)
+    public ApiRequest(string uri, HttpContent content = null, Dictionary<string, string> query = null, Dictionary<string, string> additionalHeaders = null,
+        CancellationToken cancellationToken = default, bool authClient = true)
     {
         Uri = uri;
         Content = content;
-        HeaderParam = headerParam;
+        AdditionalHeaders = additionalHeaders;
         CancellationToken = cancellationToken;
-        Version = version;
         AuthClient = authClient;
         if (query?.Any() == true)
         {
@@ -48,13 +45,11 @@ public class ApiRequest : IRgfApiRequest
 
     public string Query { get; set; }
 
-    public Version Version { get; set; }
-
     public bool AuthClient { get; set; }
 
     public HttpContent Content { get; set; }
 
-    public Dictionary<string, string> HeaderParam { get; set; }
+    public Dictionary<string, string> AdditionalHeaders { get; set; }
 
     public CancellationToken CancellationToken { get; set; }
 }

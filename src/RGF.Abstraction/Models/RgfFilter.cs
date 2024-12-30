@@ -185,10 +185,10 @@ public class RgfFilter
         public List<Condition> Conditions { get; set; }
 
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-        public object Param1 
-        { 
+        public object Param1
+        {
             get => DynValue1.Value;
-            set { DynValue1.Value = value; } 
+            set { DynValue1.Value = value; }
         }
 
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -221,5 +221,8 @@ public class RgfFilter
             }
             set { Param2 = value; }
         }
+
+        [JsonIgnore]
+        public bool IsQuickFilter { get; set; }
     }
 }

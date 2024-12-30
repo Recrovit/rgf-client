@@ -38,9 +38,9 @@ public enum PropertyFormType
     ListBox = 15,
     [EnumMember(Value = "custom")]
     Custom = 16,
-    [Obsolete("Use RGO_AggregationRequired instead", true)]
-    [EnumMember(Value = "chartitem")]
-    ChartOnlyData = 17,
+    //[Obsolete("Use RGO_AggregationRequired instead", true)]
+    //[EnumMember(Value = "chartitem")]
+    //ChartOnlyData = 17,
 }
 public enum PropertyListType
 {
@@ -88,6 +88,8 @@ public interface IRgfProperty
     string Alias { get; set; }
 
     string ClientName { get; set; }
+
+    string BaseEntityNameVersion { get; set; }
 
     int ColPos { get; set; }
 
@@ -147,6 +149,8 @@ public class RgfIdAliasPair : ICloneable
 public class RgfProperty : RgfIdAliasPair, IRgfProperty
 {
     public string ClientName { get; set; }
+
+    public string BaseEntityNameVersion { get; set; }
 
     public string ColTitle { get; set; }
 
@@ -245,19 +249,19 @@ public class RgfProperty : RgfIdAliasPair, IRgfProperty
 
 public class GridColumnSettings : RgfColumnSettings
 {
-    public GridColumnSettings(RgfProperty property) : base(property)
+    public GridColumnSettings(IRgfProperty property) : base(property)
     {
         Property = property;
         CssClass = GetCssClass();
     }
 
-    public RgfProperty Property { get; }
+    public IRgfProperty Property { get; }
 
     public string CssClass { get; }
 
     private string GetCssClass()
     {
-        RgfProperty property = this.Property;
+        var property = this.Property;
         string cssClass = string.Empty;
         if (property.IsKey)
         {

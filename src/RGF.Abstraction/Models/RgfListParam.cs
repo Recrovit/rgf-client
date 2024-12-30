@@ -10,9 +10,11 @@ public class RgfListParam
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public bool? Count { get; set; }
 
-    public int Skip { get; set; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? Skip { get; set; }
 
-    public int Take { get; set; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? Take { get; set; }
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public int? Preload { get; set; }

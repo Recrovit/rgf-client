@@ -6,7 +6,7 @@ public class RgfColumnSettings : RgfIdAliasPair
 {
     public RgfColumnSettings() { }
 
-    public RgfColumnSettings(RgfProperty property)
+    public RgfColumnSettings(IRgfProperty property)
     {
         Id = property.Id;
         Alias = property.Alias;

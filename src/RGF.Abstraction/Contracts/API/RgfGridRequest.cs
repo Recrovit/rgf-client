@@ -59,4 +59,7 @@ public class RgfGridRequest : RgfSessionParams
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public RgfGridRequest ParentGridRequest { get; set; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public RgfFilterParent FilterParent { get; set; }
 }
