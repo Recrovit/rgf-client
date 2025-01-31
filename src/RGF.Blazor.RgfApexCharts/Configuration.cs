@@ -14,9 +14,9 @@ public class RgfApexChartsConfiguration
     {
         var libName = Assembly.GetExecutingAssembly().GetName().Name;
         await jsRuntime.InvokeVoidAsync("Recrovit.LPUtils.EnsureStyleSheetLoaded", "rgf-check-stylesheet-rgfcharts", "<div class=\"rgf-check-stylesheet-rgfcharts\" rgf-apexcharts=\"\">",
-            $"{RgfClientConfiguration.AppRootPath}_content/{libName}/{libName}.bundle.scp.css?v={FileVersion}", RgfApexChartsCssLib, "Recrovit.RecroGridFramework.Client.Blazor.bundle.scp.css");
+            $"{RgfClientConfiguration.AppRootPath}/_content/{libName}/{libName}.bundle.scp.css?v={FileVersion}", RgfApexChartsCssLib, "Recrovit.RecroGridFramework.Client.Blazor.bundle.scp.css");
 
-        await jsRuntime.InvokeAsync<IJSObjectReference>("import", $"{RgfClientConfiguration.AppRootPath}_content/{libName}/scripts/" +
+        await jsRuntime.InvokeAsync<IJSObjectReference>("import", $"{RgfClientConfiguration.AppRootPath}/_content/{libName}/scripts/" +
 #if DEBUG
             "recrovit-rgf-apexcharts.js"
 #else

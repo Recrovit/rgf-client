@@ -229,10 +229,10 @@ public abstract class BaseChartComponent : ComponentBase
         {
             // Switch to this tab because the error message appears here
             ActiveTabIndex = RecroChartTab.Grid;
-            await Manager.ToastManager.RaiseEventAsync(RgfToastEventArgs.RemoveToast(toast), this);
+            await Manager.ToastManager.RaiseEventAsync(toast.Remove(), this);
             return false;
         }
-        await Manager.ToastManager.RaiseEventAsync(RgfToastEventArgs.RecreateToastWithStatus(toast, RecroDict.GetRgfUiString("Processed"), RgfToastType.Success, delay: 2000), this);
+        await Manager.ToastManager.RaiseEventAsync(toast.RecreateAsSuccess(RecroDict.GetRgfUiString("Processed"), delay: 2000), this);
         ApexChartSettings.Title = "";
         ApexChartSettings.Series.Clear();
         await ApexChartRef.UpdateChart();
@@ -272,7 +272,7 @@ public abstract class BaseChartComponent : ComponentBase
                 await Manager.ToastManager.RaiseEventAsync(toast, this);
                 await ApexChartRef.UpdateChart();
             }
-            await Manager.ToastManager.RaiseEventAsync(RgfToastEventArgs.RecreateToastWithStatus(toast, RecroDict.GetRgfUiString("Processed"), RgfToastType.Success, 2000), this);
+            await Manager.ToastManager.RaiseEventAsync(toast.RecreateAsSuccess(RecroDict.GetRgfUiString("Processed"), delay: 2000), this);
             RgfChartRef.ChartStatus = RgfProcessingStatus.Valid;
         }
         catch
