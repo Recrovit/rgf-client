@@ -5,19 +5,35 @@
         <li>
             <div class="d-flex flex-row align-items-center">
                 <div class="p-1">
-                    <RgfComboBox TValue="RgfFilter.LogicalOperator" @bind-Value="item.LogicalOperator" Disabled="idx == 0" DataSource="LogicalOperators" Width="fit-content" />
+                    <RgfComboBox TValue="RgfFilter.LogicalOperator" @bind-Value="item.LogicalOperator" Disabled="idx == 0 || item.IsQuickFilter" DataSource="LogicalOperators" Width="fit-content" />
                 </div>
-                <div class="p-1">
-                    <RgfButton IconName="bi-trash" CssClass="btn-outline-secondary p-1" OnClick="() => OnRemoveCondition(item)" />
-                </div>
-                <div class="p-1">
-                    <RgfButton IconName="bi-braces" CssClass="btn-outline-secondary p-1" OnClick="() => OnAddBracket(item)" />
-                </div>
+                @if (item.IsQuickFilter && item.Conditions != null)
+                {
+                    <div class="p-1">
+                        @RecroDict.GetRgfUiString("QuickFilter")
+                    </div>
+                }
+                @if (item.ClientId != 0)
+                {
+                    <div class="p-1">
+                        <RgfButton IconName="bi-trash" CssClass="btn-outline-secondary p-1" OnClick="() => OnRemoveCondition(item)" />
+                    </div>
+                    @if (!item.IsQuickFilter)
+                    {
+                        <div class="p-1">
+                            <RgfButton IconName="bi-braces" CssClass="btn-outline-secondary p-1" OnClick="() => OnAddBracket(item)" />
+                        </div>
+                    }
+                }
                 @if (item.Conditions != null)
                 {
                     <div class="p-1">
-                        <RgfButton CssClass="btn-warning" Title="@RecroDict.GetRgfUiString("Delete")" OnClick="() => OnRemoveBracket(item)">
-                            <sup>@item.ClientId</sup><span>(</span>
+                        <RgfButton CssClass="btn-warning" Title="@RecroDict.GetRgfUiString("Delete")" OnClick="() => OnRemoveBracket(item)" Disabled="item.ClientId == 0">
+                            @if (item.ClientId != 0)
+                            {
+                                <sup>@item.ClientId</sup>
+                            }
+                            <span>(</span>
                         </RgfButton>
                     </div>
                 }
@@ -128,18 +144,25 @@
             </li>
             <li>
                 <div>
-                    <RgfButton CssClass="btn-warning" Title="@RecroDict.GetRgfUiString("Delete")" OnClick="() => OnRemoveBracket(item)">
-                        <span>)</span><sup>@item.ClientId</sup>
+                    <RgfButton CssClass="btn-warning" Title="@RecroDict.GetRgfUiString("Delete")" OnClick="() => OnRemoveBracket(item)" Disabled="item.ClientId == 0">
+                        <span>)</span>
+                        @if (item.ClientId != 0)
+                        {
+                            <sup>@item.ClientId</sup>
+                        }
                     </RgfButton>
                 </div>
             </li>
         }
     }
-    <li>
-        <div class="p-1">
-            <RgfButton IconName="bi-plus-lg" CssClass="btn-outline-primary" OnClick="() => OnAddCondition(Condition)" />
-        </div>
-    </li>
+    @if (!Condition.IsQuickFilter && Condition.Conditions?.Any(e => e.IsQuickFilter) != true)
+    {
+        <li>
+            <div class="p-1">
+                <RgfButton IconName="bi-plus-lg" CssClass="btn-outline-primary" OnClick="() => OnAddCondition(Condition)" />
+            </div>
+        </li>
+    }
 </ul>
 
 @inject IRecroDictService RecroDict

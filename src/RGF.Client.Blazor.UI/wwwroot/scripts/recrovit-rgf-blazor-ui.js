@@ -1,5 +1,5 @@
 ﻿/*!
-* recrovit-rgf-blazor-ui.js v1.7.0
+* recrovit-rgf-blazor-ui.js v1.8.0
 */
 
 window.Recrovit = window.Recrovit || {};
@@ -9,6 +9,14 @@ var Blazor = window.Recrovit.RGF.Blazor;
 
 Blazor.UI = {
     Base: {
+        setFocus: function (selector) {
+            var element = $(selector);
+            if (element.length) {
+                element.focus();
+                return true;
+            }
+            return false;
+        },
         tooltip: function (element, options) {
             var $element = $(element);
             if ($element.length !== 1) return null;
@@ -66,8 +74,8 @@ Blazor.UI = {
                 dialogPos[0] = parseInt($element.css('width'));
                 dialogPos[1] = parseInt($element.css('height'));
                 $element = $element.parent('div.modal-dialog');
-                dialogPos[2] = parseInt($element.offset().top);
-                dialogPos[3] = parseInt($element.offset().left);
+                dialogPos[2] = parseInt($element.offset().top) - window.scrollY;
+                dialogPos[3] = parseInt($element.offset().left) - window.scrollX;
                 localStorage.setItem(key, JSON.stringify(dialogPos));
             }
         },
@@ -82,9 +90,20 @@ Blazor.UI = {
                         width: `${dialogPos[0]}px`,
                         height: `${dialogPos[1]}px`,
                     });
+
+                    var top = dialogPos[2] < 0 ? 25 : dialogPos[2];
+                    var left = dialogPos[3] < 0 ? 25 : dialogPos[3];
+
+                    if ($(window).height() < top + 50) {
+                        top = 25;
+                    }
+                    if ($(window).width() < left + 50) {
+                        left = 25;
+                    }
+
                     dialog.css({
-                        top: `${dialogPos[2] < 0 ? 0 : dialogPos[2]}px`,
-                        left: `${dialogPos[3] < 0 ? 0 : dialogPos[3]}px`,
+                        top: `${top}px`,
+                        left: `${left}px`,
                         margin: '0'
                     });
                     return;

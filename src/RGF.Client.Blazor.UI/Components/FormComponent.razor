@@ -65,6 +65,7 @@
 </RgfFormComponent>
 
 @inject IRecroDictService RecroDict
+@inject IJSRuntime _jsRuntime
 @implements IDisposable
 @code {
     [Parameter, EditorRequired]
@@ -84,6 +85,7 @@
         FormParameters.ErrorCssClass = FormParameters.ErrorCssClass ?? "is-invalid";
         FormParameters.ModifiedCssClass = FormParameters.ModifiedCssClass ?? "is-valid";
         EntityParameters.FormParameters.EventDispatcher.Subscribe(RgfFormEventKind.ParametersSet, OnParametersSet);
+        EntityParameters.FormParameters.EventDispatcher.Subscribe(RgfFormEventKind.FormItemsFirstRenderCompleted, OnFormItemsRenderedAsync);
     }
 
     private void OnParametersSet(IRgfEventArgs<RgfFormEventArgs> args)
@@ -100,12 +102,25 @@
         }
         else
         {
-            FormParameters.DialogParameters.LeftButtons = null;
+            var buttons = new List<ButtonParameters>() {
+                new("bi-chevron-double-right", RecroDict.GetRgfUiString("InsertNextClear"), async (arg) => await _rgfFormRef.ApplyAndNextNew(), "btn-secondary")};
+            FormParameters.DialogParameters.LeftButtons = buttons;
         }
         var button = FormParameters.DialogParameters.PredefinedButtons?.FirstOrDefault(e => e.ButtonName == "Apply");
         if (button != null)
         {
             button.CssClass = "btn-outline-primary";
+        }
+    }
+
+    private async Task OnFormItemsRenderedAsync(IRgfEventArgs<RgfFormEventArgs> args)
+    {
+        foreach (var prop in Manager.EntityDesc.Properties.Where(e => e.FormTab == 1 && e.Editable).OrderBy(e => e.FormPos))
+        {
+            if (await _jsRuntime.InvokeAsync<bool>(RGFClientBlazorUIConfiguration.JsBlazorUiNamespace + ".Base.setFocus", $"div.rg-property[name='{prop.ClientName}'] .rg-cru"))
+            {
+                break;
+            }
         }
     }
 
@@ -126,5 +141,6 @@
     public void Dispose()
     {
         EntityParameters.FormParameters.EventDispatcher.Unsubscribe(RgfFormEventKind.ParametersSet, OnParametersSet);
+        EntityParameters.FormParameters.EventDispatcher.Unsubscribe(RgfFormEventKind.FormItemsFirstRenderCompleted, OnFormItemsRenderedAsync);
     }
 }

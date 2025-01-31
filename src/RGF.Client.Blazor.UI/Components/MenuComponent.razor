@@ -120,7 +120,7 @@ else if (_menuItems != null)
                 case RgfMenuType.ActionLink:
                     builder.OpenComponent(sequence++, typeof(NavLink));
                     builder.AddAttribute(sequence++, "class", $"nav-link {item.CssClass}");
-                    builder.AddAttribute(sequence++, "href", item.Command);
+                    builder.AddAttribute(sequence++, "href", $"{RgfClientConfiguration.AppRootPath}{item.Command}");
                     builder.AddAttribute(sequence++, nameof(NavLink.ChildContent), (RenderFragment)((b) => b.AddContent(0, item.Title)));
                     builder.CloseComponent();
                     break;
@@ -133,7 +133,7 @@ else if (_menuItems != null)
                     string link = $"<a class=\"nav-link dropdown-toggle\" role=\"button\" aria-expanded=\"false\"";
                     if (!string.IsNullOrEmpty(item.Command))
                     {
-                        link += $" href=\"{item.Command}\"";
+                        link += $" href=\"{RgfClientConfiguration.AppRootPath}{item.Command}\"";
                     }
                     else
                     {
@@ -172,7 +172,7 @@ else if (_menuItems != null)
             switch (item.MenuType)
             {
                 case RgfMenuType.ActionLink:
-                    builder.AddMarkupContent(sequence++, $"<a class=\"dropdown-item\" href=\"{item.Command}\">{item.Title}</a>");
+                    builder.AddMarkupContent(sequence++, $"<a class=\"dropdown-item\" href=\"{RgfClientConfiguration.AppRootPath}{item.Command}\">{item.Title}</a>");
                     break;
 
                 case RgfMenuType.Function:

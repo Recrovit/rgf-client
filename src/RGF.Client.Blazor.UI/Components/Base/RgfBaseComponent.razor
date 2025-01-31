@@ -56,7 +56,7 @@
     protected Dictionary<string, object>? _attributes { get; set; }
     protected ElementReference? _elementReference;
 
-    public static string GetNextId(string format = "rgf-id-{0}") => DynamicComponentWrapper.GetNextId(format);
+    public static string GetNextId(string format = "rgf-id-{0}") => RgfComponentWrapper.GetNextId(format);
 
     protected override void OnParametersSet()
     {

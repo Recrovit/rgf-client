@@ -1,21 +1,21 @@
 ﻿@using System.Globalization
 
 <div class="toast-container position-fixed bottom-0 end-0 p-3">
-    @foreach (var toast in toasts.OrderByDescending(t => t.TriggeredAt).ToArray())
+    @foreach (var toast in _toasts.OrderByDescending(t => t.TriggeredAt).ToArray())
     {
         if (toast.Delay < 0)
         {
-            toasts.Remove(toast);
+            _toasts.Remove(toast);
             continue;
         }
         <div class="toast show @GetToastClass(toast.ToastType)" role="alert" aria-live="assertive" aria-atomic="true" style="min-width: 250px;">
             <div class="toast-header">
-                <strong class="me-auto">@GetToastHeader(toast)</strong>
+                <strong class="me-auto">@toast.MarkupHeader</strong>
                 <small class="text-muted">@GetToastTime(toast.TriggeredAt)</small>
                 <button type="button" class="btn-close" @onclick="() => RemoveToast(toast)" aria-label="Close"></button>
             </div>
             <div class="toast-body">
-                @((MarkupString)toast.Body)
+                @toast.MarkupBody
             </div>
         </div>
     }
@@ -27,7 +27,7 @@
 @implements IDisposable
 @code {
 
-    private List<RgfToastEventArgs> toasts = new List<RgfToastEventArgs>();
+    private List<RgfToastEventArgs> _toasts = new List<RgfToastEventArgs>();
     private IDisposable _toastManager = default!;
 
     protected override void OnInitialized()
@@ -41,11 +41,11 @@
         var toast = arg.Args;
         if (toast.Delay < 0)
         {
-            RemoveToast(toast);
+            _toasts.Remove(toast);
         }
         else
         {
-            toasts.Add(toast);
+            _toasts.Add(toast);
             if (toast.Delay > 0)
             {
                 _ = InvokeAsync(async () =>
@@ -60,7 +60,7 @@
 
     private void RemoveToast(RgfToastEventArgs toast)
     {
-        toasts.Remove(toast);
+        _toasts.Remove(toast);
         StateHasChanged();
     }
 
@@ -80,15 +80,6 @@
     {
         var culture = _recroSec.UserCultureInfo();
         return (DateTime.Now - triggeredAt).TotalSeconds < 1 ? _recroDict.GetRgfUiString("JustNow") : triggeredAt.ToString("t", culture);
-    }
-
-    private string GetToastHeader(RgfToastEventArgs toast)
-    {
-        if (string.IsNullOrWhiteSpace(toast.Status))
-        {
-            return toast.Title;
-        }
-        return $"{toast.Status} - {toast.Title}";
     }
 
     public void Dispose()
