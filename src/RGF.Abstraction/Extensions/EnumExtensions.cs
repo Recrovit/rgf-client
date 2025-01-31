@@ -16,10 +16,11 @@ public static class EnumExtensions
 
     public static bool IsValid(this Enum enumerator)
     {
-        bool defined = Enum.IsDefined(enumerator.GetType(), enumerator);
+        var enumType = enumerator.GetType();
+        bool defined = Enum.IsDefined(enumType, enumerator);
         if (!defined)
         {
-            var attributes = (FlagsAttribute[])enumerator.GetType().GetCustomAttributes<FlagsAttribute>(false);
+            var attributes = (FlagsAttribute[])enumType.GetCustomAttributes<FlagsAttribute>(false);
 
             // If the value is a right bitwise match and
             // FlagsAttribute is uses, ToString returns 
@@ -97,4 +98,47 @@ public static class EnumExtensions
         value = default;
         return false;
     }
+
+    public static bool TryGetEnum<TEnum>(this int value, out TEnum result) where TEnum : struct, Enum
+    {
+        Type enumType = typeof(TEnum);
+
+        if (Enum.IsDefined(enumType, value))
+        {
+            result = (TEnum)Enum.ToObject(enumType, value);
+            return true;
+        }
+
+        if (enumType.GetCustomAttributes(typeof(FlagsAttribute), false).Length > 0)
+        {
+            int combinedValue = 0;
+
+            foreach (TEnum enumValue in Enum.GetValues(enumType))
+            {
+                int intValue = Convert.ToInt32(enumValue);
+                if ((value & intValue) == intValue)
+                {
+                    combinedValue |= intValue;
+                }
+            }
+
+            if (combinedValue == value)
+            {
+                result = (TEnum)Enum.ToObject(enumType, value);
+                return true;
+            }
+        }
+
+        result = default;
+        return false;
+    }
+
+    public static TEnum GetEnumOrDefault<TEnum>(this int value, TEnum defaultValue = default) where TEnum : struct, Enum
+        => value.TryGetEnum(out TEnum result) ? result : defaultValue;
+
+    public static bool TryGetEnum<TEnum>(this short value, out TEnum result) where TEnum : struct, Enum
+        => ((int)value).TryGetEnum(out result);
+
+    public static TEnum GetEnumOrDefault<TEnum>(this short value, TEnum defaultValue = default) where TEnum : struct, Enum
+        => value.TryGetEnum(out TEnum result) ? result : defaultValue;
 }

@@ -14,6 +14,9 @@ public class RgfUserState
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string Language { get; set; }
 
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool IsNewlyCreated { get; set; }
+
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Dictionary<string, string> Roles { get; set; }
 }

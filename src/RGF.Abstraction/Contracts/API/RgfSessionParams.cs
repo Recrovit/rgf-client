@@ -24,4 +24,7 @@ public class RgfSessionParams
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string Language { get; set; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string ClientConnectionId { get; set; }
 }
