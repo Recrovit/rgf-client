@@ -11,10 +11,13 @@ public class RgfFilterSetting : ICloneable
 
     internal RgfFilterSetting(RgfFilterSetting filterSetting)
     {
-        FilterSettingsId = filterSetting.FilterSettingsId;
-        SettingsName = filterSetting.SettingsName;
-        RoleId = filterSetting.RoleId;
-        IsReadonly = filterSetting.IsReadonly;
+        if (filterSetting != null)
+        {
+            FilterSettingsId = filterSetting.FilterSettingsId;
+            SettingsName = filterSetting.SettingsName;
+            RoleId = filterSetting.RoleId;
+            IsReadonly = filterSetting.IsReadonly;
+        }
     }
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -40,12 +43,15 @@ public class RgfFilterSettings : RgfFilterSetting
 
     internal RgfFilterSettings(RgfFilterSettings source) : base(source)
     {
-        if (source.Conditions?.Any() == true)
+        if (source != null)
         {
-            var conditionsJson = JsonSerializer.Serialize(source.Conditions, new JsonSerializerOptions { DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull });
-            Conditions = JsonSerializer.Deserialize<RgfFilter.Condition[]>(conditionsJson);
+            if (source.Conditions?.Any() == true)
+            {
+                var conditionsJson = JsonSerializer.Serialize(source.Conditions, new JsonSerializerOptions { DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull });
+                Conditions = JsonSerializer.Deserialize<RgfFilter.Condition[]>(conditionsJson);
+            }
+            SQLTimeout = source.SQLTimeout;
         }
-        SQLTimeout = source.SQLTimeout;
     }
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]

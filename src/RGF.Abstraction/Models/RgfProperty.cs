@@ -132,8 +132,11 @@ public class RgfIdAliasPair : ICloneable
 
     public RgfIdAliasPair(RgfIdAliasPair rgfIdAliasPair)
     {
-        Id = rgfIdAliasPair.Id;
-        Alias = rgfIdAliasPair.Alias;
+        if (rgfIdAliasPair != null)
+        {
+            Id = rgfIdAliasPair.Id;
+            Alias = rgfIdAliasPair.Alias;
+        }
     }
 
     public int Id { get; set; }

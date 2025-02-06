@@ -17,11 +17,17 @@ public class RgfChartSetting : ICloneable
 
     internal RgfChartSetting(RgfChartSetting chartSetting)
     {
-        ChartSettingsId = chartSetting.ChartSettingsId;
-        SettingsName = chartSetting.SettingsName;
-        RoleId = chartSetting.RoleId;
-        IsReadonly = chartSetting.IsReadonly;
-        ParentGridSettings = new RgfGridSettings(chartSetting.ParentGridSettings);
+        if (chartSetting != null)
+        {
+            ChartSettingsId = chartSetting.ChartSettingsId;
+            SettingsName = chartSetting.SettingsName;
+            RoleId = chartSetting.RoleId;
+            IsReadonly = chartSetting.IsReadonly;
+            if (chartSetting.ParentGridSettings != null)
+            {
+                ParentGridSettings = new RgfGridSettings(chartSetting.ParentGridSettings);
+            }
+        }
     }
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -52,16 +58,19 @@ public class RgfChartSettings : RgfChartSetting
 
     internal RgfChartSettings(RgfChartSettings chartSettings) : base(chartSettings)
     {
-        AggregationSettings = new RgfAggregationSettings(chartSettings.AggregationSettings);
-        SeriesType = chartSettings.SeriesType;
-        Height = chartSettings.Height;
-        Width = chartSettings.Width;
-        ShowDataLabels = chartSettings.ShowDataLabels;
-        Legend = chartSettings.Legend;
-        Stacked = chartSettings.Stacked;
-        Horizontal = chartSettings.Horizontal;
-        Theme = chartSettings.Theme;
-        Palette = chartSettings.Palette;
+        if (chartSettings != null)
+        {
+            AggregationSettings = new RgfAggregationSettings(chartSettings.AggregationSettings);
+            SeriesType = chartSettings.SeriesType;
+            Height = chartSettings.Height;
+            Width = chartSettings.Width;
+            ShowDataLabels = chartSettings.ShowDataLabels;
+            Legend = chartSettings.Legend;
+            Stacked = chartSettings.Stacked;
+            Horizontal = chartSettings.Horizontal;
+            Theme = chartSettings.Theme;
+            Palette = chartSettings.Palette;
+        }
     }
 
     public RgfAggregationSettings AggregationSettings { get; set; } = new();

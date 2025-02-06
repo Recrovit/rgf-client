@@ -11,9 +11,12 @@ public class RgfAggregationSettings : ICloneable
 
     internal RgfAggregationSettings(RgfAggregationSettings source)
     {
-        Columns = source.Columns.Select(c => new RgfAggregationColumn(c)).ToList();
-        Groups = source.Groups.Select(g => new RgfIdAliasPair(g)).ToList();
-        SubGroup = source.SubGroup.Select(s => new RgfIdAliasPair(s)).ToList();
+        if (source != null)
+        {
+            Columns = source.Columns.Select(c => new RgfAggregationColumn(c)).ToList();
+            Groups = source.Groups.Select(g => new RgfIdAliasPair(g)).ToList();
+            SubGroup = source.SubGroup.Select(s => new RgfIdAliasPair(s)).ToList();
+        }
     }
 
     public List<RgfAggregationColumn> Columns { get; set; } = new();
@@ -35,7 +38,10 @@ public class RgfAggregationColumn : RgfIdAliasPair
 
     internal RgfAggregationColumn(RgfAggregationColumn source) : base(source)
     {
-        Aggregate = source.Aggregate;
+        if (source != null)
+        {
+            Aggregate = source.Aggregate;
+        }
     }
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]

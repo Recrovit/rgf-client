@@ -11,10 +11,13 @@ public class RgfGridSetting : ICloneable
 
     internal RgfGridSetting(RgfGridSetting gridSetting)
     {
-        GridSettingsId = gridSetting.GridSettingsId;
-        SettingsName = gridSetting.SettingsName;
-        RoleId = gridSetting.RoleId;
-        IsReadonly = gridSetting.IsReadonly;
+        if (gridSetting != null)
+        {
+            GridSettingsId = gridSetting.GridSettingsId;
+            SettingsName = gridSetting.SettingsName;
+            RoleId = gridSetting.RoleId;
+            IsReadonly = gridSetting.IsReadonly;
+        }
     }
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -40,15 +43,18 @@ public class RgfGridSettings : RgfGridSetting
 
     internal RgfGridSettings(RgfGridSettings source) : base(source)
     {
-        ColumnSettings = source.ColumnSettings?.Select(x => new RgfColumnSettings(x)).ToArray();
-        Sort = source.Sort?.Select(e => e.ToArray()).ToArray();
-        if (source.Conditions?.Any() == true)
+        if (source != null)
         {
-            var conditionsJson = JsonSerializer.Serialize(source.Conditions, new JsonSerializerOptions { DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull });
-            Conditions = JsonSerializer.Deserialize<RgfFilter.Condition[]>(conditionsJson);
+            ColumnSettings = source.ColumnSettings?.Select(x => new RgfColumnSettings(x)).ToArray();
+            Sort = source.Sort?.Select(e => e.ToArray()).ToArray();
+            if (source.Conditions?.Any() == true)
+            {
+                var conditionsJson = JsonSerializer.Serialize(source.Conditions, new JsonSerializerOptions { DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull });
+                Conditions = JsonSerializer.Deserialize<RgfFilter.Condition[]>(conditionsJson);
+            }
+            PageSize = source.PageSize;
+            SQLTimeout = source.SQLTimeout;
         }
-        PageSize = source.PageSize;
-        SQLTimeout = source.SQLTimeout;
     }
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
