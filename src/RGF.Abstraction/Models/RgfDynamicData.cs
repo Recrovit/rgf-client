@@ -48,9 +48,10 @@ public class RgfDynamicData : IEquatable<RgfDynamicData>
 
             var tasks = OnAfterChangeAsync?.GetInvocationList()
                 .OfType<Func<RgfDynamicData, Task>>()
-                .Select(callback => callback.Invoke(this));
+                .Select(handler => handler.Invoke(this))
+                .ToArray();
 
-            if (tasks != null)
+            if (tasks?.Length > 0)
             {
                 _ = Task.WhenAll(tasks);
             }

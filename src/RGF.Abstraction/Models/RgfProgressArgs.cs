@@ -24,11 +24,15 @@ public interface IRgfProgressArgs
 
     string Message { get; }
 
+    RgfCoreMessages CoreMessages { get; set; }
+
     int? TotalIterations { get; }
 
     int? CurrentIteration { get; }
 
     decimal? Percentage { get; }
+
+    bool? IsBackgroundTaskCompleted { get; }
 
     Dictionary<string, object> CustomData { get; set; }
 }
@@ -41,6 +45,9 @@ public class RgfProgressArgs : IRgfProgressArgs
     public string Message { get; set; }
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public RgfCoreMessages CoreMessages { get; set; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public int? TotalIterations { get; set; }
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -50,9 +57,18 @@ public class RgfProgressArgs : IRgfProgressArgs
     public decimal? Percentage { get; set; }
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public bool? IsBackgroundTaskCompleted { get; set; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Dictionary<string, object> CustomData { get; set; }
 
     public RgfProgressArgs() { }
+
+    public RgfProgressArgs(bool backgroundTaskCompleted, string message = null)
+    {
+        IsBackgroundTaskCompleted = backgroundTaskCompleted;
+        Message = message;
+    }
 
     public RgfProgressArgs(string message)
     {

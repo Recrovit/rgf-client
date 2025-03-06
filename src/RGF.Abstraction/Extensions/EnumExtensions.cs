@@ -35,6 +35,9 @@ public static class EnumExtensions
 
     public static string GetEnumMemberValue(this Enum enumerator, string defaultValue = null) => enumerator.GetAttributeValue<EnumMemberAttribute>(attr => attr.Value, defaultValue) ?? enumerator.ToString();
 
+    public static T GetCustomAttribute<T>(this Enum enumerator) where T : Attribute
+        => enumerator.GetType().GetField(enumerator.ToString())?.GetCustomAttribute<T>();
+
     /// <summary>
     /// Retrieves the value of a custom attribute applied to an enum member, using a specified selector function.
     /// If the attribute is not found or the value is null, the provided default value is returned.
@@ -65,12 +68,10 @@ public static class EnumExtensions
     /// // Example usage:
     /// var statusName = Status.Pending.GetAttributeValue<DisplayAttribute>(attr => attr.Name);
     /// </remarks>
-    public static string GetAttributeValue<TAttribute>(this Enum enumerator, Func<TAttribute, string> valueSelector, string defaultValue = null)
-        where TAttribute : Attribute
+    public static string GetAttributeValue<TAttribute>(this Enum enumerator, Func<TAttribute, string> valueSelector, string defaultValue = null) where TAttribute : Attribute
     {
-        var item = enumerator.GetType().GetMember(enumerator.ToString()).SingleOrDefault();
-        var attribute = item?.GetCustomAttributes<TAttribute>(false).FirstOrDefault();
-        return (attribute != null ? valueSelector(attribute) : null) ?? defaultValue;
+        var attribute = enumerator.GetCustomAttribute<TAttribute>();
+        return attribute == null ? defaultValue : (valueSelector(attribute) ?? defaultValue);
     }
 
     public static TEnum GetEnumValueFromEnumMemberValue<TEnum>(string enumMemberValue, TEnum defaultValue) where TEnum : Enum
@@ -141,4 +142,7 @@ public static class EnumExtensions
 
     public static TEnum GetEnumOrDefault<TEnum>(this short value, TEnum defaultValue = default) where TEnum : struct, Enum
         => value.TryGetEnum(out TEnum result) ? result : defaultValue;
+
+    public static bool IsInGrouping(this Enum enumerator, string group)
+        => enumerator.GetCustomAttribute<GroupingAttribute>()?.ValidateGroup(group) ?? false;
 }

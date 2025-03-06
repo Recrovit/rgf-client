@@ -11,4 +11,6 @@ public class RgfCustomFunctionResult
     public bool RefreshRow{ get; set; }
 
     public RgfDynamicDictionary Row { get; set; }
+
+    public bool StartedInBackground { get; set; }
 }

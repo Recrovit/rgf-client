@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Microsoft.Extensions.Logging;
+using System;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -6,6 +7,12 @@ namespace Recrovit.RecroGridFramework.Abstraction.Infrastructure.Events;
 
 public class EventDispatcher<TValue>
 {
+    public EventDispatcher() { }
+
+    public EventDispatcher(ILogger logger) { _logger = logger; }
+
+    private readonly ILogger _logger;
+
     private event Action<TValue> _event;
 
     private event Func<TValue, Task> _eventAsync;
@@ -54,19 +61,60 @@ public class EventDispatcher<TValue>
 
     public void Unsubscribe(Action<TValue> eventHandler) => _event -= eventHandler;
 
-    public Task InvokeAsync(TValue value)
+    public void Unsubscribe(object subscriberTarget)
     {
-        _event?.Invoke(value);
-
-        var tasks = _eventAsync?.GetInvocationList()
-            .OfType<Func<TValue, Task>>()
-            .Select(callback => callback.Invoke(value));
-
-        if (tasks != null)
+        if (_event != null)
         {
-            return Task.WhenAll(tasks);
+            foreach (var handler in _event.GetInvocationList())
+            {
+                if (handler.Target == subscriberTarget)
+                {
+                    _event -= (Action<TValue>)handler;
+                }
+            }
         }
 
-        return Task.CompletedTask;
+        if (_eventAsync != null)
+        {
+            foreach (var handler in _eventAsync.GetInvocationList())
+            {
+                if (handler.Target == subscriberTarget)
+                {
+                    _eventAsync -= (Func<TValue, Task>)handler;
+                }
+            }
+        }
+    }
+
+    public async Task InvokeAsync(TValue value)
+    {
+        var eventSync = _event;
+        var eventAsync = _eventAsync;
+
+        if (eventSync != null)
+        {
+            foreach (var handler in eventSync.GetInvocationList().OfType<Action<TValue>>())
+            {
+                _logger?.LogDebug("Invoke: {target}.{name}", handler.Target, handler.Method.Name);
+                handler.Invoke(value);
+            }
+        }
+
+        if (eventAsync != null)
+        {
+            var tasks = eventAsync.GetInvocationList()
+                .OfType<Func<TValue, Task>>()
+                .Select((handler) =>
+                {
+                    _logger?.LogDebug("Invoke: {target}.{name}", handler.Target, handler.Method.Name);
+                    return handler.Invoke(value);
+                })
+                .ToArray();
+
+            if (tasks.Length > 0)
+            {
+                await Task.WhenAll(tasks);
+            }
+        }
     }
 }
