@@ -18,7 +18,7 @@ public enum RecroChartTab
     Grid = 3
 }
 
-public abstract class BaseChartComponent : ComponentBase
+public abstract class BaseChartComponent : ComponentBase, IAsyncDisposable
 {
     [Parameter, EditorRequired]
     public RgfEntityParameters EntityParameters { get; set; } = null!;
@@ -93,7 +93,7 @@ public abstract class BaseChartComponent : ComponentBase
 
     protected override void OnInitialized()
     {
-        EntityParameters.ChartParameters.EventDispatcher.Subscribe(RgfChartEventKind.ShowChart, (arg) => OnInitSize(true));
+        EntityParameters.ChartParameters.EventDispatcher.Subscribe(RgfChartEventKind.ShowChart, (arg) => OnInitSizeAsync(true), true, this);
     }
 
     protected override void OnAfterRender(bool firstRender)
@@ -120,7 +120,7 @@ public abstract class BaseChartComponent : ComponentBase
         ApexChartSettings.Series.Clear();
     }
 
-    protected virtual async Task OnInitSize(bool recreate = false)
+    protected virtual async Task OnInitSizeAsync(bool recreate = false)
     {
         if (recreate)
         {
@@ -195,7 +195,7 @@ public abstract class BaseChartComponent : ComponentBase
         ActiveTabIndex = RecroChartTab.Chart;
         StateHasChanged();
         await Task.Delay(50);
-        await OnInitSize();
+        await OnInitSizeAsync();
         if (RgfChartRef.DataStatus == RgfProcessingStatus.Valid || await GetData())
         {
             await UpdateChart();
@@ -407,5 +407,11 @@ public abstract class BaseChartComponent : ComponentBase
             StateHasChanged();
             await OnGetData();
         }
+    }
+
+    public virtual ValueTask DisposeAsync()
+    {
+        EntityParameters?.ChartParameters.EventDispatcher.Unsubscribe(this);
+        return ValueTask.CompletedTask;
     }
 }
