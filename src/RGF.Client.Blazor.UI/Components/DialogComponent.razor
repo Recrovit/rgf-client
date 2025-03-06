@@ -1,8 +1,11 @@
-﻿
-<div class="modal-backdrop show"></div>
+﻿@using Recrovit.RecroGridFramework.Client.Events
 
-<div id="@_dialogId" class="modal fade show" tabindex="-1" role="dialog" style="display:block">
-    <div class="modal-dialog modal-dialog-scrollable" @onkeydown="@OnKeyDown">
+@if (!DialogParameters.IsInline)
+{
+    <div class="modal-backdrop show"></div>
+}
+<div id="@_dialogId" class="@(DialogParameters.IsInline ? null : "modal fade show")" tabindex="-1" role="dialog" style="display:block">
+    <div class="@(DialogParameters.IsInline ? null: "modal-dialog modal-dialog-scrollable")" @onkeydown="@OnKeyDown">
         <div @attributes="_attributes">
             @if (DialogParameters.NoHeader != true)
             {
@@ -105,8 +108,10 @@
     protected override void OnInitialized()
     {
         base.OnInitialized();
-        DialogParameters.Destroy = Destroy;
-        DialogParameters.Refresh = StateHasChanged;
+        DialogParameters.EventDispatcher.Subscribe(RgfDialogEventKind.Destroy, OnDestroyAsync);
+        DialogParameters.EventDispatcher.Subscribe(RgfDialogEventKind.Refresh, (arg) => StateHasChanged(), true, this);
+
+        DialogParameters.EventDispatcher.RaiseEventAsync(RgfDialogEventKind.Initialized, this);
     }
 
     protected override void OnParametersSet()
@@ -117,50 +122,41 @@
         MinWidth = DialogParameters.MinWidth ?? "400px";
         Width = DialogParameters.Width;
         Height = DialogParameters.Height;
-        //IsModal = DialogParameters.IsModal;
 
         base.OnParametersSet();
     }
 
-    private void Destroy()
+    private async Task OnDestroyAsync(IRgfEventArgs<RgfDialogEventArgs> args)
     {
-        if (!_isDestroyed)
+        if (!_isDestroyed && !DialogParameters.IsInline)
         {
             if (!string.IsNullOrEmpty(DialogParameters.UniqueName))
             {
-                _ = _jsRuntime.InvokeVoidAsync(RGFClientBlazorUIConfiguration.JsBlazorUiNamespace + ".Dialog.saveDialogPos", DialogParameters.UniqueName, _dialogId);
+                await _jsRuntime.InvokeVoidAsync(RGFClientBlazorUIConfiguration.JsBlazorUiNamespace + ".Dialog.saveDialogPos", DialogParameters.UniqueName, _dialogId);
             }
             _isDestroyed = true;
+            DialogParameters.EventDispatcher.Unsubscribe(this);
         }
     }
 
-    private void OnClose(MouseEventArgs args)
-    {
-        bool cancel = false;
-        if (DialogParameters.OnClose != null)
-        {
-            cancel = DialogParameters.OnClose.Invoke() == false;
-        }
-        else
-        {
-            DialogParameters.Destroy?.Invoke();
-        }
-    }
+    private Task OnClose() => DialogParameters.EventDispatcher.RaiseEventAsync(RgfDialogEventKind.Close, this);
 
-    public void OnKeyDown(KeyboardEventArgs args)
-    {
-        if (args.Code == "Escape")
-        {
-            OnClose(new());
-        }
-    }
+    private Task OnKeyDown(KeyboardEventArgs args) => args.Code == "Escape" ? OnClose() : Task.CompletedTask;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         await base.OnAfterRenderAsync(firstRender);
         if (firstRender)
         {
-            await _jsRuntime.InvokeVoidAsync(RGFClientBlazorUIConfiguration.JsBlazorUiNamespace + ".Dialog.initialize", _dialogId, DialogParameters.Resizable, DialogParameters.UniqueName, _focusId);
+            await _jsRuntime.InvokeVoidAsync(RGFClientBlazorUIConfiguration.JsBlazorUiNamespace + ".Dialog.initialize", _dialogId, DialogParameters.Resizable, DialogParameters.UniqueName, _focusId, DialogParameters.IsInline);
         }
+        var eventArg = new RgfEventArgs<RgfDialogEventArgs>(this, RgfDialogEventArgs.CreateAfterRenderEvent(firstRender));
+        await DialogParameters.EventDispatcher.DispatchEventAsync(eventArg.Args.EventKind, eventArg);
+    }
+
+    public override ValueTask DisposeAsync()
+    {
+        DialogParameters?.EventDispatcher.Unsubscribe(this);
+        return base.DisposeAsync();
     }
 }

@@ -1,5 +1,5 @@
 ﻿/*!
-* recrovit-rgf-blazor-ui.js v1.8.0
+* recrovit-rgf-blazor-ui.js v1.9.0
 */
 
 window.Recrovit = window.Recrovit || {};
@@ -16,6 +16,53 @@ Blazor.UI = {
                 return true;
             }
             return false;
+        },
+        ensureVisible: async function (selector, setFocus = false, closestSelector = null, duration = 500, offset = 20) {
+            try {
+                var element = $(selector);
+                if (element.length && element.is(':visible')) {
+
+                    if (closestSelector) {
+                        var e2 = element.closest(closestSelector);
+                        if (e2.length) {
+                            element = e2;
+                        }
+                    }
+
+                    var windowTop = $(window).scrollTop(),
+                        windowHeight = $(window).height(),
+                        windowBottom = windowTop + windowHeight,
+                        elementTop = element.offset().top,
+                        elementBottom = elementTop + element.outerHeight(),
+                        elementHeight = element.outerHeight();
+
+                    if (elementTop >= windowTop && elementBottom <= windowBottom) {
+                        if (setFocus) {
+                            element.focus();
+                        }
+                        return true;
+                    }
+
+                    var scrollTo = elementTop - offset;
+                    if (elementBottom > windowBottom && elementHeight < windowHeight) {
+                        scrollTo = elementBottom - windowHeight + offset;
+                    }
+
+                    await new Promise((resolve, reject) => {
+                        $('html, body').stop(true, true).animate({ scrollTop: scrollTo }, duration, function () {
+                            if (setFocus) {
+                                element.focus();
+                            }
+                            resolve();
+                        });
+                    });
+                    return true;
+                }
+                return false;
+            }
+            catch (error) {
+                return false;
+            }
         },
         tooltip: function (element, options) {
             var $element = $(element);
@@ -34,33 +81,39 @@ Blazor.UI = {
                     customClass: options.customClass || 'rgf-tooltip-400',
                     placement: options.placement || 'top',
                     trigger: options.trigger || 'hover',
-                    html: options.allowHtml,
-                    delay: { show: 500 }
+                    html: options.allowHtml ?? false,
+                    delay: {
+                        show: options.delayShow ?? 500,
+                        hide: options.delayHide ?? 100
+                    }
                 });
-            } else {
+            }
+            else {
                 tooltipInstance.setContent({ '.tooltip-inner': options.title });
             }
             return tooltipInstance;
         }
     },
     Dialog: {
-        initialize: function (dialogId, resizable, uniqueName, focusId) {
+        initialize: function (dialogId, resizable, uniqueName, focusId, isInline) {
             var dialog = document.getElementById(dialogId);
-            $('div.modal-dialog', dialog).draggable({ handle: '.modal-header, .dialog-header' });
+            if (!isInline) {
+                $('div.modal-dialog', dialog).draggable({ handle: '.modal-header, .dialog-header' });
+                $('div.modal-dialog', dialog).height('auto');
+                Blazor.UI.Dialog.loadDialogPos(uniqueName, dialogId, true);
+                if (resizable) {
+                    var dialogContent = $('div.modal-content', dialog).first();
+                    Recrovit.LPUtils.ResizableWithResponsiveFlex(dialogContent);
+                    window.setTimeout(function () {
+                        Recrovit.LPUtils.ResizeResponsiveFlex(dialogContent);
+                    }, 1000);
+                }
+            }
             if (focusId != null) {
                 document.getElementById(focusId).focus();
             }
             else {
                 $('.btn-primary:first', dialog).focus();
-            }
-            $('div.modal-dialog', dialog).height('auto');
-            Blazor.UI.Dialog.loadDialogPos(uniqueName, dialogId, true);
-            if (resizable) {
-                var dialogContent = $('div.modal-content', dialog).first();
-                Recrovit.LPUtils.ResizableWithResponsiveFlex(dialogContent);
-                window.setTimeout(function () {
-                    Recrovit.LPUtils.ResizeResponsiveFlex(dialogContent);
-                }, 1000);
             }
         },
         saveDialogPos: function (name, dialogId) {
@@ -243,20 +296,120 @@ Blazor.UI = {
             });
         },
         setText: function (comboBoxId, text) {
-            $(`#${comboBoxId}`).rgcombobox("instance").input.val(text);
+            $(`#${comboBoxId}`).rgcombobox('instance').input.val(text);
         },
         clearText: function (comboBoxId) {
             $(`#${comboBoxId}`).val('');
         },
         destroy: function (comboBoxId) {
-            $(`#${comboBoxId}`).off('change.RGF-Client-Blazor-UI').rgcombobox("destroy");
+            $(`#${comboBoxId}`).off('change.RGF-Client-Blazor-UI').rgcombobox('destroy');
         }
     },
     Menu: {
         hide: function (element) {
             $(element).removeClass('show');
         }
+    },
+    Splitter: {
+        initialize: function (container) {
+            var $sp = $(container).children('.rgf-splitter');
+            $sp.off('mousedown.rgfSplitter');
+            if ($sp.prop('data-splitter-disabled')) return;
+
+            $sp.on('mousedown.rgfSplitter', function () {
+                var $splitter = $(this);
+
+                const isHorizontal = $splitter.parent().hasClass('horizontal');
+                const minSize = isHorizontal ? 100 : 50;
+
+                var $container = $splitter.parent(),
+                    $primaryPanel = $splitter.prev(),
+                    $secondaryPanel = $splitter.next();
+
+                var isResizing = true;
+                $('body').css('cursor', isHorizontal ? 'ew-resize' : 'ns-resize');
+
+                $(document).on('mousemove.rgfSplitter', function (event) {
+                    if (!isResizing) return;
+
+                    var newPrimarySize;
+                    var newSecondarySize;
+
+                    if (isHorizontal) {
+                        var containerOffset = $container.offset().left,
+                            containerSize = $container.width();
+
+                        newPrimarySize = event.pageX - containerOffset;
+                        newSecondarySize = containerSize - newPrimarySize - $splitter.outerWidth(true);
+                        if ($container.resizable('instance')) {
+                            $container.resizable('option', 'minWidth', newPrimarySize + minSize);
+                        }
+                    }
+                    else {
+                        var containerOffset = $container.offset().top,
+                            containerSize = $container.height();
+
+                        newPrimarySize = event.pageY - containerOffset;
+                        newSecondarySize = containerSize - newPrimarySize - $splitter.outerHeight(true);
+                        if ($container.resizable('instance')) {
+                            $container.resizable('option', 'minHeight', newPrimarySize + minSize);
+                        }
+                    }
+
+                    if (newPrimarySize > minSize && newSecondarySize > minSize) {
+                        $primaryPanel.css('flex', `0 0 ${newPrimarySize}px`);
+                        $secondaryPanel.css('flex', `0 0 ${newSecondarySize}px`);
+                        BlazorSplitter.clearSiblingFlex($primaryPanel, isHorizontal);
+                    }
+                });
+
+                $(document).on('mouseup.rgfSplitter', function () {
+                    isResizing = false;
+                    $('body').css('cursor', '');
+                    $(document).off("mousemove.rgfSplitter mouseup.rgfSplitter");
+                });
+            });
+        },
+        clearSiblingFlex: function ($panel, horizontal) {
+            if ($panel.length == 0) {
+                return;
+            }
+            var $container = $panel?.children('.rgf-splitter-wrapper');
+            if ($container.length > 0) {
+                if (horizontal && $container.hasClass('horizontal') ||
+                    !horizontal && $container.hasClass('vertical')) {
+                    $container.children('div.rgf-splitter-flex-2').css('flex', '');
+                    return;
+                }
+                BlazorSplitter.clearSiblingFlex($container.children('div.rgf-splitter-flex-1'), horizontal);
+                BlazorSplitter.clearSiblingFlex($container.children('div.rgf-splitter-flex-2'), horizontal);
+            }
+        },
+        resizable: function (container) {
+            if ($(container).resizable('instance')) {
+                return;
+            }
+            $(container).resizable({
+                resize: function (event, ui) {
+                    $(this).find('div.rgf-splitter-flex-1, div.rgf-splitter-flex-2').css('flex', '');
+                }
+            });
+        },
+        disable: function (container) {
+            var $container = $(container),
+                $splitter = $container.children('.rgf-splitter'),
+                $primaryPanel = $splitter.prev(),
+                $secondaryPanel = $splitter.next();
+
+            $primaryPanel.css('flex', '');
+            $secondaryPanel.css('flex', '');
+            if ($container.resizable('instance')) {
+                $container.resizable("destroy");
+            }
+        }
     }
 };
 
+const BlazorBase = Blazor.UI.Base;
 const BlazorGrids = Blazor.UI.Grid;
+const BlazorSplitter = Blazor.UI.Splitter;

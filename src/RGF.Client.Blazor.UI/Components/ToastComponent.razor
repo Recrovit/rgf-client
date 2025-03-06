@@ -11,11 +11,15 @@
         <div class="toast show @GetToastClass(toast.ToastType)" role="alert" aria-live="assertive" aria-atomic="true" style="min-width: 250px;">
             <div class="toast-header">
                 <strong class="me-auto">@toast.MarkupHeader</strong>
-                <small class="text-muted">@GetToastTime(toast.TriggeredAt)</small>
+                <small class="text-muted">@GetToastTime(toast)</small>
                 <button type="button" class="btn-close" @onclick="() => RemoveToast(toast)" aria-label="Close"></button>
             </div>
             <div class="toast-body">
                 @toast.MarkupBody
+                @if (toast.ProgressArgs?.IsBackgroundTaskCompleted == false)
+                {
+                    <SpinnerComponent ContainerClass="d-inline ps-2" Style="width: 1rem; height: 1rem;" />
+                }
             </div>
         </div>
     }
@@ -76,10 +80,10 @@
         };
     }
 
-    private string GetToastTime(DateTime triggeredAt)
+    private string GetToastTime(RgfToastEventArgs toast)
     {
         var culture = _recroSec.UserCultureInfo();
-        return (DateTime.Now - triggeredAt).TotalSeconds < 1 ? _recroDict.GetRgfUiString("JustNow") : triggeredAt.ToString("t", culture);
+        return toast.Delay < 2000 && (DateTime.Now - toast.TriggeredAt).TotalSeconds < 1 ? _recroDict.GetRgfUiString("JustNow") : toast.TriggeredAt.ToString("t", culture);
     }
 
     public void Dispose()

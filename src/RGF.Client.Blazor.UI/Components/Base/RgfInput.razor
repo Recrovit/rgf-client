@@ -25,7 +25,7 @@
         base.OnInitialized();
     }
 
-    protected void OnValueChanged(TValue value) => ValueChanging(value);
+    protected virtual void OnValueChanged(TValue value) => ValueChanging(value);
 
     protected bool ValueChanging(TValue value)
     {

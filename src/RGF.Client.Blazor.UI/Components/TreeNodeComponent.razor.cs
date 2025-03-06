@@ -13,7 +13,7 @@ namespace Recrovit.RecroGridFramework.Client.Blazor.UI.Components;
 public partial class TreeNodeComponent : IDisposable
 {
     [Inject]
-    private ILogger<TreeComponent> _logger { get; set; } = default!;
+    private ILogger<TreeNodeComponent> _logger { get; set; } = default!;
 
     private RgfEntityParameters? EntityParameters => Node.EntityParameters;
 
@@ -67,14 +67,8 @@ public partial class TreeNodeComponent : IDisposable
         }
     }
 
-    private void OnClickData(MouseEventArgs arg)
-    {
-        var eventArgs = new RgfEventArgs<RgfToolbarEventArgs>(this, new RgfToolbarEventArgs(RgfToolbarEventKind.Read, Node.RowData));
-        _ = EntityParameters?.ToolbarParameters.EventDispatcher.DispatchEventAsync(eventArgs.Args.EventKind, eventArgs);
-    }
-
     public void Dispose()
     {
-        EntityParameters?.EventDispatcher.Unsubscribe(RgfEntityEventKind.Initialized, OnEntityInitialized);
+        EntityParameters?.UnsubscribeFromAll(this);
     }
 }

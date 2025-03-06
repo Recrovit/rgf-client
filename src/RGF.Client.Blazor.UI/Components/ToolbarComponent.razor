@@ -1,6 +1,6 @@
 ﻿<RgfToolbarComponent @ref="_rgfToolbarRef" EntityParameters="EntityParameters">
     <ToolbarTemplate Context="RgfToolbar">
-        @if (EntityParameters.DisplayMode != RfgDisplayMode.Tree || EntityParameters.ParentManager == null)
+        @if (EntityParameters.DisplayMode != RfgDisplayMode.Tree || EntityParameters.ParentEntityParameters?.Manager == null)
         {
             <div class="bg-body-secondary p-1">
                 <div class="btn-toolbar" role="toolbar">
@@ -74,7 +74,7 @@
                             </div>
                         }
                         <div class="btn-group me-2" role="group">
-                            @if (EntityParameters.ParentManager == null || EntityParameters.ParentManager.ValidFormKeyExists() == true)
+                            @if (EntityParameters.ParentEntityParameters?.Manager == null || EntityParameters.ParentEntityParameters.Manager.ValidFormKeyExists() == true)
                             {
                                 <RgfButton IconName="bi-bar-chart-steps"
                                            CssClass="@(EntityParameters.DisplayMode == RfgDisplayMode.Tree ? "btn-success" : "btn-secondary")"
@@ -102,7 +102,7 @@
                         }
                         @if (RgfToolbar.SelectParam != null && Manager.EntityDesc.Options.GetBoolValue("RGO_SelectMode") == true)
                         {
-                            <div class="btn-group" role="group">
+                            <div class="btn-group me-2" role="group">
                                 <RgfButton IconName="bi-link" CssClass="@(RgfToolbar.IsSingleSelectedRow ? "btn-success" : "btn-secondary")" Disabled="@(!RgfToolbar.IsSingleSelectedRow)"
                                            Tooltip="@RecroDict.GetRgfUiString("Select")"
                                            OnClick="() => RgfToolbar.OnToolbarCommand(RgfToolbarEventKind.Select)" />
@@ -137,6 +137,17 @@
                     }
                 </div>
             </div>
+        }
+        else if (RgfToolbar.CustomMenu != null)
+        {
+            <RgfHtml TagName="div" CssClass="dropdown" role="group"
+                        Tooltip="@RecroDict.GetRgfUiString("CustomFunctions")">
+                <div style="position:fixed;z-index:10;">
+                    @RgfToolbar.CustomMenu
+                </div>
+                <RgfButton IconName="bi-list-task" CssClass="btn-secondary rgf-bs-icon-sm dropdown-toggle"
+                            AdditionalAttributes="@(new(){ {"data-bs-toggle","dropdown"}, {"aria-expanded", "false"}, {"rgf-bs-tree",""} })" />
+            </RgfHtml>
         }
     </ToolbarTemplate>
 </RgfToolbarComponent>

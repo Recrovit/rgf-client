@@ -2,7 +2,7 @@
 {
     <label for="@Id" class="@($"form-label {LabelCssClass ?? ""}".TrimEnd())">@Label</label>
 }
-@if (!AllowCustom)
+@if (!IsCustomAllowed)
 {
     <InputSelect @ref="_inputRef" TValue="TValue" Value="@Value" ValueExpression="ValueExpression" ValueChanged="OnValueChanged" DisplayName="@DisplayName" AdditionalAttributes="_attributes">
         @if (IncludeEmptyItem && !DataSource.Any(e => string.IsNullOrEmpty(e.Value?.ToString())))
@@ -56,6 +56,9 @@ else
 
     private InputSelect<TValue>? _inputRef { get; set; }
 
+    public bool IsCustomAllowed => AllowCustom && !Readonly && !Disabled;
+
+
     protected override void OnInitialized()
     {
         this.Id = GetNextId();
@@ -69,14 +72,12 @@ else
 
         if (DataSource == null)
         {
-            if (Items != null)
-            {
-                DataSource = Items.Select(e => new KeyValuePair<TValue, string>(e, e?.ToString() ?? string.Empty)).ToList();
-            }
-            else
-            {
-                DataSource = [];
-            }
+            DataSource = Items?.Select(e => new KeyValuePair<TValue, string>(e, e?.ToString() ?? string.Empty)).ToList() ?? [];
+        }
+
+        if (AllowCustom && DataSource.Any(e => e.Key?.Equals(Value) == true) && (Readonly || Disabled) && MinWidth == null)
+        {
+            MinWidth = "fit-content";
         }
 
         base.OnParametersSet();
@@ -94,10 +95,7 @@ else
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (!AllowCustom)
-        {
-            _elementReference = _inputRef?.Element;
-        }
+        _elementReference = IsCustomAllowed ? null : _inputRef?.Element;
 
         await base.OnAfterRenderAsync(firstRender);
 
@@ -109,7 +107,7 @@ else
             }
         }
 
-        if (AllowCustom)
+        if (IsCustomAllowed)
         {
             if (_selfRef == null)
             {
@@ -120,6 +118,14 @@ else
             {
                 await _jsRuntime.InvokeVoidAsync(RGFClientBlazorUIConfiguration.JsBlazorUiNamespace + ".Base.tooltip", $"#{this.Id} + input", TooltipOptions);
             }
+        }
+    }
+
+    protected override void OnValueChanged(TValue value)
+    {
+        if (!Readonly)
+        {
+            base.OnValueChanged(value);
         }
     }
 
@@ -200,8 +206,8 @@ else
         if (Text != text)
         {
             Text = text;
-            await TextChanged.InvokeAsync(text);
-            await InputChanged.InvokeAsync(new KeyValuePair<object?, string>(null, text));
+            await TextChanged.InvokeAsync(Text);
+            await InputChanged.InvokeAsync(new KeyValuePair<object?, string>(null, Text));
         }
     }
 

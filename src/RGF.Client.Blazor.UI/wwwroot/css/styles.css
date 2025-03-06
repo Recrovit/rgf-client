@@ -15,6 +15,10 @@ div.spinner-flex {
     width: 100%;
 }
 
+div.toast-body > div.progress-message {
+    display: inline !important;
+}
+
 .rgf-bs-icon-sm {
     padding: 0px 2px 0px 2px;
 }

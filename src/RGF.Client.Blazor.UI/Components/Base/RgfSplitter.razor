@@ -1,0 +1,66 @@
+﻿<div @ref="_elementReference" @attributes="_attributes">
+    <div class="rgf-splitter-flex-1">
+        @PrimaryPanel
+    </div>
+    <div class="rgf-splitter" data-splitter-disabled="@(IsDisabledSplitter ? "true" : null)"></div>
+    <div class="rgf-splitter-flex-2">
+        @SecondaryPanel
+    </div>
+</div>
+
+@inherits RgfBaseComponent
+@code {
+
+    [Parameter]
+    public RenderFragment? PrimaryPanel { get; set; }
+
+    [Parameter]
+    public RenderFragment? SecondaryPanel { get; set; }
+
+    [Parameter]
+    public bool IsVertical { get; set; } = false;
+
+    [Parameter]
+    public bool IsResizable { get; set; } = false;
+
+    [Parameter]
+    public bool DisabledSplitter { get; set; }
+
+    public bool IsDisabledSplitter => DisabledSplitter || PrimaryPanel == null || SecondaryPanel == null;
+
+    protected override void OnParametersSet()
+    {
+        if (PrimaryPanel != null && SecondaryPanel != null)
+        {
+            _baseCssClass = "rgf-splitter-wrapper " + (IsVertical ? "vertical" : "horizontal");
+            if (!IsResizable)
+            {
+                _baseCssClass += " w-100 h-100";
+            }
+        }
+        else
+        {
+            _baseCssClass = string.Empty;
+        }
+
+        base.OnParametersSet();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await base.OnAfterRenderAsync(firstRender);
+
+        if (IsDisabledSplitter)
+        {
+            await _jsRuntime.InvokeVoidAsync(RGFClientBlazorUIConfiguration.JsBlazorUiNamespace + ".Splitter.disable", _elementReference);
+        }
+        else
+        {
+            if (IsResizable)
+            {
+                await _jsRuntime.InvokeVoidAsync(RGFClientBlazorUIConfiguration.JsBlazorUiNamespace + ".Splitter.resizable", _elementReference);
+            }
+            await _jsRuntime.InvokeVoidAsync(RGFClientBlazorUIConfiguration.JsBlazorUiNamespace + ".Splitter.initialize", _elementReference);
+        }
+    }
+}

@@ -27,7 +27,7 @@
                             </div>
                             @if (EntityParameters.ToolbarParameters.QuickFilterEnabled)
                             {
-                                var clientDataType = (new[] { PropertyFormType.TextBox, PropertyFormType.TextBoxMultiLine }).Contains(prop.FormType) ? prop.ClientDataType : ClientDataType.Undefined;
+                                var clientDataType = (new[] { PropertyFormType.TextBox, PropertyFormType.TextBoxMultiLine, PropertyFormType.StaticText }).Contains(prop.FormType) ? prop.ClientDataType : ClientDataType.Undefined;
                                 if (clientDataType != ClientDataType.Undefined)
                                 {
                                     var data = _quickFilters.GetItemData(prop.Id.ToString());
@@ -115,7 +115,7 @@
     public RgfEntityParameters EntityParameters { get; set; } = null!;
 
     private IRgManager Manager => EntityParameters.Manager!;
-    private RgfGridParameters GridParameters { get => EntityParameters.GridParameters; }
+    private RgfGridParameters GridParameters => EntityParameters.GridParameters;
 
     private RgfDynamicDictionary _quickFilters = new RgfDynamicDictionary();
 

@@ -91,19 +91,19 @@
     private void OnParametersSet(IRgfEventArgs<RgfFormEventArgs> args)
     {
         var rowIndex = FormParameters.FormViewKey.RowIndex;
-        if (rowIndex != -1)
+        if (_rgfFormRef.FormEditMode == FormEditMode.Create)
+        {
+            var buttons = new List<ButtonParameters>() {
+                new("bi-chevron-double-right", RecroDict.GetRgfUiString("InsertNextClear"), async (arg) => await _rgfFormRef.ApplyAndNextNew(), "btn-secondary")};
+            FormParameters.DialogParameters.LeftButtons = buttons;
+        }
+        else if (rowIndex != -1)
         {
             var buttons = new List<ButtonParameters>() {
                  new("bi-chevron-double-left", RecroDict.GetRgfUiString("First"), async (arg) => await _rgfFormRef.FirstFormItemAsync(), "btn-secondary") { Disabled = rowIndex <= 0 },
                  new("bi-chevron-left", RecroDict.GetRgfUiString("Prev"), async (arg) => await _rgfFormRef.PrevFormItemAsync(), "btn-secondary") { Disabled = rowIndex <= 0 },
                  new("bi-chevron-right", RecroDict.GetRgfUiString("Next"), async (arg) => await _rgfFormRef.NextFormItemAsync(), "btn-secondary") { Disabled = rowIndex + 1 >= Manager.ItemCount.Value },
                  new("bi-chevron-double-right", RecroDict.GetRgfUiString("Last"), async (arg) => await _rgfFormRef.LastFormItemAsync(), "btn-secondary") { Disabled = rowIndex + 1 >= Manager.ItemCount.Value } };
-            FormParameters.DialogParameters.LeftButtons = buttons;
-        }
-        else
-        {
-            var buttons = new List<ButtonParameters>() {
-                new("bi-chevron-double-right", RecroDict.GetRgfUiString("InsertNextClear"), async (arg) => await _rgfFormRef.ApplyAndNextNew(), "btn-secondary")};
             FormParameters.DialogParameters.LeftButtons = buttons;
         }
         var button = FormParameters.DialogParameters.PredefinedButtons?.FirstOrDefault(e => e.ButtonName == "Apply");
@@ -115,9 +115,13 @@
 
     private async Task OnFormItemsRenderedAsync(IRgfEventArgs<RgfFormEventArgs> args)
     {
+        if (_rgfFormRef.FormEditMode != FormEditMode.Create)
+        {
+            return;
+        }
         foreach (var prop in Manager.EntityDesc.Properties.Where(e => e.FormTab == 1 && e.Editable).OrderBy(e => e.FormPos))
         {
-            if (await _jsRuntime.InvokeAsync<bool>(RGFClientBlazorUIConfiguration.JsBlazorUiNamespace + ".Base.setFocus", $"div.rg-property[name='{prop.ClientName}'] .rg-cru"))
+            if (await _jsRuntime.InvokeAsync<bool>(RGFClientBlazorUIConfiguration.JsBlazorUiNamespace + ".Base.ensureVisible", $"div.rg-property[name='{prop.ClientName}'] .rg-cru", true))
             {
                 break;
             }
@@ -140,7 +144,6 @@
 
     public void Dispose()
     {
-        EntityParameters.FormParameters.EventDispatcher.Unsubscribe(RgfFormEventKind.ParametersSet, OnParametersSet);
-        EntityParameters.FormParameters.EventDispatcher.Unsubscribe(RgfFormEventKind.FormItemsFirstRenderCompleted, OnFormItemsRenderedAsync);
+        EntityParameters?.UnsubscribeFromAll(this);
     }
 }

@@ -93,13 +93,14 @@ else if (_menuItems != null)
         if (MenuParameters.MenuItems != null)
         {
             _menuItems = new();
+            bool icons = MenuParameters.MenuItems.Any(x => x.Icon != null);
             foreach (var item in MenuParameters.MenuItems)
             {
                 if (MenuParameters.OnMenuRender != null)
                 {
                     await MenuParameters.OnMenuRender.Invoke(item);
                 }
-                _menuItems.Add(MenuParameters.Navbar ? RenderNavItem(item) : RenderMenuItem(item));
+                _menuItems.Add(MenuParameters.Navbar ? RenderNavItem(item) : RenderMenuItem(item, icons));
             }
         }
     }
@@ -159,20 +160,24 @@ else if (_menuItems != null)
         builder.CloseElement();
     };
 
-    private RenderFragment RenderMenuItem(RgfMenu item) => builder =>
+    private RenderFragment RenderMenuItem(RgfMenu item, bool icons) => builder =>
     {
         int sequence = 0;
         builder.OpenElement(sequence++, "li");
+        var iconContent = !icons ? string.Empty : item.Icon != null ?
+            $"<i class=\"bi {item.Icon} me-3\"></i>" :
+            "<i class=\"bi mx-3 inline-block\"></i>";
+
         if (item.Disabled || item.MenuType == RgfMenuType.Disabled)
         {
-            builder.AddMarkupContent(sequence++, $"<a class=\"dropdown-item disabled\">{item.Title}</a>");
+            builder.AddMarkupContent(sequence++, $"<a class=\"dropdown-item disabled\">{iconContent}{item.Title}</a>");
         }
         else
         {
             switch (item.MenuType)
             {
                 case RgfMenuType.ActionLink:
-                    builder.AddMarkupContent(sequence++, $"<a class=\"dropdown-item\" href=\"{RgfClientConfiguration.AppRootPath}{item.Command}\">{item.Title}</a>");
+                    builder.AddMarkupContent(sequence++, $"<a class=\"dropdown-item\" href=\"{RgfClientConfiguration.AppRootPath}{item.Command}\">{iconContent}{item.Title}</a>");
                     break;
 
                 case RgfMenuType.Function:
@@ -183,6 +188,7 @@ else if (_menuItems != null)
                         builder.AddAttribute(sequence++, "type", "button");
                         builder.AddAttribute(sequence++, "class", "dropdown-item");
                         builder.AddAttribute(sequence++, "onclick", EventCallback.Factory.Create(this, async () => await MenuParameters.OnMenuItemSelect.Invoke(item)));
+                        builder.AddMarkupContent(sequence++, iconContent);
                         builder.AddContent(sequence++, item.Title);
                         builder.CloseElement();
                     }
@@ -194,7 +200,7 @@ else if (_menuItems != null)
 
                 case RgfMenuType.Menu:
                     builder.AddAttribute(sequence++, "class", "dropdown-submenu");
-                    builder.AddMarkupContent(sequence++, $"<a class=\"dropdown-item\">{item.Title}</a>");
+                    builder.AddMarkupContent(sequence++, $"<a class=\"dropdown-item\">{iconContent}{item.Title}</a>");
                     builder.OpenComponent(sequence++, typeof(MenuComponent));
                     builder.AddAttribute(sequence++, nameof(MenuParameters), new RgfMenuParameters()
                         {

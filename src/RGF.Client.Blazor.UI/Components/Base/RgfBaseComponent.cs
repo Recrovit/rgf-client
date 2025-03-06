@@ -1,5 +1,20 @@
-﻿@implements IAsyncDisposable
-@code {
+﻿using Microsoft.AspNetCore.Components;
+using Microsoft.JSInterop;
+using Recrovit.RecroGridFramework.Abstraction.Extensions;
+using Recrovit.RecroGridFramework.Client.Blazor.Components;
+
+namespace Recrovit.RecroGridFramework.Client.Blazor.UI.Components.Base;
+
+public class RgfBaseComponent : ComponentBase, IAsyncDisposable
+{
+    public enum VisibilityState
+    {
+        Visible,
+        Hidden,
+        Collapse,
+        Initial,
+        Inherit
+    }
 
     [Parameter]
     public string? CssClass { get; set; }
@@ -32,6 +47,9 @@
     public bool Disabled { get; set; }
 
     [Parameter]
+    public VisibilityState Visibility { get; set; } = VisibilityState.Visible;
+
+    [Parameter]
     public string? Width { get; set; }
 
     [Parameter]
@@ -53,7 +71,9 @@
     protected IJSRuntime _jsRuntime { get; set; } = null!;
 
     protected string _baseCssClass { get; set; } = string.Empty;
+
     protected Dictionary<string, object>? _attributes { get; set; }
+
     protected ElementReference? _elementReference;
 
     public static string GetNextId(string format = "rgf-id-{0}") => RgfComponentWrapper.GetNextId(format);
@@ -85,7 +105,7 @@
         if (Disabled) { _attributes["disabled"] = ""; }
 
         string styleAttr = Style?.Trim() ?? string.Empty;
-        if (styleAttr.Length > 0 && !styleAttr.EndsWith(";"))
+        if (styleAttr.Length > 0 && !styleAttr.EndsWith(';'))
         {
             styleAttr += ";";
         }
@@ -101,9 +121,13 @@
         {
             styleAttr += $"height:{Height};";
         }
+        if (Visibility != VisibilityState.Visible)
+        {
+            styleAttr += $"visibility:{Visibility.ToString().ToLower()};";
+        }
         if (AdditionalAttributes?.TryGetValue("style", out var s) == true && s is string addStyle)
         {
-            if (!addStyle.EndsWith(";"))
+            if (!addStyle.EndsWith(';'))
             {
                 addStyle += ";";
             }
