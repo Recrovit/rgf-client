@@ -114,7 +114,7 @@ public partial class ApexChartComponent : ComponentBase
 
     private void AddSerie(Dictionary<string, RgfDynamicDictionary> chartData, string name, string dataAlias, CultureInfo cultureInfo)
     {
-        _logger.LogDebug($"AddSerie: {name}");
+        _logger.LogDebug("AddSerie | {name}", name);
         var serie = new ChartSerie()
         {
             Name = name,
