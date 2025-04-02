@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Web;
 using Microsoft.JSInterop;
 using Recrovit.RecroGridFramework.Abstraction.Extensions;
 using Recrovit.RecroGridFramework.Client.Blazor.Components;
@@ -65,16 +66,32 @@ public class RgfBaseComponent : ComponentBase, IAsyncDisposable
     public string? Role { get; set; }
 
     [Parameter]
-    public Dictionary<string, object> AdditionalAttributes { get; set; } = new();
+    public string? KeyboardEventTargetSelector { get; set; }
+
+    [Parameter]
+    public string[]? KeysToPrevent { get; set; }
+
+    [Parameter]
+    public Func<KeyboardEventArgs, Task>? OnKeyDown { get; set; }
+
+    [Parameter]
+    public Dictionary<string, object> AdditionalAttributes { get; set; } = [];
 
     [Inject]
     protected IJSRuntime _jsRuntime { get; set; } = null!;
 
     protected string _baseCssClass { get; set; } = string.Empty;
 
-    protected Dictionary<string, object>? _attributes { get; set; }
+    private Dictionary<string, object> _attributes { get; } = [];
+
+    protected IReadOnlyDictionary<string, object>? Attributes => _attributes.Count > 0 ? _attributes : null;
 
     protected ElementReference? _elementReference;
+    private DotNetObjectReference<RgfBaseComponent>? _selfRef;
+
+    private string? _currentKeyboardEventTargetSelector;
+    private string[]? _currentKeysToPrevent;
+    private Func<KeyboardEventArgs, Task>? _currentOnKeyDown;
 
     public static string GetNextId(string format = "rgf-id-{0}") => RgfComponentWrapper.GetNextId(format);
 
@@ -82,14 +99,16 @@ public class RgfBaseComponent : ComponentBase, IAsyncDisposable
     {
         base.OnParametersSet();
 
-        _attributes = new Dictionary<string, object>();
-        if (AdditionalAttributes.Any() == true)
+        _attributes.Clear();
+
+        AdditionalAttributes ??= [];
+        if (AdditionalAttributes.Count > 0)
         {
             _attributes.AddRange(AdditionalAttributes);
         }
 
         var classAttr = (string.IsNullOrEmpty(CssClass) ? _baseCssClass : $"{_baseCssClass} {CssClass}")?.Trim() ?? string.Empty;
-        if (AdditionalAttributes?.TryGetValue("class", out var c) == true && c is string addClass)
+        if (AdditionalAttributes.TryGetValue("class", out var c) == true && c is string addClass)
         {
             classAttr = classAttr.EnsureContains(addClass, ' ');
         }
@@ -109,23 +128,14 @@ public class RgfBaseComponent : ComponentBase, IAsyncDisposable
         {
             styleAttr += ";";
         }
-        if (Width != null)
-        {
-            styleAttr += $"width:{Width};";
-        }
-        if (MinWidth != null)
-        {
-            styleAttr += $"min-width:{MinWidth};";
-        }
-        if (Height != null)
-        {
-            styleAttr += $"height:{Height};";
-        }
-        if (Visibility != VisibilityState.Visible)
-        {
-            styleAttr += $"visibility:{Visibility.ToString().ToLower()};";
-        }
-        if (AdditionalAttributes?.TryGetValue("style", out var s) == true && s is string addStyle)
+
+        if (Width != null) { styleAttr += $"width:{Width};"; }
+        if (MinWidth != null) { styleAttr += $"min-width:{MinWidth};"; }
+        if (Height != null) { styleAttr += $"height:{Height};"; }
+
+        if (Visibility != VisibilityState.Visible) { styleAttr += $"visibility:{Visibility.ToString().ToLower()};"; }
+
+        if (AdditionalAttributes.TryGetValue("style", out var s) == true && s is string addStyle)
         {
             if (!addStyle.EndsWith(';'))
             {
@@ -133,6 +143,7 @@ public class RgfBaseComponent : ComponentBase, IAsyncDisposable
             }
             styleAttr += addStyle;
         }
+
         if (!string.IsNullOrWhiteSpace(styleAttr))
         {
             _attributes["style"] = styleAttr;
@@ -151,6 +162,25 @@ public class RgfBaseComponent : ComponentBase, IAsyncDisposable
         }
     }
 
+    protected override async Task OnParametersSetAsync()
+    {
+        await base.OnParametersSetAsync();
+
+        if (ShouldUpdateKeydownHandler)
+        {
+            await UnregisterKeydownHandler();
+            if (OnKeyDown != null && string.IsNullOrEmpty(KeyboardEventTargetSelector) && Id == null)
+            {
+                _attributes["id"] = Id = GetNextId();
+            }
+        }
+    }
+
+    private bool ShouldUpdateKeydownHandler =>
+        _currentOnKeyDown != OnKeyDown ||
+        _currentKeyboardEventTargetSelector != KeyboardEventTargetSelector ||
+        (_currentKeysToPrevent?.SequenceEqual(KeysToPrevent ?? Array.Empty<string>()) ?? KeysToPrevent != null);
+
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         await base.OnAfterRenderAsync(firstRender);
@@ -159,15 +189,23 @@ public class RgfBaseComponent : ComponentBase, IAsyncDisposable
         {
             await _jsRuntime.InvokeVoidAsync(RGFClientBlazorUIConfiguration.JsBlazorUiNamespace + ".Base.tooltip", _elementReference, TooltipOptions);
         }
+
+        if (ShouldUpdateKeydownHandler)
+        {
+            if (OnKeyDown != null)
+            {
+                _selfRef ??= DotNetObjectReference.Create(this);
+                var selector = KeyboardEventTargetSelector ?? $"#{Id}";
+                await _jsRuntime.InvokeVoidAsync(RGFClientBlazorUIConfiguration.JsBlazorUiNamespace + ".Base.registerKeydown", _selfRef, selector, KeysToPrevent);
+            }
+            _currentOnKeyDown = OnKeyDown;
+            _currentKeyboardEventTargetSelector = KeyboardEventTargetSelector;
+            _currentKeysToPrevent = KeysToPrevent;
+        }
     }
 
     protected string? GetAttribute(string key)
     {
-        if (_attributes == null)
-        {
-            return null;
-        }
-
         if (_attributes.TryGetValue(key, out var value))
         {
             return value?.ToString();
@@ -175,11 +213,34 @@ public class RgfBaseComponent : ComponentBase, IAsyncDisposable
         return null;
     }
 
+    private async Task UnregisterKeydownHandler()
+    {
+        if (_currentOnKeyDown != null)
+        {
+            await _jsRuntime.InvokeVoidAsync(RGFClientBlazorUIConfiguration.JsBlazorUiNamespace + ".Base.unregisterKeydown", _currentKeyboardEventTargetSelector);
+        }
+    }
+
+    [JSInvokable]
+    public async Task OnKeyDownJsCallback(KeyboardEventArgs args)
+    {
+        if (OnKeyDown != null)
+        {
+            await OnKeyDown.Invoke(args);
+        }
+    }
+
     public virtual async ValueTask DisposeAsync()
     {
         if (_elementReference != null && TooltipOptions != null)
         {
-            await _jsRuntime.InvokeVoidAsync(RGFClientBlazorUIConfiguration.JsBlazorUiNamespace + ".Base.tooltip", _elementReference, TooltipOptions);
+            await _jsRuntime.InvokeVoidAsync(RGFClientBlazorUIConfiguration.JsBlazorUiNamespace + ".Base.tooltip", _elementReference);
+        }
+        if (_selfRef != null)
+        {
+            await UnregisterKeydownHandler();
+            _selfRef.Dispose();
+            _selfRef = null;
         }
     }
 }

@@ -177,16 +177,13 @@
     [Parameter, EditorRequired]
     public RgfFormItemParameters FormItemParameters { get; set; } = null!;
 
-    [CascadingParameter]
-    public EditContext CurrentEditContext { get; set; } = null!;
-
     protected RgfFormComponent BaseFormComponent => FormItemParameters.BaseFormComponent;
     protected FormComponent FormComponent => (FormComponent)FormItemParameters.BaseFormComponent.FormComponent;
     protected RgfForm.Property Property => FormItemParameters.Property;
     protected RgfDynamicData ItemData => FormItemParameters.ItemData;
 
     protected RgfProperty PropertyDesc => Property.PropertyDesc;
-    private string? Tooltip => BaseFormComponent.PropertyTooltips.GetTooltip(Property.Id);
+    private string? Tooltip => BaseFormComponent.PropertyTooltips.GetTooltip(Property.Id, ItemData.Value?.ToString());
     private RenderFragment? _embeddedGrid;
 
     protected string Id { get; set; } = RgfBaseComponent.GetNextId();

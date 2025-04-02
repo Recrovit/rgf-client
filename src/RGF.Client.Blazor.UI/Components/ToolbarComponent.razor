@@ -7,7 +7,7 @@
                     <div class="d-flex">
                         @if (RgfToolbar.CustomMenu != null)
                         {
-                            <RgfHtml TagName="div" CssClass="dropdown me-2" role="group"
+                            <RgfHtml TagName="div" CssClass="dropdown me-2" Role="group"
                                      Tooltip="@RecroDict.GetRgfUiString("CustomFunctions")">
                                 <div style="position:fixed;z-index:10;">
                                     @RgfToolbar.CustomMenu
@@ -34,9 +34,8 @@
                                         <RgfButton IconName="@(ToolbarParameters.QuickFilterEnabled ? "bi-binoculars-fill" : "bi-binoculars")"
                                                    CssClass="@(ToolbarParameters.QuickFilterEnabled ? "btn-success" : "btn-secondary")"
                                                    Tooltip="@RecroDict.GetRgfUiString("QuickFilter")"
-                                                   OnClick="() => {
-                                                    ToolbarParameters.QuickFilterEnabled = !ToolbarParameters.QuickFilterEnabled;
-                                                    RgfToolbar.OnToolbarCommand(RgfToolbarEventKind.ToggleQuickFilter);}" />
+                                                   OnClick="() => {ToolbarParameters.QuickFilterEnabled = !ToolbarParameters.QuickFilterEnabled;
+                                                        RgfToolbar.OnToolbarCommand(RgfToolbarEventKind.ToggleQuickFilter);}" />
                                     }
                                 }
                             </div>
@@ -79,8 +78,7 @@
                                 <RgfButton IconName="bi-bar-chart-steps"
                                            CssClass="@(EntityParameters.DisplayMode == RfgDisplayMode.Tree ? "btn-success" : "btn-secondary")"
                                            Tooltip="TreeView"
-                                           OnClick="() => RgfToolbar.OnToolbarCommand(RgfToolbarEventKind.ToggleDisplayMode,
-                                        new RgfDynamicDictionary() { { nameof(RgfToolbarEventKind.ToggleDisplayMode), EntityParameters.DisplayMode == RfgDisplayMode.Tree ? RfgDisplayMode.Grid : RfgDisplayMode.Tree} })" />
+                                           OnClick="() => RgfToolbar.OnToolbarCommand(RgfToolbarEventKind.ToggleDisplayMode, new RgfDynamicDictionary() {{ nameof(RgfToolbarEventKind.ToggleDisplayMode), EntityParameters.DisplayMode == RfgDisplayMode.Tree ? RfgDisplayMode.Grid : RfgDisplayMode.Tree} })" />
                             }
                             @if (RgfToolbar.EnableChart)
                             {
@@ -140,13 +138,12 @@
         }
         else if (RgfToolbar.CustomMenu != null)
         {
-            <RgfHtml TagName="div" CssClass="dropdown" role="group"
-                        Tooltip="@RecroDict.GetRgfUiString("CustomFunctions")">
+            <RgfHtml TagName="div" CssClass="rgf-fit-content dropdown" Role="group" Tooltip="@RecroDict.GetRgfUiString("CustomFunctions")">
                 <div style="position:fixed;z-index:10;">
                     @RgfToolbar.CustomMenu
                 </div>
                 <RgfButton IconName="bi-list-task" CssClass="btn-secondary rgf-bs-icon-sm dropdown-toggle"
-                            AdditionalAttributes="@(new(){ {"data-bs-toggle","dropdown"}, {"aria-expanded", "false"}, {"rgf-bs-tree",""} })" />
+                           AdditionalAttributes="@(new() { { "data-bs-toggle", "dropdown" }, { "aria-expanded", "false" }, { "rgf-bs-tree", "" } })" />
             </RgfHtml>
         }
     </ToolbarTemplate>

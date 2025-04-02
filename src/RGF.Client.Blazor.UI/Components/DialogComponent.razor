@@ -1,12 +1,10 @@
-﻿@using Recrovit.RecroGridFramework.Client.Events
-
-@if (!DialogParameters.IsInline)
+﻿@if (!DialogParameters.IsInline)
 {
     <div class="modal-backdrop show"></div>
 }
 <div id="@_dialogId" class="@(DialogParameters.IsInline ? null : "modal fade show")" tabindex="-1" role="dialog" style="display:block">
-    <div class="@(DialogParameters.IsInline ? null: "modal-dialog modal-dialog-scrollable")" @onkeydown="@OnKeyDown">
-        <div @attributes="_attributes">
+    <div class="@(DialogParameters.IsInline ? null: "modal-dialog modal-dialog-scrollable")">
+        <div @attributes="Attributes">
             @if (DialogParameters.NoHeader != true)
             {
                 <div class="@($"modal-header {ThemeColor}")">
@@ -53,6 +51,7 @@
 </div>
 
 @inherits RgfBaseComponent
+@inject ILogger<DialogComponent> _logger
 @code {
 
     [Parameter, EditorRequired]
@@ -112,6 +111,9 @@
         DialogParameters.EventDispatcher.Subscribe(RgfDialogEventKind.Refresh, (arg) => StateHasChanged(), true, this);
 
         DialogParameters.EventDispatcher.RaiseEventAsync(RgfDialogEventKind.Initialized, this);
+
+        KeysToPrevent = ["Escape"];
+        OnKeyDown = (args) => args.Code == "Escape" ? OnClose() : Task.CompletedTask;
     }
 
     protected override void OnParametersSet()
@@ -141,11 +143,12 @@
 
     private Task OnClose() => DialogParameters.EventDispatcher.RaiseEventAsync(RgfDialogEventKind.Close, this);
 
-    private Task OnKeyDown(KeyboardEventArgs args) => args.Code == "Escape" ? OnClose() : Task.CompletedTask;
-
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        _logger.LogDebug("OnAfterRender | FirstRender:{firstRender}, {DialogType}:{UniqueName}, {Title}", firstRender, DialogParameters.DialogType, DialogParameters.UniqueName, DialogParameters.Title);
+
         await base.OnAfterRenderAsync(firstRender);
+
         if (firstRender)
         {
             await _jsRuntime.InvokeVoidAsync(RGFClientBlazorUIConfiguration.JsBlazorUiNamespace + ".Dialog.initialize", _dialogId, DialogParameters.Resizable, DialogParameters.UniqueName, _focusId, DialogParameters.IsInline);

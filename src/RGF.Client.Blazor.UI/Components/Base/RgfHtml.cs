@@ -32,9 +32,10 @@ public class RgfHtml : RgfBaseComponent
 
         int sequence = 0;
         builder.OpenElement(sequence++, TagName);
-        if (_attributes?.Count > 0)
+        var attributes = Attributes;
+        if (attributes != null && attributes.Count > 0)
         {
-            foreach (var attribute in _attributes)
+            foreach (var attribute in attributes)
             {
                 builder.AddAttribute(sequence++, attribute.Key, attribute.Value);
             }

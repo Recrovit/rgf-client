@@ -2,7 +2,7 @@
 {
     <label for="@Id" class="@($"form-label {LabelCssClass ?? ""}".TrimEnd())">@Label</label>
 }
-<InputDate @ref="_inputRef" TValue="TValue" Type="DateType" Value="@Value" ValueExpression="ValueExpression" ValueChanged="OnValueChanged" DisplayName="@DisplayName" AdditionalAttributes="_attributes" />
+<InputDate @ref="_inputRef" TValue="TValue" Type="DateType" Value="@Value" ValueExpression="ValueExpression" ValueChanged="OnValueChanged" DisplayName="@DisplayName" AdditionalAttributes="Attributes" />
 
 @typeparam TValue
 @inherits RgfInput<TValue>

@@ -1,5 +1,5 @@
 ﻿<div class="@_formClass">
-    <InputCheckbox @ref="_inputRef" Value="@Value" ValueExpression="ValueExpression" ValueChanged="OnValueChanged" DisplayName="@DisplayName" AdditionalAttributes="_attributes" />
+    <InputCheckbox @ref="_inputRef" Value="@Value" ValueExpression="ValueExpression" ValueChanged="OnValueChanged" DisplayName="@DisplayName" AdditionalAttributes="Attributes" />
     @if (!string.IsNullOrEmpty(Label))
     {
         <label for="@Id" class="@($"form-check-label {LabelCssClass ?? ""}".TrimEnd())">@Label</label>

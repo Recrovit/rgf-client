@@ -4,11 +4,11 @@
 }
 @if (Multiline)
 {
-    <InputTextArea @ref="_inputAreaRef" Value="@Value" ValueExpression="ValueExpression" ValueChanged="OnValueChanged" DisplayName="@DisplayName" AdditionalAttributes="_attributes" />
+    <InputTextArea @ref="_inputAreaRef" Value="@Value" ValueExpression="ValueExpression" ValueChanged="OnValueChanged" DisplayName="@DisplayName" AdditionalAttributes="Attributes" />
 }
 else
 {
-    <InputText @ref="_inputRef" Value="@Value" ValueExpression="ValueExpression" ValueChanged="OnValueChanged" DisplayName="@DisplayName" AdditionalAttributes="_attributes" />
+    <InputText @ref="_inputRef" Value="@Value" ValueExpression="ValueExpression" ValueChanged="OnValueChanged" DisplayName="@DisplayName" AdditionalAttributes="Attributes" />
 }
 
 @inherits RgfInput<string>

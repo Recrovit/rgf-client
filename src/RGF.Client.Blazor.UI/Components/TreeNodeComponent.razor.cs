@@ -19,9 +19,22 @@ public partial class TreeNodeComponent : IDisposable
 
     private IRgManager Manager => TreeComponent.Manager;
 
-    protected override void OnParametersSet()
+    public async override Task SetParametersAsync(ParameterView parameters)
     {
-        base.OnParametersSet();
+        await base.SetParametersAsync(parameters);
+
+        Node.TooltipText = null;
+
+        if (EntityParameters != null)
+        {
+            var eventArg = new RgfEventArgs<RgfTreeEventArgs>(this, new RgfTreeEventArgs(RgfTreeEventKind.NodeParametersSet, this, Node));
+            await EntityParameters.TreeParameters.EventDispatcher.DispatchEventAsync(eventArg.Args.EventKind, eventArg);
+
+            if (Node.TooltipText != null)
+            {
+                return;
+            }
+        }
 
         if (Node.Property != null && Node.Property.ListType != PropertyListType.RecroGrid)
         {
@@ -38,10 +51,6 @@ public partial class TreeNodeComponent : IDisposable
             }
             str.Append("</div>");
             Node.TooltipText = str.ToString();
-        }
-        else
-        {
-            Node.TooltipText = null;
         }
     }
 

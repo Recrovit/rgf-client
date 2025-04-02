@@ -101,7 +101,7 @@ public partial class GridComponent : ComponentBase, IDisposable
 
     protected virtual Task OnCreateAttributes(IRgfEventArgs<RgfListEventArgs> arg)
     {
-        _logger.LogDebug("CreateAttributes");
+        _logger.LogDebug("CreateAttributes | EntityName:{EntityName}", EntityParameters.EntityName);
         var rowData = arg.Args.Data ?? throw new ArgumentException();
         foreach (var prop in EntityDesc.SortedVisibleColumns)
         {

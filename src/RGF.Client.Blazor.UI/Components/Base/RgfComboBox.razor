@@ -4,7 +4,7 @@
 }
 @if (!IsCustomAllowed)
 {
-    <InputSelect @ref="_inputRef" TValue="TValue" Value="@Value" ValueExpression="ValueExpression" ValueChanged="OnValueChanged" DisplayName="@DisplayName" AdditionalAttributes="_attributes">
+    <InputSelect @ref="_inputRef" TValue="TValue" Value="@Value" ValueExpression="ValueExpression" ValueChanged="OnValueChanged" DisplayName="@DisplayName" AdditionalAttributes="Attributes">
         @if (IncludeEmptyItem && !DataSource.Any(e => string.IsNullOrEmpty(e.Value?.ToString())))
         {
             <option value=""></option>
@@ -17,7 +17,7 @@
 }
 else
 {
-    <select value="@Value" @attributes="_attributes">
+    <select value="@Value" @attributes="Attributes">
         @foreach (var option in DataSource)
         {
             <option value="@option.Key" selected="@(option.Key?.Equals(Value) == true)">@option.Value</option>

@@ -2,7 +2,7 @@
 {
     <label for="@Id" class="@($"form-label {LabelCssClass ?? ""}".TrimEnd())">@Label</label>
 }
-<select @ref="_elementReference" multiple @onchange="OnValuesChanged" @attributes="_attributes">
+<select @ref="_elementReference" multiple @onchange="OnValuesChanged" @attributes="Attributes">
     @foreach (var option in DataSource)
     {
         <option value="@option.Key" selected="@(Values?.Any(e => e?.Equals(option.Key) == true) == true)">@option.Value</option>
