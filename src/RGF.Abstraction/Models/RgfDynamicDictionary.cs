@@ -42,7 +42,16 @@ public class RgfDynamicDictionary : DynamicObject, IDictionary<string, object>, 
 
     private readonly object _lock = new object();
 
-    public bool TryGetMember(string key, out object result) => _data.TryGetValue(key, out result);
+    public bool TryGetMember(string key, out object result, bool ignoreCase = false)
+    {
+        if (ignoreCase)
+        {
+            var value = _data.FirstOrDefault(e => e.Key.Equals(key, StringComparison.OrdinalIgnoreCase));
+            result = value.Value;
+            return value.Key != null;
+        }
+        return _data.TryGetValue(key, out result);
+    }
 
     public override bool TryGetMember(GetMemberBinder binder, out object result) => TryGetMember(binder.Name, out result);
 
@@ -67,15 +76,30 @@ public class RgfDynamicDictionary : DynamicObject, IDictionary<string, object>, 
         }
     }
 
-    public object GetMember(string key)
+    public object GetMember(string key, bool ignoreCase = false)
     {
+        if (key == null)
+        {
+            throw new ArgumentNullException(nameof(key), "Key cannot be null");
+        }
+
         lock (_lock)
         {
-            if (_dynData.TryGetValue(key ?? throw new ArgumentNullException(nameof(key)), out var dynValue))
+            object value = null;
+            if (ignoreCase)
             {
-                return dynValue.Value;
+                value = _dynData.FirstOrDefault(e => e.Key.Equals(key, StringComparison.OrdinalIgnoreCase)).Value?.Value;
             }
-            TryGetMember(key, out object value);
+            else if (_dynData.TryGetValue(key, out var dynValue))
+            {
+                value = dynValue.Value;
+            }
+
+            if (value == null)
+            {
+                TryGetMember(key, out value, ignoreCase);
+            }
+
             return value;
         }
     }
@@ -95,18 +119,32 @@ public class RgfDynamicDictionary : DynamicObject, IDictionary<string, object>, 
         return value;
     }
 
-    public RgfDynamicData GetItemData(string key)
+    public RgfDynamicData GetItemData(string key, bool ignoreCase = false)
     {
+        if (key == null)
+        {
+            throw new ArgumentNullException(nameof(key), "Key cannot be null");
+        }
+
         lock (_lock)
         {
             RgfDynamicData dynValue;
-            if (!_dynData.TryGetValue(key, out dynValue))
+            if (ignoreCase)
             {
-                object value = null;
-                _data.TryGetValue(key, out value);
+                dynValue = _dynData.FirstOrDefault(e => e.Key.Equals(key, StringComparison.OrdinalIgnoreCase)).Value;
+            }
+            else
+            {
+                _dynData.TryGetValue(key, out dynValue);
+            }
+
+            if (dynValue == null)
+            {
+                TryGetMember(key, out var value, ignoreCase);
                 dynValue = new RgfDynamicData(key, value);
                 _dynData.Add(key, dynValue);
             }
+
             return dynValue;
         }
     }
