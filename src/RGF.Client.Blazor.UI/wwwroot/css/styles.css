@@ -19,6 +19,11 @@ div.toast-body > div.progress-message {
     display: inline !important;
 }
 
+div.toast-footer {
+    padding: var(--bs-toast-padding-y) var(--bs-toast-padding-x);
+    border-top: var(--bs-toast-border-width) solid var(--bs-toast-header-border-color);
+}
+
 .rgf-bs-icon-sm {
     padding: 0px 2px 0px 2px;
 }

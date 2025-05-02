@@ -29,9 +29,17 @@ public partial class GridComponent : ComponentBase, IDisposable
 
     public IRgListHandler ListHandler => Manager.ListHandler;
 
+    private RgfPropertyTooltips? PropertyTooltips { get; set; }
+
     private DotNetObjectReference<GridComponent>? _selfRef;
 
     private List<IDisposable> _disposables { get; set; } = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await base.OnInitializedAsync();
+        PropertyTooltips = await Manager.GetPropertyTooltipsAsync();
+    }
 
     protected override void OnInitialized()
     {

@@ -8,7 +8,8 @@
             _toasts.Remove(toast);
             continue;
         }
-        <div class="toast show @GetToastClass(toast.ToastType)" role="alert" aria-live="assertive" aria-atomic="true" style="min-width: 250px;">
+        var footer = toast.MarkupFooter;
+        <div @key="toast" class="toast show @GetToastClass(toast.ToastType)" role="alert" aria-live="assertive" aria-atomic="true" style="min-width: 250px;">
             <div class="toast-header">
                 <strong class="me-auto">@toast.MarkupHeader</strong>
                 <small class="text-muted">@GetToastTime(toast)</small>
@@ -21,6 +22,12 @@
                     <SpinnerComponent ContainerClass="d-inline ps-2" Style="width: 1rem; height: 1rem;" />
                 }
             </div>
+            @if (!string.IsNullOrWhiteSpace(footer.Value))
+            {
+                <div class="toast-footer">
+                    @footer
+                </div>
+            }
         </div>
     }
 </div>
@@ -31,7 +38,7 @@
 @implements IDisposable
 @code {
 
-    private List<RgfToastEventArgs> _toasts = new List<RgfToastEventArgs>();
+    private List<RgfToastEventArgs> _toasts = [];
     private IDisposable _toastManager = default!;
 
     protected override void OnInitialized()
@@ -59,7 +66,7 @@
                 });
             }
         }
-        StateHasChanged();
+        RefreshAsync();
     }
 
     private void RemoveToast(RgfToastEventArgs toast)
@@ -83,7 +90,20 @@
     private string GetToastTime(RgfToastEventArgs toast)
     {
         var culture = _recroSec.UserCultureInfo();
-        return toast.Delay < 2000 && (DateTime.Now - toast.TriggeredAt).TotalSeconds < 1 ? _recroDict.GetRgfUiString("JustNow") : toast.TriggeredAt.ToString("t", culture);
+        return toast.Delay < 2000 && (DateTime.Now - toast.TriggeredAt).TotalSeconds < 1 ? _recroDict.GetRgfUiString("JustNow") : toast.TriggeredAt.ToString("HH:mm:ss", culture);
+    }
+
+    private void RefreshAsync()
+    {
+        StateHasChanged();
+        if (_toasts.Count > 0)
+        {
+            Task.Run(async () =>
+            {
+                await Task.Delay(5000);
+                RefreshAsync();
+            });
+        }
     }
 
     public void Dispose()

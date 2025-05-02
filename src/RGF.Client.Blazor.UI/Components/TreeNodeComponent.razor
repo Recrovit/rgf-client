@@ -12,6 +12,12 @@
                        Disabled="@(Node.EntityParameters?.Manager == null)"
                        Tooltip="TreeView"
                        OnClick="OnEmbedded" />
+
+            <RgfButton IconName="bi-arrow-clockwise"
+                       CssClass="@($"rgf-bs-icon-sm me-1 {(Node.EntityParameters?.DisplayMode == RfgDisplayMode.Tree ? "btn-success" : "btn-secondary")}")"
+                       Tooltip="@RecroDict.GetRgfUiString("Refresh")"
+                       Disabled="@(Node.EntityParameters?.Manager == null || Node.EntityParameters?.DisplayMode != RfgDisplayMode.Tree)"
+                       OnClick="OnRefresh" />
         }
     }
 

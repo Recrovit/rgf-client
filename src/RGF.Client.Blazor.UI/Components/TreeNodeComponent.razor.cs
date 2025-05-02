@@ -15,6 +15,9 @@ public partial class TreeNodeComponent : IDisposable
     [Inject]
     private ILogger<TreeNodeComponent> _logger { get; set; } = default!;
 
+    [Inject]
+    private IRecroDictService RecroDict { get; set; } = default!;
+
     private RgfEntityParameters? EntityParameters => Node.EntityParameters;
 
     private IRgManager Manager => TreeComponent.Manager;
@@ -79,5 +82,13 @@ public partial class TreeNodeComponent : IDisposable
     public void Dispose()
     {
         EntityParameters?.UnsubscribeFromAll(this);
+    }
+    private async Task OnRefresh(MouseEventArgs args)
+    {
+        if (EntityParameters?.Manager != null)
+        {
+            var eventArgs = new RgfEventArgs<RgfToolbarEventArgs>(this, new RgfToolbarEventArgs(RgfToolbarEventKind.Refresh, null));
+            await EntityParameters.ToolbarParameters.EventDispatcher.DispatchEventAsync(eventArgs.Args.EventKind, eventArgs);
+        }
     }
 }

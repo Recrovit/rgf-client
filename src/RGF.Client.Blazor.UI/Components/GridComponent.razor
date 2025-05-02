@@ -10,9 +10,11 @@
                 <tr>
                     @foreach (var prop in EntityDesc.SortedVisibleColumns)
                     {
-                        <th scope="col" title="@prop.ColTitle"
-                            class="@($"rg-col-{prop.Id} {(Manager.IsColumnFiltered(prop) ? "table-success" : "bg-body-tertiary")}") "
-                            style="@(prop.ColWidth > 0 ? $"width:{prop.ColWidth}px" : null)">
+                        <RgfHtml TagName="th" @key="@prop.Id"
+                                 CssClass="@($"rg-col-{prop.Id} {(Manager.IsColumnFiltered(prop) ? "table-success" : "bg-body-tertiary")}")"
+                                 Style="@(prop.ColWidth > 0 ? $"width:{prop.ColWidth}px" : null)"
+                                 Tooltip="@PropertyTooltips?.GetTooltip(prop.Id)"
+                                 AdditionalAttributes="@(new(){ {"scope","col"} })">
                             <div class="d-flex justify-content-between align-items-center pe-0"
                                  @oncontextmenu="(arg) => RgfGrid.ShowHeaderMenu(prop.Id, new((int)arg.ClientX, (int)arg.ClientY))" @oncontextmenu:preventDefault>
                                 <div class="p-1">@prop.ColTitle</div>
@@ -67,7 +69,7 @@
                                     </div>
                                 }
                             }
-                        </th>
+                        </RgfHtml>
                     }
                 </tr>
             </thead>

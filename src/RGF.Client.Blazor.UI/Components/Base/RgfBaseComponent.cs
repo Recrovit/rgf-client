@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.JSInterop;
+using Recrovit.RecroGridFramework.Abstraction.Contracts.Services;
 using Recrovit.RecroGridFramework.Abstraction.Extensions;
 using Recrovit.RecroGridFramework.Client.Blazor.Components;
 
@@ -25,6 +26,9 @@ public class RgfBaseComponent : ComponentBase, IAsyncDisposable
 
     [Parameter]
     public string? Label { get; set; }
+
+    [Parameter]
+    public string? RecroDictLabel { get; set; }
 
     [Parameter]
     public string? LabelCssClass { get; set; }
@@ -76,6 +80,9 @@ public class RgfBaseComponent : ComponentBase, IAsyncDisposable
 
     [Parameter]
     public Dictionary<string, object> AdditionalAttributes { get; set; } = [];
+
+    [Inject]
+    protected IRecroDictService RecroDict { get; set; } = null!;
 
     [Inject]
     protected IJSRuntime _jsRuntime { get; set; } = null!;
@@ -165,6 +172,11 @@ public class RgfBaseComponent : ComponentBase, IAsyncDisposable
     protected override async Task OnParametersSetAsync()
     {
         await base.OnParametersSetAsync();
+
+        if (RecroDictLabel != null)
+        {
+            Label = await RecroDict.GetItemAsync(RecroDictLabel);
+        }
 
         if (ShouldUpdateKeydownHandler)
         {
