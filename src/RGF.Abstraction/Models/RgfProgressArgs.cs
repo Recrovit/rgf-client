@@ -24,6 +24,8 @@ public interface IRgfProgressArgs
 
     string Message { get; }
 
+    string Footer { get; }
+
     RgfCoreMessages CoreMessages { get; set; }
 
     int? TotalIterations { get; }
@@ -43,6 +45,9 @@ public class RgfProgressArgs : IRgfProgressArgs
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string Message { get; set; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string Footer { get; set; }
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public RgfCoreMessages CoreMessages { get; set; }
