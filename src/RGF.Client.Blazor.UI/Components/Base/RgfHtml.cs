@@ -10,6 +10,9 @@ public class RgfHtml : RgfBaseComponent
     public string TagName { get; set; } = default!;
 
     [Parameter]
+    public object? RenderKey { get; set; }
+
+    [Parameter]
     public RenderFragment ChildContent { get; set; } = null!;
 
     [Parameter]
@@ -25,6 +28,8 @@ public class RgfHtml : RgfBaseComponent
 
     protected override void BuildRenderTree(RenderTreeBuilder builder)
     {
+        base.BuildRenderTree(builder);
+
         if (string.IsNullOrEmpty(TagName))
         {
             return;
@@ -32,6 +37,11 @@ public class RgfHtml : RgfBaseComponent
 
         int sequence = 0;
         builder.OpenElement(sequence++, TagName);
+        if (RenderKey != null)
+        {
+            builder.SetKey(RenderKey);
+        }
+
         var attributes = Attributes;
         if (attributes != null && attributes.Count > 0)
         {
@@ -57,10 +67,12 @@ public class RgfHtml : RgfBaseComponent
         }
 
         builder.AddElementReferenceCapture(sequence++, capturedRef => _elementReference = capturedRef);
+
         if (ChildContent != null)
         {
             builder.AddContent(sequence++, ChildContent);
         }
+
         builder.CloseElement();
     }
 }
