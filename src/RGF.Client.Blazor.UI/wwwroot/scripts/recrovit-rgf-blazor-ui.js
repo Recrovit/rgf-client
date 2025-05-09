@@ -1,5 +1,5 @@
 ﻿/*!
-* recrovit-rgf-blazor-ui.js v1.10.0
+* recrovit-rgf-blazor-ui.js v1.10.1
 */
 
 window.Recrovit = window.Recrovit || {};
@@ -69,12 +69,11 @@ Blazor.UI = {
             if ($element.length !== 1) return null;
 
             var tooltipInstance = bootstrap.Tooltip.getInstance($element[0]);
-            if ($element.is(':disabled') || !options) {
-                if (tooltipInstance) {
-                    tooltipInstance.dispose();
-                }
+            if ($element.is(':disabled') || !options || !options.title) {
+                tooltipInstance?.dispose();
                 return null;
             }
+
             if (!tooltipInstance) {
                 tooltipInstance = new bootstrap.Tooltip($element[0], {
                     title: options.title,
@@ -222,6 +221,11 @@ Blazor.UI = {
                 if (idx != newIdx && idx + 1 != newIdx) {
                     gridRef.invokeMethodAsync('SetColumnPos', idx, newIdx > idx ? newIdx - 1 : newIdx);
                 }
+            });
+            $('th', rgfTable.get_thead()).each(function () {
+                $('div.ui-draggable', this).on('dragstart', function (event) {
+                    bootstrap.Tooltip.getInstance($(event.target).closest('th')[0])?.dispose();
+                });
             });
             BlazorGrids.initializeTooltips(gridRef, table);
         },

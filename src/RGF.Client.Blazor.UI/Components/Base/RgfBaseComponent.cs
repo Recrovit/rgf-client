@@ -156,16 +156,13 @@ public class RgfBaseComponent : ComponentBase, IAsyncDisposable
             _attributes["style"] = styleAttr;
         }
 
-        if (Tooltip != null)
+        if (Tooltip != null && TooltipOptions == null)
         {
-            if (TooltipOptions == null)
-            {
-                TooltipOptions = new RgfTooltipOptions(Tooltip);
-            }
-            else
-            {
-                TooltipOptions.Title = Tooltip;
-            }
+            TooltipOptions = new RgfTooltipOptions(Tooltip);
+        }
+        else if (TooltipOptions != null)
+        {
+            TooltipOptions.Title = Tooltip;
         }
     }
 
