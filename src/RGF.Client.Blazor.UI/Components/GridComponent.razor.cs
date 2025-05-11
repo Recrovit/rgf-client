@@ -77,7 +77,11 @@ public partial class GridComponent : ComponentBase, IDisposable
     }
 
     [JSInvokable]
-    public void SetColumnWidth(int index, int width) => ListHandler.ReplaceColumnWidth(index, width);
+    public void SetColumnWidth(int index, int width)
+    {
+        ListHandler.ReplaceColumnWidth(index, width);
+        StateHasChanged();
+    }
 
     [JSInvokable]
     public Task SetColumnPos(int from, int to) => ListHandler.MoveColumnAsync(from, to);
