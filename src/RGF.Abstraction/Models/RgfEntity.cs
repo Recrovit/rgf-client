@@ -41,6 +41,7 @@ public class RgfEntity
     public int Preload => (int)Options.GetLongValue("RGO_Preload", ItemsPerPage * 2);
 
     [JsonIgnore]
+    [Obsolete("Use ListHandler.SortedVisibleColumns instead", true)]
     public IEnumerable<RgfProperty> SortedVisibleColumns => Properties.Where(e => e.Readable && e.ColPos > 0 && e.ListType != PropertyListType.RecroGrid).OrderBy(e => e.ColPos).ThenBy(e => e.ColTitle);
 
     [JsonIgnore]

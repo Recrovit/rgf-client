@@ -1,4 +1,5 @@
-﻿using System.Text.Json.Serialization;
+﻿using System.Collections.Generic;
+using System.Text.Json.Serialization;
 
 namespace Recrovit.RecroGridFramework.Abstraction.Models;
 
@@ -23,6 +24,9 @@ public class RgfListParam
     public int? SQLTimeout { get; set; }
 
     public int[] Columns { get; set; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<RgfExternalColumnSettings> ExternalColumns { get; set; }
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public int[][] Sort { get; set; }

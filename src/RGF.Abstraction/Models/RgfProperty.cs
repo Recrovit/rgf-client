@@ -1,6 +1,7 @@
 ﻿using Recrovit.RecroGridFramework.Abstraction.Extensions;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Runtime.Serialization;
 using System.Text.Json.Serialization;
 
@@ -91,6 +92,8 @@ public interface IRgfProperty
 
     string BaseEntityNameVersion { get; set; }
 
+    string BaseEntityPropertyName { get; set; }
+
     int ColPos { get; set; }
 
     string ColTitle { get; set; }
@@ -155,6 +158,8 @@ public class RgfProperty : RgfIdAliasPair, IRgfProperty
 
     public string BaseEntityNameVersion { get; set; }
 
+    public string BaseEntityPropertyName { get; set; }
+
     public string ColTitle { get; set; }
 
     public PropertyListType ListType { get; set; }
@@ -186,20 +191,21 @@ public class RgfProperty : RgfIdAliasPair, IRgfProperty
     public Dictionary<string, object> Options { get; set; }
 
     [JsonIgnore]
-    public int? MaxLength => Options?.TryGetIntValue("RGO_MaxLength");
+    public int? MaxLength => this.GetMaxLength();
 
     [JsonIgnore]
-    public bool PasswordType => Options?.GetBoolValue("RGO_Password") ?? false;
+    public bool PasswordType => this.IsPasswordType();
 
     [JsonIgnore]
-    public bool Nullable => Options?.GetBoolValue("RGO_Nullable") ?? false;
+    public bool Nullable => this.IsNullable();
 
     [JsonIgnore]
-    public bool IsDynamic => Ex?.Contains("D") == true;
+    public bool IsDynamic => this.IsDynamic();
 
     [JsonIgnore]
     public bool Required => !Nullable;
 
+    [JsonIgnore]
     public ClientDataType ClientDataType
     {
         get
@@ -250,46 +256,23 @@ public class RgfProperty : RgfIdAliasPair, IRgfProperty
     }
 }
 
-public class GridColumnSettings : RgfColumnSettings
+public static class IRgfPropertyExtension
 {
-    public GridColumnSettings(IRgfProperty property) : base(property)
+    public static int? GetMaxLength(this IRgfProperty property) => property.Options?.TryGetIntValue("RGO_MaxLength");
+
+    public static bool IsPasswordType(this IRgfProperty property) => property.Options?.GetBoolValue("RGO_Password") ?? false;
+
+    public static bool IsNullable(this IRgfProperty property) => property.Options?.GetBoolValue("RGO_Nullable") ?? false;
+
+    public static bool IsDynamic(this IRgfProperty property) => property.Ex?.Contains("D") == true;
+
+    public static int? GetAutoExternalId(this IRgfProperty property)
     {
-        Property = property;
-        CssClass = GetCssClass();
-    }
-
-    public IRgfProperty Property { get; }
-
-    public string CssClass { get; }
-
-    private string GetCssClass()
-    {
-        var property = this.Property;
-        string cssClass = string.Empty;
-        if (property.IsKey)
+        var ext = property.Options?.GetStringValue("RGO_AutoExternal");
+        if (ext != null && int.TryParse(ext.ToString().Split('/').Last(), out int externalId))
         {
-            cssClass = "rgf-f-key";
+            return externalId;
         }
-        else if (property.ListType == PropertyListType.RecroGrid)
-        {
-            cssClass = "rgf-f-recrogrid";
-        }
-        else if (property.Ex.IndexOf('E') != -1)
-        {
-            cssClass = "rgf-f-entity";
-        }
-        else if (property.Ex.IndexOf('D') != -1)
-        {
-            cssClass = "rgf-f-dynamic";
-        }
-        else if (property.Ex.IndexOf('B') != -1)
-        {
-            cssClass = "rgf-ebase";
-        }
-        else if (property.Ex.IndexOf('N') != -1)
-        {
-            cssClass = "rgf-esql";
-        }
-        return cssClass;
+        return null;
     }
 }
