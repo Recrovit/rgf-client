@@ -95,6 +95,7 @@ public class RgfBaseComponent : ComponentBase, IAsyncDisposable
 
     protected ElementReference? _elementReference;
     private DotNetObjectReference<RgfBaseComponent>? _selfRef;
+    internal RgfTooltipOptions? _tooltipOptions { get; set; }
 
     private string? _currentKeyboardEventTargetSelector;
     private string[]? _currentKeysToPrevent;
@@ -156,13 +157,18 @@ public class RgfBaseComponent : ComponentBase, IAsyncDisposable
             _attributes["style"] = styleAttr;
         }
 
-        if (Tooltip != null && TooltipOptions == null)
+        _tooltipOptions = TooltipOptions;
+
+        if (Tooltip != null)
         {
-            TooltipOptions = new RgfTooltipOptions(Tooltip);
-        }
-        else if (TooltipOptions != null)
-        {
-            TooltipOptions.Title = Tooltip;
+            if (_tooltipOptions == null)
+            {
+                _tooltipOptions = new RgfTooltipOptions(Tooltip);
+            }
+            else
+            {
+                _tooltipOptions.Title = Tooltip;
+            }
         }
     }
 
@@ -194,9 +200,9 @@ public class RgfBaseComponent : ComponentBase, IAsyncDisposable
     {
         await base.OnAfterRenderAsync(firstRender);
 
-        if (_elementReference != null && (!firstRender || TooltipOptions != null))
+        if (_elementReference != null && (!firstRender || _tooltipOptions != null))
         {
-            await _jsRuntime.InvokeVoidAsync(RGFClientBlazorUIConfiguration.JsBlazorUiNamespace + ".Base.tooltip", _elementReference, TooltipOptions);
+            await _jsRuntime.InvokeVoidAsync(RGFClientBlazorUIConfiguration.JsBlazorUiNamespace + ".Base.tooltip", _elementReference, _tooltipOptions);
         }
 
         if (ShouldUpdateKeydownHandler)
@@ -241,7 +247,7 @@ public class RgfBaseComponent : ComponentBase, IAsyncDisposable
 
     public virtual async ValueTask DisposeAsync()
     {
-        if (_elementReference != null && TooltipOptions != null)
+        if (_elementReference != null && _tooltipOptions != null)
         {
             await _jsRuntime.InvokeVoidAsync(RGFClientBlazorUIConfiguration.JsBlazorUiNamespace + ".Base.tooltip", _elementReference);
         }

@@ -43,7 +43,7 @@ public partial class TreeNodeComponent : IDisposable
         {
             StringBuilder str = new();
             str.Append("<div class='rgf-tree-tooltip'>");
-            foreach (var prop in Manager.EntityDesc.SortedVisibleColumns)
+            foreach (var prop in Manager.ListHandler.SortedVisibleColumns)
             {
                 var data = Node.RowData.GetItemData(prop.Alias).StringValue;
                 str.Append("<div class='row justify-content-start align-items-center'>")

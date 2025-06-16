@@ -3,24 +3,13 @@
         <table class="tablesorter">
             <thead>
                 <tr>
-                    <th @onclick="(arg) => Sort(1)">@RecroDict.GetRgfUiString("Name")</th>
-                    <th @onclick="(arg) => Sort(2)" style="text-align:center">@RecroDict.GetRgfUiString("Position")</th>
+                    <th class="sort" @onclick="(arg) => Sort(1)">@RecroDict.GetRgfUiString("Name")</th>
+                    <th class="sort" @onclick="(arg) => Sort(2)" style="text-align:center">@RecroDict.GetRgfUiString("Position")</th>
                     <th style="text-align:center">@RecroDict.GetRgfUiString("Width")</th>
                 </tr>
             </thead>
             <tbody>
-                @foreach (var col in (Columns ?? RgfColSettings.Columns))
-                {
-                    <tr>
-                        <td class="@col.CssClass" style="white-space:nowrap">@col.Property.ColTitle</td>
-                        <td>
-                            <RgfInputNumber TValue="int?" @bind-Value="@col.ColPos" Width="125px" />
-                        </td>
-                        <td>
-                            <RgfInputNumber TValue="int?" @bind-Value="@col.ColWidth" Width="125px" />
-                        </td>
-                    </tr>
-                }
+                @RenderProperties(Columns ?? RgfColSettings.Columns)
             </tbody>
         </table>
     </SettingsTemplate>
@@ -32,20 +21,19 @@
     [Parameter, EditorRequired]
     public RgfDataComponentBase BaseDataComponent { get; set; } = null!;
 
-    private RgfGridColumnSettingsComponent _rgfColSettingsRef { get; set; } = null!;
+    public RenderFragment RenderProperty(RgfGridColumnSettings settings) =>
+    @<tr>
+        <td class="@settings.CssClass" style="white-space:nowrap">@(settings.PathTitle ?? settings.Property.ColTitle)</td>
+        <td><RgfInputNumber TValue="int?" @bind-Value="@settings.ColPosOrNull" Width="125px" /></td>
+        <td><RgfInputNumber TValue="int?" @bind-Value="@settings.ColWidthOrNull" Width="125px" /></td>
+    </tr>;
 
-    private GridColumnSettings[]? Columns { get; set; }
-
-    private void Sort(int col)
-    {
-        if (col == 1)
-        {
-            Columns = _rgfColSettingsRef.Columns.OrderBy(e => e.Property.ColTitle).ToArray();
-        }
-        else if (col == 2)
-        {
-            Columns = _rgfColSettingsRef.Columns.OrderBy(e => e.ColPos > 0 ? e.ColPos : int.MaxValue).ToArray();
-        }
-        StateHasChanged();
-    }
+    public RenderFragment RenderEntity(RgfGridColumnSettings settings, RgfGridColumnSettings? parent) =>
+    @<tr>
+        <td style="white-space:nowrap">
+            <RgfButton IconName="@(settings.IsExpanded ? "bi-chevron-down" : "bi-chevron-right")" Label="@(settings.PathTitle ?? settings.Property.ColTitle)"
+                       CssClass="@($"rgf-bs-icon-sm me-1 tree-toggle-icon {(settings.IsExpanded ? "btn-secondary" : "btn-light")}")" AdditionalAttributes="@(new(){ {"rgf-bs-tree",""} })"
+                       OnClick="(arg) => OnExternal(settings, parent)" />
+        </td>
+    </tr>;
 }

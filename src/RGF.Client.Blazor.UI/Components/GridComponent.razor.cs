@@ -115,7 +115,7 @@ public partial class GridComponent : ComponentBase, IDisposable
     {
         _logger.LogDebug("CreateAttributes | EntityName:{EntityName}", EntityParameters.EntityName);
         var rowData = arg.Args.Data ?? throw new ArgumentException();
-        foreach (var prop in EntityDesc.SortedVisibleColumns)
+        foreach (var prop in ListHandler.SortedVisibleColumns)
         {
             string? propClass = null;
             if (prop.FormType == PropertyFormType.CheckBox)
@@ -157,7 +157,7 @@ public partial class GridComponent : ComponentBase, IDisposable
         return Task.CompletedTask;
     }
 
-    private async Task OnSort(MouseEventArgs args, RgfProperty property)
+    private async Task OnSort(MouseEventArgs args, IRgfProperty property)
     {
         var dict = new Dictionary<string, int>();
         if (args.ShiftKey)

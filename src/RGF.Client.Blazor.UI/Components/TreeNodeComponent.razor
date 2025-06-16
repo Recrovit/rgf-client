@@ -36,7 +36,7 @@
                      Style="@(propAttributes?.Get<string>("style"))">
                 @TreeComponent.RenderContentItem(Node.Property, Node.RowData)
             </RgfHtml>
-            @foreach (var prop in Manager.EntityDesc.SortedVisibleColumns.Take(TreeComponent.TreeViewColumnCount()).Skip(1).ToArray())
+            @foreach (var prop in Manager.ListHandler.SortedVisibleColumns.Take(TreeComponent.TreeViewColumnCount()).Skip(1).ToArray())
             {
                 <i class="bi bi-three-dots-vertical"></i>
                 var propAttr = attributes?.Get<RgfDynamicDictionary>(prop.Alias);

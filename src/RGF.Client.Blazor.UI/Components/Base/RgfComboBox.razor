@@ -114,9 +114,9 @@ else
                 _selfRef = DotNetObjectReference.Create(this);
                 await _jsRuntime.InvokeVoidAsync(RGFClientBlazorUIConfiguration.JsBlazorUiNamespace + ".ComboBox.initialize", _selfRef, this.Id, this.Text, this.Width);
             }
-            if (TooltipOptions != null)
+            if (_tooltipOptions != null)
             {
-                await _jsRuntime.InvokeVoidAsync(RGFClientBlazorUIConfiguration.JsBlazorUiNamespace + ".Base.tooltip", $"#{this.Id} + input", TooltipOptions);
+                await _jsRuntime.InvokeVoidAsync(RGFClientBlazorUIConfiguration.JsBlazorUiNamespace + ".Base.tooltip", $"#{this.Id} + input", _tooltipOptions);
             }
         }
     }

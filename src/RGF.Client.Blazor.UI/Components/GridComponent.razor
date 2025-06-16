@@ -8,7 +8,7 @@
         <table @ref="_tableRef" class="recro-grid table table-sm table-bordered table-hover mb-0">
             <thead>
                 <tr>
-                    @foreach (var prop in EntityDesc.SortedVisibleColumns)
+                    @foreach (var prop in ListHandler.SortedVisibleColumns)
                     {
                         <RgfHtml TagName="th" RenderKey="@($"{prop.Id}.{prop.ColPos}.{prop.ColWidth}")"
                                  CssClass="@($"rg-col-{prop.Id} {(Manager.IsColumnFiltered(prop) ? "table-success" : "bg-body-tertiary")}")"
@@ -89,7 +89,7 @@
                             class="@rowClass"
                             style="@(attributes?.Get<string>("style"))"
                             @onclick="(arg) => OnRowClick(arg, rowData, rowIdx)">
-                            @foreach (var prop in EntityDesc.SortedVisibleColumns)
+                            @foreach (var prop in ListHandler.SortedVisibleColumns)
                             {
                                 var propAttributes = attributes?.Get<RgfDynamicDictionary>(prop.Alias);
                                 <td data-cell="@prop.Id"
@@ -121,7 +121,7 @@
 
     private RgfDynamicDictionary _quickFilters = new RgfDynamicDictionary();
 
-    public async Task OnQuickFilterChanged(RgfProperty property, object? value)
+    public async Task OnQuickFilterChanged(IRgfProperty property, object? value)
     {
         _quickFilters.SetMember(property.Id.ToString(), value);
         var handler = await Manager.GetFilterHandlerAsync();

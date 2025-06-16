@@ -5,3 +5,13 @@
 .modal-content {
     margin: auto;
 }
+
+div.rgf-dialog-column-settings {
+    max-height: calc(100vh - 50px);
+    overflow-y: auto;
+}
+
+    div.rgf-dialog-column-settings > div.modal-body {
+        width: fit-content;
+        overflow-x: inherit;
+    }
