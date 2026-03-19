@@ -1,4 +1,5 @@
-﻿using System.Net;
+﻿#nullable enable
+using System.Net;
 
 namespace Recrovit.RecroGridFramework.Abstraction.Infrastructure.API;
 
@@ -7,6 +8,8 @@ public interface IRgfApiResponse<ResultType>
     bool Success { get; }
 
     HttpStatusCode StatusCode { get; }
+
+    string? ReasonPhrase { get; set; }
 
     ResultType Result { get; }
 
@@ -19,7 +22,9 @@ public class ApiResponse<ResultType> : IRgfApiResponse<ResultType>
 
     public HttpStatusCode StatusCode { get; set; }
 
-    public ResultType Result { get; set; }
+    public string? ReasonPhrase { get; set; }
+
+    public ResultType Result { get; set; } = default!;
 
     public string ErrorMessage { get; set; } = string.Empty;
 }
