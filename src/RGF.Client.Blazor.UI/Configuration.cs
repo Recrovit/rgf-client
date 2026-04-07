@@ -29,20 +29,20 @@ public class RGFClientBlazorUIConfiguration
             await jsRuntime.InvokeAsync<IJSObjectReference>("import", $"{RgfClientConfiguration.AppRootPath}/_content/{_rgfClientBlazorAssemblyName}/lib/jqueryui/jquery-ui.min.js");
         }
 
-        await jsRuntime.InvokeAsync<bool>("Recrovit.LPUtils.AddStyleSheetLink", RgfBlazorConfigurationExtension.GetJQueryUiCssHref(), false, RGFClientBlazorUIConfiguration.JqueryUiCssId);
+        await jsRuntime.InvokeAsync<bool>("Recrovit.LPUtils.AddStyleSheetLink", RgfBlazorConfigurationExtension.GetJQueryUiCssHref(), false, JqueryUiCssId);
 
         if (!_scriptsLoaded)
         {
             await jsRuntime.InvokeAsync<IJSObjectReference>("import", $"{RgfClientConfiguration.AppRootPath}/_content/{_uiAssemblyName}/lib/bootstrap/dist/js/bootstrap.bundle.min.js");
         }
-        await jsRuntime.InvokeAsync<bool>("Recrovit.LPUtils.AddStyleSheetLink", RGFClientBlazorUIConfiguration.GetBootstrapCssHref(), false, RGFClientBlazorUIConfiguration.BootstrapCssId);
-        await jsRuntime.InvokeAsync<bool>("Recrovit.LPUtils.AddStyleSheetLink", RGFClientBlazorUIConfiguration.GetBootstrapIconsCssHref(), false, RGFClientBlazorUIConfiguration.BootstrapIconsId);
-        await jsRuntime.InvokeAsync<bool>("Recrovit.LPUtils.AddStyleSheetLink", RGFClientBlazorUIConfiguration.GetStylesCssHref(), false, RGFClientBlazorUIConfiguration.BlazorUICss);
+        await jsRuntime.InvokeAsync<bool>("Recrovit.LPUtils.AddStyleSheetLink", GetBootstrapCssHref(), false, BootstrapCssId);
+        await jsRuntime.InvokeAsync<bool>("Recrovit.LPUtils.AddStyleSheetLink", GetBootstrapIconsCssHref(), false, BootstrapIconsId);
+        await jsRuntime.InvokeAsync<bool>("Recrovit.LPUtils.AddStyleSheetLink", GetStylesCssHref(), false, BlazorUICss);
 
         await jsRuntime.InvokeAsync<bool>("Recrovit.LPUtils.EnsureStyleSheetLoaded", "rgf-check-stylesheet-client-blazor-ui", "<div class=\"rgf-check-stylesheet-client-blazor-ui\" rgf-bs-root=\"\"></div>",
-            RGFClientBlazorUIConfiguration.GetBundleCssHref(), RGFClientBlazorUIConfiguration.BlazorUICssLib, RgfBlazorConfigurationExtension.GetBundleCssHref());
+            GetBundleCssHref(), BlazorUICssLib, RgfBlazorConfigurationExtension.GetBundleCssHref());
 
-        await jsRuntime.InvokeAsync<bool>("Recrovit.LPUtils.AddStyleSheetLink", RGFClientBlazorUIConfiguration.GetBootstrapSubmenuCssHref(), false, RGFClientBlazorUIConfiguration.BootstrapSubmenuCssId);
+        await jsRuntime.InvokeAsync<bool>("Recrovit.LPUtils.AddStyleSheetLink", GetBootstrapSubmenuCssHref(), false, BootstrapSubmenuCssId);
 
         if (!_scriptsLoaded)
         {
