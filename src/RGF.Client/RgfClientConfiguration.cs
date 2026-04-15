@@ -36,8 +36,6 @@ public static class RgfClientConfigurationExtension
         RgfApiAuthMode authMode = RgfApiAuthMode.None)
     {
         var config = configuration.GetSection("Recrovit:RecroGridFramework");
-        services.AddOptions<RgfAuthenticationOptions>()
-            .Bind(config.GetSection("Authentication"));
         var externalBaseAddress = config.GetValue<string>("API:BaseAddress", string.Empty)!.TrimEnd('/');
         var configuredProxyBaseAddress = config.GetValue<string>("API:ProxyBaseAddress", string.Empty);
         var effectiveProxyBaseAddress = ResolveProxyBaseAddress(authMode, externalBaseAddress, configuredProxyBaseAddress);
@@ -76,7 +74,6 @@ public static class RgfClientConfigurationExtension
         });
 
         services.AddSingleton<IRgfApiService, ApiService>();
-        services.AddSingleton<RgfAuthenticationPrincipalFactory>();
         services.AddScoped<IRgfAccessTokenAccessor, NoOpRgfAccessTokenAccessor>();
         services.AddSingleton<IRgfAuthenticationFailureHandler, NoOpRgfAuthenticationFailureHandler>();
         services.AddScoped<IRgfEventNotificationService, RgfEventNotificationService>();

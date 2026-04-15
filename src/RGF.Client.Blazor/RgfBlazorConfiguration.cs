@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Http;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Microsoft.JSInterop;
 using Recrovit.RecroGridFramework.Abstraction.Contracts.Constants;
 using Recrovit.RecroGridFramework.Abstraction.Contracts.Services;
@@ -112,6 +113,7 @@ public static class RgfBlazorConfigurationExtension
     public static IServiceCollection AddRgfBlazorServerProxyClientServices(this IServiceCollection services, IConfiguration configuration, ILogger? logger = null)
     {
         AddRgfBlazorServicesCore(services, configuration, logger, RgfApiAuthMode.ServerProxy);
+        ConfigureAuthenticationPrincipalSynchronization(services, configuration);
         services.AddAuthorizationCore();
         services.AddCascadingAuthenticationState();
         services.AddAuthenticationStateDeserialization();
@@ -133,6 +135,13 @@ public static class RgfBlazorConfigurationExtension
         ConfigureServerProxySsrHttpClients(services, logger);
         logger?.LogInformation("RecroGrid Framework Blazor registration: SSR server-proxy auth via configured proxy base address.");
         return services;
+    }
+
+    private static void ConfigureAuthenticationPrincipalSynchronization(IServiceCollection services, IConfiguration configuration)
+    {
+        services.AddOptions<RgfAuthenticationOptions>()
+            .Bind(configuration.GetSection("Recrovit:RecroGridFramework").GetSection("Authentication"));
+        services.TryAddSingleton<RgfAuthenticationPrincipalFactory>();
     }
 
     private static IServiceCollection AddRgfBlazorServicesCore(IServiceCollection services, IConfiguration configuration, ILogger? logger,

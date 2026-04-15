@@ -1,7 +1,7 @@
 using System.Security.Claims;
 using Microsoft.Extensions.Options;
 
-namespace Recrovit.RecroGridFramework.Client.Services;
+namespace Recrovit.RecroGridFramework.Client.Blazor.Services;
 
 internal sealed class RgfAuthenticationPrincipalSnapshot
 {
@@ -44,6 +44,11 @@ internal sealed class RgfAuthenticationClaimSnapshot
     public string? Issuer { get; init; }
 
     public string? OriginalIssuer { get; init; }
+}
+
+internal sealed class RgfAuthenticationOptions
+{
+    public string[]? NameClaimFallbackTypes { get; set; }
 }
 
 internal sealed class RgfAuthenticationPrincipalFactory(IOptions<RgfAuthenticationOptions> options)
