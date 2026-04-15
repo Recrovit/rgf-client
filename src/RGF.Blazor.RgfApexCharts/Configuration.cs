@@ -12,11 +12,10 @@ public class RgfApexChartsConfiguration
 {
     public static async Task LoadResourcesAsync(IJSRuntime jsRuntime)
     {
-        var libName = Assembly.GetExecutingAssembly().GetName().Name;
-        await jsRuntime.InvokeVoidAsync("Recrovit.LPUtils.EnsureStyleSheetLoaded", "rgf-check-stylesheet-rgfcharts", "<div class=\"rgf-check-stylesheet-rgfcharts\" rgf-apexcharts=\"\">",
-            $"{RgfClientConfiguration.AppRootPath}/_content/{libName}/{libName}.bundle.scp.css?v={FileVersion}", RgfApexChartsCssLib, "Recrovit.RecroGridFramework.Client.Blazor.bundle.scp.css");
+        await jsRuntime.InvokeAsync<bool>("Recrovit.LPUtils.EnsureStyleSheetLoaded", "rgf-check-stylesheet-rgfcharts", "<div class=\"rgf-check-stylesheet-rgfcharts\" rgf-apexcharts=\"\">",
+            GetBundleCssHref(), RgfApexChartsCssLib, RgfBlazorConfigurationExtension.GetBundleCssHref());
 
-        await jsRuntime.InvokeAsync<IJSObjectReference>("import", $"{RgfClientConfiguration.AppRootPath}/_content/{libName}/scripts/" +
+        await jsRuntime.InvokeAsync<IJSObjectReference>("import", $"{RgfClientConfiguration.AppRootPath}/_content/{_rgfApexChartsAssemblyName}/scripts/" +
 #if DEBUG
             "recrovit-rgf-apexcharts.js"
 #else
@@ -31,7 +30,11 @@ public class RgfApexChartsConfiguration
         RgfBlazorConfiguration.UnregisterComponent(RgfBlazorConfiguration.ComponentType.Chart);
     }
 
+    private static readonly string _rgfApexChartsAssemblyName = Assembly.GetExecutingAssembly().GetName().Name!;
+
     private static readonly string RgfApexChartsCssLib = "rgf-apexcharts-lib";
+
+    private static string GetBundleCssHref() => $"{RgfClientConfiguration.AppRootPath}/_content/{_rgfApexChartsAssemblyName}/{_rgfApexChartsAssemblyName}.bundle.scp.css?v={FileVersion}";
 
     public static readonly string JsApexChartsNamespace = "Recrovit.RGF.Blazor.ApexCharts";
 

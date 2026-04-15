@@ -1,5 +1,5 @@
 ﻿/*!
-* recrovit-rgf-blazor-ui.js v1.10.2
+* recrovit-rgf-blazor-ui.js v1.11.0
 */
 
 window.Recrovit = window.Recrovit || {};
@@ -9,7 +9,7 @@ var Blazor = window.Recrovit.RGF.Blazor;
 
 Blazor.UI = {
     Base: {
-        setFocus: function (selector) {
+        setFocus: function(selector) {
             var element = $(selector);
             if (element.length) {
                 element.focus();
@@ -17,7 +17,7 @@ Blazor.UI = {
             }
             return false;
         },
-        ensureVisible: async function (selector, setFocus = false, closestSelector = null, duration = 500, offset = 20) {
+        ensureVisible: async function(selector, setFocus = false, closestSelector = null, duration = 500, offset = 20) {
             try {
                 var element = $(selector);
                 if (element.length && element.is(':visible')) {
@@ -49,7 +49,7 @@ Blazor.UI = {
                     }
 
                     await new Promise((resolve, reject) => {
-                        $('html, body').stop(true, true).animate({ scrollTop: scrollTo }, duration, function () {
+                        $('html, body').stop(true, true).animate({ scrollTop: scrollTo }, duration, function() {
                             if (setFocus) {
                                 element.focus();
                             }
@@ -64,7 +64,7 @@ Blazor.UI = {
                 return false;
             }
         },
-        tooltip: function (element, options) {
+        tooltip: function(element, options) {
             var $element = $(element);
             if ($element.length !== 1) return null;
 
@@ -92,10 +92,10 @@ Blazor.UI = {
             }
             return tooltipInstance;
         },
-        registerKeydown: function (dotNetObjRef, selector, keysToPrevent) {
+        registerKeydown: function(dotNetObjRef, selector, keysToPrevent) {
             if (selector) {
                 var targetElement = $(selector);
-                targetElement.on('keydown.RgfUI', function (e) {
+                targetElement.on('keydown.RgfUI', function(e) {
                     if (keysToPrevent && keysToPrevent.includes(e.key)) {
                         e.preventDefault();
                         e.stopPropagation();
@@ -116,14 +116,14 @@ Blazor.UI = {
                 });
             }
         },
-        unregisterKeydown: function (selector) {
+        unregisterKeydown: function(selector) {
             if (selector) {
                 $(selector).off('keydown.RgfUI');
             }
         }
     },
     Dialog: {
-        initialize: function (dialogId, resizable, uniqueName, focusId, isInline) {
+        initialize: function(dialogId, resizable, uniqueName, focusId, isInline) {
             var dialog = document.getElementById(dialogId);
             if (!isInline) {
                 $('div.modal-dialog', dialog).draggable({ handle: '.modal-header, .dialog-header' });
@@ -132,7 +132,7 @@ Blazor.UI = {
                 if (resizable) {
                     var dialogContent = $('div.modal-content', dialog).first();
                     Recrovit.LPUtils.ResizableWithResponsiveFlex(dialogContent);
-                    window.setTimeout(function () {
+                    window.setTimeout(function() {
                         Recrovit.LPUtils.ResizeResponsiveFlex(dialogContent);
                     }, 1000);
                 }
@@ -144,7 +144,7 @@ Blazor.UI = {
                 $('.btn-primary:first', dialog).focus();
             }
         },
-        saveDialogPos: function (name, dialogId) {
+        saveDialogPos: function(name, dialogId) {
             const key = `RGF.DialogPos.${name}`;
             if (dialogId == undefined) {
                 localStorage.removeItem(key);
@@ -160,7 +160,7 @@ Blazor.UI = {
                 localStorage.setItem(key, JSON.stringify(dialogPos));
             }
         },
-        loadDialogPos: function (name, dialogId, verticalCenter) {
+        loadDialogPos: function(name, dialogId, verticalCenter) {
             var content = $('div.modal-content:first', '#' + dialogId);
             var dialog = content.parent('div.modal-dialog');
             if (name != null) {
@@ -202,42 +202,42 @@ Blazor.UI = {
         }
     },
     Grid: {
-        selectRow: function (row, idx) {
+        selectRow: function(row, idx) {
             //$(table).find('tr').eq(idx).addClass('table-primary');
             $(row).addClass('table-primary');
         },
-        deselectRow: function (row, idx) {
+        deselectRow: function(row, idx) {
             $(row).removeClass('table-primary');
         },
-        deselectAllRow: function (table) {
+        deselectAllRow: function(table) {
             $('tr.table-primary', table).removeClass('table-primary');
         },
-        initializeTable: function (gridRef, table) {
+        initializeTable: function(gridRef, table) {
             var rgfTable = new Recrovit.WebCli.RgfTable(table);
-            rgfTable.makeColumnsResizable(function (idx, target, width) {
+            rgfTable.makeColumnsResizable(function(idx, target, width) {
                 bootstrap.Tooltip.getInstance(target)?.dispose();
                 gridRef.invokeMethodAsync('SetColumnWidth', idx + 1, parseInt(width) || 0);
             });
-            rgfTable.makeColumnsDragable(function (idx, newIdx) {
+            rgfTable.makeColumnsDragable(function(idx, newIdx) {
                 if (idx != newIdx && idx + 1 != newIdx) {
                     gridRef.invokeMethodAsync('SetColumnPos', idx, newIdx > idx ? newIdx - 1 : newIdx);
                 }
             });
-            $('th', rgfTable.get_thead()).each(function () {
-                $('div.ui-draggable', this).on('dragstart', function (event) {
+            $('th', rgfTable.get_thead()).each(function() {
+                $('div.ui-draggable', this).on('dragstart', function(event) {
                     bootstrap.Tooltip.getInstance($(event.target).closest('th')[0])?.dispose();
                 });
             });
             BlazorGrids.initializeTooltips(gridRef, table);
         },
-        initializeTooltips: function (gridRef, table) {
-            $('td', table).each(function () {
+        initializeTooltips: function(gridRef, table) {
+            $('td', table).each(function() {
                 var element = $(this);
                 element.off('show.bs.tooltip');
                 bootstrap.Tooltip.getInstance(element[0])?.dispose();
             });
             var tooltipTriggerArr = $('td[data-bs-toggle="tooltip"]', table);
-            tooltipTriggerArr.each(function () {
+            tooltipTriggerArr.each(function() {
                 var element = $(this);
                 var tooltip = new bootstrap.Tooltip(element[0], {
                     title: element.text(),
@@ -246,7 +246,7 @@ Blazor.UI = {
                     delay: { show: 500 },
                     html: true
                 });
-                element.on('show.bs.tooltip', async function () {
+                element.on('show.bs.tooltip', async function() {
                     if (tooltip.tooltipText == null) {
                         var col = element.attr('data-cell');
                         var rowIdx = element.closest('tr').attr('data-row');
@@ -256,14 +256,14 @@ Blazor.UI = {
                         }
                         tooltip.setContent({ '.tooltip-inner': tooltip.tooltipText })
                     }
-                    setTimeout(function () { tooltip.hide(); }, 8000);
+                    setTimeout(function() { tooltip.hide(); }, 8000);
                 });
             });
         }
     },
     Chart: {
-        initialize: async function (containerId, chartRef) {
-            Blazor.ApexCharts.onResize = async function (element, chartRef) {
+        initialize: async function(containerId, chartRef) {
+            Blazor.ApexCharts.onResize = async function(element, chartRef) {
                 var container = $(element);
                 var w = Math.round($('div.card-body', container).first().width());
                 var h1 = Math.round(container.height());
@@ -274,7 +274,7 @@ Blazor.UI = {
         }
     },
     ListBox: {
-        resizable: function (listBoxId, width, height) {
+        resizable: function(listBoxId, width, height) {
             var element = $(`#${listBoxId}`);
             if (width == null) {
                 element.width(element.width());
@@ -287,20 +287,20 @@ Blazor.UI = {
             element.resizable({
                 minWidth: 130,
                 minHeight: 61,
-                create: function (event, ui) {
+                create: function(event, ui) {
                     $(this).resizable("resizeTo", { width: outerWidth, height: outerHeight });
                 },
-                stop: function (event, ui) {
+                stop: function(event, ui) {
                     $(this).css({ width: '', height: '' });
                 }
             });
         },
-        resizableDestroy: function (listBoxId) {
+        resizableDestroy: function(listBoxId) {
             $(`#${listBoxId}`).resizable('destroy');
         }
     },
     ComboBox: {
-        initialize: function (dotNetRef, comboBoxId, value, width) {
+        initialize: function(dotNetRef, comboBoxId, value, width) {
             var combo = $(`#${comboBoxId}`).rgcombobox({
                 value: value,
                 inputClass: 'rgf-combobox-edit form-control form-control-sm',
@@ -310,7 +310,7 @@ Blazor.UI = {
                 width: width
             });
             combo.rgcombobox('instance').input.autocomplete('widget').css('z-index', 5000);
-            combo.on('change.RGF-Client-Blazor-UI', function (event) {
+            combo.on('change.RGF-Client-Blazor-UI', function(event) {
                 var $this = $(this);
                 if (event.originalEvent?.type == 'keyup' && event.originalEvent?.key == "Enter") {
                     var text = $this.rgcombobox("instance").input.val();
@@ -329,28 +329,53 @@ Blazor.UI = {
                 }
             });
         },
-        setText: function (comboBoxId, text) {
+        setText: function(comboBoxId, text) {
             $(`#${comboBoxId}`).rgcombobox('instance').input.val(text);
         },
-        clearText: function (comboBoxId) {
+        clearText: function(comboBoxId) {
             $(`#${comboBoxId}`).val('');
         },
-        destroy: function (comboBoxId) {
+        destroy: function(comboBoxId) {
             $(`#${comboBoxId}`).off('change.RGF-Client-Blazor-UI').rgcombobox('destroy');
         }
     },
+    SetTheme: {
+        getSettings: function(themeKeys, sizeKeys) {
+            const currentTheme = document.documentElement.getAttribute('data-bs-theme') ?? '';
+            const themeName = themeKeys.includes(currentTheme)
+                ? currentTheme
+                : (themeKeys[0] ?? '');
+
+            const size = Array.from(document.body.classList).find(value => sizeKeys.includes(value))
+                ?? (sizeKeys.includes('') ? '' : (sizeKeys[0] ?? ''));
+
+            return { themeName, size };
+        },
+        setTheme: function(themeName) {
+            document.documentElement.setAttribute('data-bs-theme', themeName ?? '');
+        },
+        setSize: function(oldValue, newValue) {
+            if (oldValue) {
+                document.body.classList.remove(oldValue);
+            }
+
+            if (newValue) {
+                document.body.classList.add(newValue);
+            }
+        }
+    },
     Menu: {
-        hide: function (element) {
+        hide: function(element) {
             $(element).removeClass('show');
         }
     },
     Splitter: {
-        initialize: function (container) {
+        initialize: function(container) {
             var $sp = $(container).children('.rgf-splitter');
             $sp.off('mousedown.rgfSplitter');
             if ($sp.prop('data-splitter-disabled')) return;
 
-            $sp.on('mousedown.rgfSplitter', function () {
+            $sp.on('mousedown.rgfSplitter', function() {
                 var $splitter = $(this);
 
                 const isHorizontal = $splitter.parent().hasClass('horizontal');
@@ -363,7 +388,7 @@ Blazor.UI = {
                 var isResizing = true;
                 $('body').css('cursor', isHorizontal ? 'ew-resize' : 'ns-resize');
 
-                $(document).on('mousemove.rgfSplitter', function (event) {
+                $(document).on('mousemove.rgfSplitter', function(event) {
                     if (!isResizing) return;
 
                     var newPrimarySize;
@@ -397,14 +422,14 @@ Blazor.UI = {
                     }
                 });
 
-                $(document).on('mouseup.rgfSplitter', function () {
+                $(document).on('mouseup.rgfSplitter', function() {
                     isResizing = false;
                     $('body').css('cursor', '');
                     $(document).off("mousemove.rgfSplitter mouseup.rgfSplitter");
                 });
             });
         },
-        clearSiblingFlex: function ($panel, horizontal) {
+        clearSiblingFlex: function($panel, horizontal) {
             if ($panel.length == 0) {
                 return;
             }
@@ -419,17 +444,17 @@ Blazor.UI = {
                 BlazorSplitter.clearSiblingFlex($container.children('div.rgf-splitter-flex-2'), horizontal);
             }
         },
-        resizable: function (container) {
+        resizable: function(container) {
             if ($(container).resizable('instance')) {
                 return;
             }
             $(container).resizable({
-                resize: function (event, ui) {
+                resize: function(event, ui) {
                     $(this).find('div.rgf-splitter-flex-1, div.rgf-splitter-flex-2').css('flex', '');
                 }
             });
         },
-        disable: function (container) {
+        disable: function(container) {
             var $container = $(container),
                 $splitter = $container.children('.rgf-splitter'),
                 $primaryPanel = $splitter.prev(),
