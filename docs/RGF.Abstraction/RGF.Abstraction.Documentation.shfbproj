@@ -31,7 +31,7 @@
       <Argument Key="maxVersionParts" Value="" xmlns="" />
     </TransformComponentArguments>
     <DocumentationSources>
-      <DocumentationSource sourceFile="..\src\RGF.Abstraction.csproj" />
+      <DocumentationSource sourceFile="..\..\src\RGF.Abstraction\RGF.Abstraction.csproj" />
     </DocumentationSources>
     <HelpFileFormat>Website</HelpFileFormat>
     <SyntaxFilters>C#</SyntaxFilters>
@@ -51,7 +51,7 @@
     <MaximumGroupParts>12</MaximumGroupParts>
     <Preliminary>False</Preliminary>
     <FooterText>&amp;lt%3ba href=&amp;quot%3b/latest/contact&amp;quot%3b target=&amp;quot%3b_blank&amp;quot%3b&amp;gt%3bContact Us&amp;lt%3b/a&amp;gt%3b</FooterText>
-    <CopyrightText>Copyright \xA9 2011-2025, Recrovit Kft, All rights reserved</CopyrightText>
+    <CopyrightText>Copyright \xA9 2011-2026, Recrovit Kft. Licensed under LGPL-2.1-only.</CopyrightText>
     <SdkLinkTarget>Blank</SdkLinkTarget>
     <VisibleItems>InheritedMembers, InheritedFrameworkMembers, Protected, ProtectedInternalAsProtected, NonBrowsable</VisibleItems>
     <MissingTags>AutoDocumentCtors, AutoDocumentDispose</MissingTags>

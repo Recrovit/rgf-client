@@ -1,52 +1,23 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk.Razor">
 
   <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
-    <Nullable>enable</Nullable>
-    <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>Recrovit.RecroGridFramework.Client.Blazor.UI</RootNamespace>
     <AssemblyName>Recrovit.RecroGridFramework.Client.Blazor.UI</AssemblyName>
     <StaticWebAssetFingerprintingEnabled>false</StaticWebAssetFingerprintingEnabled>
   </PropertyGroup>
 
   <PropertyGroup>
-    <Company>Recrovit Kft.</Company>
-    <Product>RecroGrid Framework</Product>
-    <Copyright>© Recrovit Kft. All rights reserved.</Copyright>
-    <Version>10.0.0</Version>
-    <FileVersion>$(Version).1$([System.DateTime]::Now.ToString(MMdd))</FileVersion>
-    <InformationalVersion>$(FileVersion)</InformationalVersion>
-    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
-  </PropertyGroup>
-
-  <PropertyGroup>
-    <Authors>$(Company)</Authors>
-    <PackageOutputPath>..\..\dist</PackageOutputPath>
-    <PackageProjectUrl>https://recrogridframework.com/</PackageProjectUrl>
+    <!--<Version>10.x.x</Version>-->
     <Description>RecroGrid Framework Blazor UI.</Description>
-    <PackageTags>RecroGrid Framework UI Bootstrap</PackageTags>
-    <RepositoryUrl>https://github.com/RecroGridFramework/RGF.Client.Blazor.UI.git</RepositoryUrl>
-    <PackageLicenseExpression>LGPL-3.0-only</PackageLicenseExpression>
-    <PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
-    <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
-
-  <Target Name="Recrovit-signtool" AfterTargets="PostBuildEvent" Condition="'$(Configuration)'=='Release' and Exists('$(ProjectDir)..\..\dist\signtool.bat')">
-    <Exec Command="$(ProjectDir)..\..\dist\signtool.bat $(ProjectDir)$(OutputPath)$(TargetFileName)" />
-  </Target>
 
   <ItemGroup>
     <SupportedPlatform Include="browser" />
   </ItemGroup>
 
-  <ItemGroup Condition="'$(Configuration)'=='Release'">
-    <PackageReference Include="Recrovit.RecroGridFramework.Blazor.RgfApexCharts" Version="10.0.0" />
-    <PackageReference Include="Recrovit.RecroGridFramework.Client.Blazor" Version="10.0.0" />
-    <Content Update="wwwroot\scripts\recrovit-rgf-blazor-ui.js" CopyToPublishDirectory="Never" />
-  </ItemGroup>
-
-  <ItemGroup Condition="'$(Configuration)'=='Debug'">
-    <ProjectReference Include="..\..\RGF.Blazor.RgfApexCharts\src\RGF.Blazor.RgfApexCharts.csproj" />
+  <ItemGroup>
+    <ProjectReference Include="..\RGF.Blazor.RgfApexCharts\RGF.Blazor.RgfApexCharts.csproj" />
+    <ProjectReference Include="..\RGF.Client.Blazor\RGF.Client.Blazor.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -61,13 +32,8 @@
     <None Update="Components\DialogComponent.razor.css" CssScope="rgf-bs-dialog" />
   </ItemGroup>
 
-  <ItemGroup>
-    <None Include="..\.gitignore" />
-    <None Include="..\README.*" Pack="true" PackagePath="\" />
-    <Content Remove="bundleconfig.json" />
-    <Content Remove="libman.json" />
-    <None Include="bundleconfig.json" />
-    <None Include="libman.json" />
+  <ItemGroup Condition="'$(Configuration)'=='Release'">
+    <Content Update="wwwroot\scripts\recrovit-rgf-blazor-ui.js" CopyToPublishDirectory="Never" />
   </ItemGroup>
 
 </Project>

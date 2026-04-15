@@ -29,11 +29,15 @@
   <!-- Publishing -->
   <PropertyGroup Condition="'$(IsPackable)' != 'false'">
     <PackageProjectUrl>https://recrogridframework.com/</PackageProjectUrl>
-    <PackageTags>recrogrid dotnet blazor</PackageTags>
+    <PackageTags>recrogrid dotnet blazor bootstrap</PackageTags>
     <PackageLicenseExpression>LGPL-2.1-only</PackageLicenseExpression>
     <PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageOutputPath>$(RepositoryRoot)..\dist</PackageOutputPath>
   </PropertyGroup>
+
+  <ItemGroup Condition="Exists('README.md')">
+    <None Include="README.md" Pack="true" PackagePath="" />
+  </ItemGroup>
 
 </Project>
