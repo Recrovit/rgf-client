@@ -24,24 +24,37 @@
     @if (Node.Property != null && Node.Property.ListType != PropertyListType.RecroGrid)
     {
         var attributes = Node.RowData.Get<RgfDynamicDictionary>("__attributes");
-        var propAttributes = attributes?.Get<RgfDynamicDictionary>(Node.Property.Alias);
-        var selected = TreeComponent.SelectedItems.ContainsKey(Manager.ListHandler.GetAbsoluteRowIndex(Node.RowData)) ? "table-primary" : null;
+        var prop1Attributes = attributes?.Get<RgfDynamicDictionary>(Node.Property.Alias);
+        var selected = TreeComponent.SelectedItems.ContainsKey(Manager.ListHandler.GetAbsoluteRowIndex(Node.RowData));
+        string? rowClass = attributes?.Get<string>("class");
+        var colClass1 = prop1Attributes?.Get<string>("class");
+        if (selected)
+        {
+            rowClass = "table-primary".EnsureContains(rowClass, ' ');
+            colClass1 = "table-primary".EnsureContains(colClass1, ' ');
+        }
+
         <RgfHtml TagName="div" RenderKey="@Node"
-                 CssClass="@("data-node table d-inline tree-tooltip".EnsureContains(selected, ' ').EnsureContains(attributes?.Get<string>("class"), ' '))" AdditionalAttributes="@(new(){ {"rgf-bs-tree",""} })"
+                 CssClass="@("data-node table d-inline tree-tooltip".EnsureContains(rowClass, ' '))" AdditionalAttributes="@(new(){ {"rgf-bs-tree",""} })"
                  TooltipOptions="@(new RgfTooltipOptions(Node.TooltipText) { CustomClass = "rgf-tooltip-600", DelayShow = 1500 } )"
                  OnClick="(arg) => TreeComponent.SelectNodeAsync(Node)"
                  OnDblClick="(arg) => TreeComponent.DispatchToolbarReadEventAsync(Node)">
             <RgfHtml TagName="div"
-                     CssClass="@("d-inline".EnsureContains(propAttributes?.Get<string>("class"), ' '))" AdditionalAttributes="@(new(){ {"rgf-bs-tree",""} })"
-                     Style="@(propAttributes?.Get<string>("style"))">
+                     CssClass="@("d-inline".EnsureContains(colClass1, ' '))" AdditionalAttributes="@(new(){ {"rgf-bs-tree",""} })"
+                     Style="@(prop1Attributes?.Get<string>("style"))">
                 @TreeComponent.RenderContentItem(Node.Property, Node.RowData)
             </RgfHtml>
             @foreach (var prop in Manager.ListHandler.SortedVisibleColumns.Take(TreeComponent.TreeViewColumnCount()).Skip(1).ToArray())
             {
                 <i class="bi bi-three-dots-vertical"></i>
                 var propAttr = attributes?.Get<RgfDynamicDictionary>(prop.Alias);
+                var colClass = propAttr?.Get<string>("class");
+                if (selected)
+                {
+                    colClass = "table-primary".EnsureContains(colClass, ' ');
+                }
                 <RgfHtml TagName="div"
-                         CssClass="@("d-inline".EnsureContains(propAttr?.Get<string>("class"), ' '))" AdditionalAttributes="@(new(){ {"rgf-bs-tree",""} })"
+                         CssClass="@("d-inline".EnsureContains(colClass, ' '))" AdditionalAttributes="@(new(){ {"rgf-bs-tree",""} })"
                          Style="@(propAttr?.Get<string>("style"))">
                     @TreeComponent.RenderContentItem(prop, Node.RowData)
                 </RgfHtml>

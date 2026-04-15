@@ -13,7 +13,7 @@
             <div class="toast-header">
                 <strong class="me-auto">@toast.MarkupHeader</strong>
                 <small class="text-muted">@GetToastTime(toast)</small>
-                <button type="button" class="btn-close" @onclick="() => RemoveToast(toast)" aria-label="Close"></button>
+                <button type="button" class="btn-close" @onclick="() => RemoveToastAsync(toast)" aria-label="Close"></button>
             </div>
             <div class="toast-body">
                 @toast.MarkupBody
@@ -40,6 +40,9 @@
 
     private List<RgfToastEventArgs> _toasts = [];
     private IDisposable _toastManager = default!;
+    private readonly CancellationTokenSource _disposeCancellationTokenSource = new();
+    private CancellationTokenSource? _refreshCancellationTokenSource;
+    private Task? _refreshTask;
 
     protected override void OnInitialized()
     {
@@ -49,30 +52,46 @@
 
     private void ShowToast(IRgfEventArgs<RgfToastEventArgs> arg)
     {
-        var toast = arg.Args;
+        _ = InvokeAsync(() => ShowToastAsync(arg.Args));
+    }
+
+    private Task ShowToastAsync(RgfToastEventArgs toast)
+    {
         if (toast.Delay < 0)
         {
             _toasts.Remove(toast);
+            if (_toasts.Count == 0)
+            {
+                StopRefreshLoop();
+            }
         }
         else
         {
             _toasts.Add(toast);
+            EnsureRefreshLoop();
             if (toast.Delay > 0)
             {
-                _ = InvokeAsync(async () =>
+                _ = Task.Run(async () =>
                 {
-                    await Task.Delay(Math.Max(1000, toast.Delay));
-                    RemoveToast(toast);
-                });
+                    await Task.Delay(Math.Max(1000, toast.Delay), _disposeCancellationTokenSource.Token);
+                    await InvokeAsync(() => RemoveToastAsync(toast));
+                }, _disposeCancellationTokenSource.Token);
             }
         }
-        RefreshAsync();
+
+        return InvokeAsync(StateHasChanged);
     }
 
-    private void RemoveToast(RgfToastEventArgs toast)
+    private Task RemoveToastAsync(RgfToastEventArgs toast)
     {
         _toasts.Remove(toast);
-        StateHasChanged();
+
+        if (_toasts.Count == 0)
+        {
+            StopRefreshLoop();
+        }
+
+        return InvokeAsync(StateHasChanged);
     }
 
     private string GetToastClass(RgfToastType toastType)
@@ -93,21 +112,47 @@
         return toast.Delay < 2000 && (DateTime.Now - toast.TriggeredAt).TotalSeconds < 1 ? _recroDict.GetRgfUiString("JustNow") : toast.TriggeredAt.ToString("HH:mm:ss", culture);
     }
 
-    private void RefreshAsync()
+    private void EnsureRefreshLoop()
     {
-        StateHasChanged();
-        if (_toasts.Count > 0)
+        if (_refreshTask is { IsCompleted: false })
         {
-            Task.Run(async () =>
-            {
-                await Task.Delay(5000);
-                RefreshAsync();
-            });
+            return;
         }
+
+        _refreshCancellationTokenSource?.Dispose();
+        _refreshCancellationTokenSource = new CancellationTokenSource();
+        _refreshTask = RefreshLoopAsync(_refreshCancellationTokenSource.Token);
+    }
+
+    private async Task RefreshLoopAsync(CancellationToken cancellationToken)
+    {
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(1));
+
+        try
+        {
+            while (_toasts.Count > 0 && await timer.WaitForNextTickAsync(cancellationToken))
+            {
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+        }
+    }
+
+    private void StopRefreshLoop()
+    {
+        _refreshCancellationTokenSource?.Cancel();
+        _refreshCancellationTokenSource?.Dispose();
+        _refreshCancellationTokenSource = null;
+        _refreshTask = null;
     }
 
     public void Dispose()
     {
+        _disposeCancellationTokenSource.Cancel();
+        _disposeCancellationTokenSource.Dispose();
+        StopRefreshLoop();
         _toastManager?.Dispose();
     }
 }
