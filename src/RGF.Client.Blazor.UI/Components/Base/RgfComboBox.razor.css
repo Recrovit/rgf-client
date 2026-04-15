@@ -1,0 +1,12 @@
+﻿.rgf-combobox-edit {
+    margin-right: 0;
+    border-right: 0;
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+}
+
+.rgf-combobox-button {
+    margin-left: 0;
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+}

@@ -1,0 +1,44 @@
+﻿.rgf-splitter-wrapper {
+    display: flex !important;
+}
+
+    .rgf-splitter-wrapper.horizontal {
+        flex-direction: row;
+    }
+
+    .rgf-splitter-wrapper.vertical {
+        flex-direction: column;
+    }
+
+    .rgf-splitter-wrapper > .rgf-splitter-flex-1 {
+        flex-grow: 1;
+        overflow: auto;
+    }
+
+    .rgf-splitter-wrapper > .rgf-splitter-flex-2 {
+        flex-grow: 1;
+        overflow: auto;
+    }
+
+    .rgf-splitter-wrapper > .rgf-splitter {
+        display: flex;
+        border-left: 2px dotted #000;
+        margin-left: 5px;
+        padding-right: 5px;
+        cursor: ew-resize;
+    }
+
+    .rgf-splitter-wrapper.vertical > .rgf-splitter {
+        border-left: none;
+        border-top: 2px dotted #000;
+        margin-left: 0;
+        padding-right: 0;
+        margin-top: 5px;
+        padding-bottom: 5px;
+        cursor: ns-resize;
+    }
+
+    .rgf-splitter-wrapper > .rgf-splitter[data-splitter-disabled] {
+        cursor: not-allowed;
+        opacity: 0.5;
+    }

@@ -1,0 +1,165 @@
+﻿@if (!DialogParameters.IsInline)
+{
+    <div class="modal-backdrop show"></div>
+}
+<div id="@_dialogId" class="@(DialogParameters.IsInline ? null : "modal fade show")" tabindex="-1" role="dialog" style="display:block">
+    <div class="@(DialogParameters.IsInline ? null: "modal-dialog modal-dialog-scrollable")">
+        <div @attributes="Attributes">
+            @if (DialogParameters.NoHeader != true)
+            {
+                <div class="@($"modal-header {ThemeColor}")">
+                    <div class="modal-title fs-5">
+                        @DialogParameters.Header
+                    </div>
+                    @if (DialogParameters.ShowCloseButton == true)
+                    {
+                        <RgfButton CssClass="btn-close" OnClick="OnClose" />
+                    }
+                </div>
+            }
+            <div class="modal-body">
+                @DialogParameters.Content
+            </div>
+            <div class="modal-footer d-block">
+                @if (DialogParameters.FooterTemplate != null)
+                {
+                    @DialogParameters.FooterTemplate
+                }
+                <div class="d-flex flex-wrap justify-content-between align-items-center">
+                    <div class="d-flex justify-content-start">
+                        @foreach (var button in DialogParameters.LeftButtons ?? [])
+                        {
+                            @CreateButton(button)
+                        }
+                    </div>
+                    <div class="d-flex justify-content-end">
+                        @foreach (var button in DialogParameters.PredefinedButtons ?? [])
+                        {
+                            @CreateButton(button)
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    @if (@DialogParameters.DynamicChild != null)
+    {
+        <div>
+            @DialogParameters.DynamicChild
+        </div>
+    }
+</div>
+
+@inherits RgfBaseComponent
+@inject ILogger<DialogComponent> _logger
+@code {
+
+    [Parameter, EditorRequired]
+    public RgfDialogParameters DialogParameters { get; set; } = null!;
+
+    private string? _show { get; set; } = "display:block";
+    private string _dialogId = RgfBaseComponent.GetNextId();
+    private bool _isDestroyed = false;
+    private string? _focusId;
+    private string _nextButtonId
+    {
+        get
+        {
+            _focusId = RgfBaseComponent.GetNextId();
+            return _focusId;
+        }
+    }
+
+    private RenderFragment<ButtonParameters> CreateButton => (button) =>
+    @<div class="p-1">
+        <RgfButton Id="@(button.IsPrimary ? _nextButtonId : null)" Title="@button.Title" CssClass="@(button.CssClass ?? (button.IsPrimary ? "btn-primary" : "btn-secondary"))"
+                   IconName="@button.IconName" Disabled="@button.Disabled" MinWidth="@button.MinWidth" OnClick="button.Callback">
+            @if (!string.IsNullOrEmpty(button.ChildText))
+        {
+            @button.ChildText
+        }
+        else if (button.ChildContent != null)
+        {
+            @button.ChildContent
+        }
+        </RgfButton>
+    </div>;
+
+    private string ThemeColor
+    {
+        get
+        {
+            switch (DialogParameters.DialogType)
+            {
+                case DialogType.Error:
+                    return "text-bg-danger";
+
+                case DialogType.Warning:
+                    return "text-bg-warning";
+
+                case DialogType.Info:
+                    return "text-bg-info";
+            }
+            return "bg-body-tertiary";
+        }
+    }
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        DialogParameters.EventDispatcher.Subscribe(RgfDialogEventKind.Destroy, OnDestroyAsync);
+        DialogParameters.EventDispatcher.Subscribe(RgfDialogEventKind.Refresh, (arg) => StateHasChanged(), true, this);
+
+        DialogParameters.EventDispatcher.RaiseEventAsync(RgfDialogEventKind.Initialized, this);
+
+        KeysToPrevent = ["Escape"];
+        OnKeyDown = (args) => args.Code == "Escape" ? OnClose() : Task.CompletedTask;
+    }
+
+    protected override void OnParametersSet()
+    {
+        _baseCssClass = "modal-content";
+
+        CssClass = DialogParameters.CssClass;
+        MinWidth = DialogParameters.MinWidth ?? "400px";
+        Width = DialogParameters.Width;
+        Height = DialogParameters.Height;
+
+        base.OnParametersSet();
+    }
+
+    private async Task OnDestroyAsync(IRgfEventArgs<RgfDialogEventArgs> args)
+    {
+        if (!_isDestroyed && !DialogParameters.IsInline)
+        {
+            if (!string.IsNullOrEmpty(DialogParameters.UniqueName))
+            {
+                await _jsRuntime.InvokeVoidAsync(RGFClientBlazorUIConfiguration.JsBlazorUiNamespace + ".Dialog.saveDialogPos", DialogParameters.UniqueName, _dialogId);
+            }
+            _isDestroyed = true;
+            DialogParameters.EventDispatcher.Unsubscribe(this);
+        }
+    }
+
+    private Task OnClose() => DialogParameters.EventDispatcher.RaiseEventAsync(RgfDialogEventKind.Close, this);
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        _logger.LogDebug("OnAfterRender | FirstRender:{firstRender}, {DialogType}:{UniqueName}, {Title}", firstRender, DialogParameters.DialogType, DialogParameters.UniqueName, DialogParameters.Title);
+
+        await base.OnAfterRenderAsync(firstRender);
+
+        if (firstRender)
+        {
+            await _jsRuntime.InvokeVoidAsync(RGFClientBlazorUIConfiguration.JsBlazorUiNamespace + ".Dialog.initialize", _dialogId, DialogParameters.Resizable, DialogParameters.UniqueName, _focusId, DialogParameters.IsInline);
+        }
+        var eventArg = new RgfEventArgs<RgfDialogEventArgs>(this, RgfDialogEventArgs.CreateAfterRenderEvent(firstRender));
+        await DialogParameters.EventDispatcher.DispatchEventAsync(eventArg.Args.EventKind, eventArg);
+    }
+
+    public override ValueTask DisposeAsync()
+    {
+        DialogParameters?.EventDispatcher.Unsubscribe(this);
+        return base.DisposeAsync();
+    }
+}

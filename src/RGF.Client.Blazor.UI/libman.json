@@ -1,0 +1,22 @@
+{
+  "version": "1.0",
+  "defaultProvider": "cdnjs",
+  "libraries": [
+    {
+      "provider": "unpkg",
+      "library": "bootstrap@5.3.8",
+      "destination": "wwwroot/lib/bootstrap/",
+      "files": [
+        "dist/js/bootstrap.bundle.min.js",
+        "dist/js/bootstrap.bundle.min.js.map",
+        "dist/css/bootstrap.min.css",
+        "dist/css/bootstrap.min.css.map"
+      ]
+    },
+    {
+      "provider": "cdnjs",
+      "library": "bootstrap-icons@1.13.1",
+      "destination": "wwwroot/lib/bootstrap-icons/"
+    }
+  ]
+}

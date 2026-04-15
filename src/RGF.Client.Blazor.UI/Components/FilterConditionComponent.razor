@@ -1,0 +1,189 @@
+﻿<ul class="list-unstyled ps-4">
+    @for (int idx = 0; idx < Condition.Conditions?.Count; idx++)
+    {
+        var item = Condition.Conditions[idx];
+        <li>
+            <div class="d-flex flex-row align-items-center">
+                <div class="p-1">
+                    <RgfComboBox TValue="RgfFilter.LogicalOperator" @bind-Value="item.LogicalOperator" Disabled="idx == 0 || item.IsQuickFilter" DataSource="LogicalOperators" Width="fit-content" />
+                </div>
+                @if (item.IsQuickFilter && item.Conditions != null)
+                {
+                    <div class="p-1">
+                        @RecroDict.GetRgfUiString("QuickFilter")
+                    </div>
+                }
+                @if (item.ClientId != 0)
+                {
+                    <div class="p-1">
+                        <RgfButton IconName="bi-trash" CssClass="btn-outline-secondary p-1" OnClick="() => OnRemoveCondition(item)" />
+                    </div>
+                    @if (!item.IsQuickFilter)
+                    {
+                        <div class="p-1">
+                            <RgfButton IconName="bi-braces" CssClass="btn-outline-secondary p-1" OnClick="() => OnAddBracket(item)" />
+                        </div>
+                    }
+                }
+                @if (item.Conditions != null)
+                {
+                    <div class="p-1">
+                        <RgfButton CssClass="btn-warning" Title="@RecroDict.GetRgfUiString("Delete")" OnClick="() => OnRemoveBracket(item)" Disabled="item.ClientId == 0">
+                            @if (item.ClientId != 0)
+                            {
+                                <sup>@item.ClientId</sup>
+                            }
+                            <span>(</span>
+                        </RgfButton>
+                    </div>
+                }
+                else
+                {
+                    <div class="p-1">
+                        <RgfComboBox TValue="int" Value="item.PropertyId" ValueExpression="() => item.PropertyId" Disabled="item.IsQuickFilter"
+                                     DataSource="Columns"
+                                     ValueChanged="(value) => OnChangeProperty(value, item)" />
+                    </div>
+                    <div class="p-1">
+                        <RgfComboBox TValue="RgfFilter.QueryOperator" Value="item.QueryOperator" ValueExpression="() => item.QueryOperator" Disabled="item.IsQuickFilter"
+                                     DataSource="GetQueryOperators(item)"
+                                     ValueChanged="(value) => OnChangeQueryOperator(value, item)" />
+                    </div>
+                    @if (!(new[] { RgfFilter.QueryOperator.IsNull, RgfFilter.QueryOperator.IsNotNull, RgfFilter.QueryOperator.Exists }.Contains(item.QueryOperator)))
+                    {
+                        var prop = FilterComponent.RgfFilterProperties.Single(e => e.Id == item.PropertyId);
+                        <div class="p-1">
+                            @switch (prop.ClientDataType)
+                            {
+                                case ClientDataType.Integer:
+                                    <RgfInputNumber TValue="int?" @bind-Value="item.DynValue1.IntValue" Disabled="item.IsQuickFilter"
+                                                    OnValueChanging="() => FilterComponent.IsFilterActive=true" />
+                                    break;
+
+                                case ClientDataType.Decimal:
+                                    <RgfInputNumber TValue="decimal?" @bind-Value="item.DynValue1.DecimalValue" HideSpinButton="true" Disabled="item.IsQuickFilter"
+                                                    OnValueChanging="() => FilterComponent.IsFilterActive=true" />
+                                    break;
+
+                                case ClientDataType.Double:
+                                    <RgfInputNumber TValue="double?" @bind-Value="item.DynValue1.DoubleValue" HideSpinButton="true" Disabled="item.IsQuickFilter"
+                                                    OnValueChanging="() => FilterComponent.IsFilterActive=true" />
+                                    break;
+
+                                case ClientDataType.DateTime:
+                                    <RgfInputDate TValue="DateTime?" DateType="prop.FormType == PropertyFormType.Date ? InputDateType.Date : InputDateType.DateTimeLocal" @bind-Value="item.DynValue1.DateTimeValue" Disabled="item.IsQuickFilter"
+                                                  OnValueChanging="() => FilterComponent.IsFilterActive=true" />
+                                    break;
+
+                                case ClientDataType.Boolean:
+                                    <RgfCheckBox @bind-Value="item.DynValue1.BooleanValue" Disabled="item.IsQuickFilter"
+                                                 OnValueChanging="() => FilterComponent.IsFilterActive=true" />
+                                    break;
+
+                                default:
+                                    if (prop.FormType == PropertyFormType.DropDown || prop.FormType == PropertyFormType.ListBox)
+                                    {
+                                        <RgfListBox TValue="string" @bind-Values="item.DynValue1.StringArray" DataSource="prop.Dictionary" Resizable="true"
+                                                    OnValueChanging="() => FilterComponent.IsFilterActive=true" />
+                                    }
+                                    else
+                                    {
+                                        <RgfInputText @bind-Value="item.DynValue1.StringValue" Disabled="item.IsQuickFilter"
+                                                      OnValueChanging="() => FilterComponent.IsFilterActive=true" />
+                                    }
+                                    break;
+                            }
+                        </div>
+                        @if (new[] { RgfFilter.QueryOperator.Interval, RgfFilter.QueryOperator.IntervalE }.Contains(item.QueryOperator))
+                        {
+                            <span>-</span>
+                            <div class="p-1">
+                                @switch (prop.ClientDataType)
+                                {
+                                    case ClientDataType.Integer:
+                                        <RgfInputNumber TValue="int?" @bind-Value="item.DynValue2.IntValue"
+                                                        OnValueChanging="() => FilterComponent.IsFilterActive=true" />
+                                        break;
+
+                                    case ClientDataType.Decimal:
+                                        <RgfInputNumber TValue="decimal?" @bind-Value="item.DynValue2.DecimalValue" HideSpinButton="true"
+                                                        OnValueChanging="() => FilterComponent.IsFilterActive=true" />
+                                        break;
+
+                                    case ClientDataType.Double:
+                                        <RgfInputNumber TValue="double?" @bind-Value="item.DynValue2.DoubleValue" HideSpinButton="true"
+                                                        OnValueChanging="() => FilterComponent.IsFilterActive=true" />
+                                        break;
+
+                                    case ClientDataType.DateTime:
+                                        <RgfInputDate TValue="DateTime?" DateType="prop.FormType == PropertyFormType.Date ? InputDateType.Date : InputDateType.DateTimeLocal" @bind-Value="item.DynValue2.DateTimeValue"
+                                                      OnValueChanging="() => FilterComponent.IsFilterActive=true" />
+                                        break;
+
+                                    default:
+                                        <RgfInputText @bind-Value="item.DynValue2.StringValue"
+                                                      OnValueChanging="() => FilterComponent.IsFilterActive=true" />
+                                        break;
+                                }
+                            </div>
+                        }
+                        @if (new[] { RgfFilter.QueryOperator.Like, RgfFilter.QueryOperator.NotLike }.Contains(item.QueryOperator))
+                        {
+                            <div class="p-1 checkbox-lg">
+                                <RgfCheckBox @bind-Value="item.ToLower" Label="ToLower" />
+                            </div>
+                        }
+                    }
+                }
+            </div>
+        </li>
+        @if (item.Conditions != null)
+        {
+            <li>
+                <FilterConditionComponent FilterComponent="FilterComponent" Condition="item" />
+            </li>
+            <li>
+                <div>
+                    <RgfButton CssClass="btn-warning" Title="@RecroDict.GetRgfUiString("Delete")" OnClick="() => OnRemoveBracket(item)" Disabled="item.ClientId == 0">
+                        <span>)</span>
+                        @if (item.ClientId != 0)
+                        {
+                            <sup>@item.ClientId</sup>
+                        }
+                    </RgfButton>
+                </div>
+            </li>
+        }
+    }
+    @if (!Condition.IsQuickFilter && Condition.Conditions?.Any(e => e.IsQuickFilter) != true)
+    {
+        <li>
+            <div class="p-1">
+                <RgfButton IconName="bi-plus-lg" CssClass="btn-outline-primary" OnClick="() => OnAddCondition(Condition)" />
+            </div>
+        </li>
+    }
+</ul>
+
+@inject IRecroDictService RecroDict
+@code {
+
+    [Parameter, EditorRequired]
+    public RgfFilterComponent FilterComponent { get; set; } = null!;
+
+    [Parameter, EditorRequired]
+    public RgfFilter.Condition Condition { get; set; } = null!;
+
+    private IRgManager Manager => FilterComponent.EntityParameters.Manager!;
+
+    private Dictionary<int, string> Columns => FilterComponent.RgfFilterProperties.ToDictionary(p => p.Id, p => p.ColTitle);
+    private Dictionary<RgfFilter.LogicalOperator, string> LogicalOperators => RgfFilter.GetLogicalOperators(RecroDict);
+    private Dictionary<RgfFilter.QueryOperator, string> GetQueryOperators(RgfFilter.Condition condition) => RgfFilter.GetQueryOperators(FilterComponent.RgfFilterProperties.SingleOrDefault(e => e.Id == condition.PropertyId)?.Operators, RecroDict);
+
+    private void OnAddCondition(RgfFilter.Condition condition) => FilterComponent.AddCondition(condition);
+    private void OnRemoveCondition(RgfFilter.Condition condition) => FilterComponent.RemoveCondition(condition);
+    private void OnAddBracket(RgfFilter.Condition condition) => FilterComponent.AddBracket(condition);
+    private void OnRemoveBracket(RgfFilter.Condition condition) => FilterComponent.RemoveBracket(condition);
+    private void OnChangeQueryOperator(RgfFilter.QueryOperator value, RgfFilter.Condition condition) => FilterComponent.ChangeQueryOperator(condition, value);
+    private void OnChangeProperty(int value, RgfFilter.Condition condition) => FilterComponent.ChangeProperty(condition, value);
+}

@@ -1,0 +1,8 @@
+[
+  {
+    "outputFileName": "wwwroot/scripts/recrovit-rgf-blazor-ui.min.js",
+    "inputFiles": [
+      "wwwroot/scripts/recrovit-rgf-blazor-ui.js"
+    ]
+  }
+]
