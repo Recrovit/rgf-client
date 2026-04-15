@@ -1,0 +1,51 @@
+﻿@if (!string.IsNullOrEmpty(Label))
+{
+    <label for="@Id" class="@($"form-label {LabelCssClass ?? ""}".TrimEnd())">@Label</label>
+}
+@if (Multiline)
+{
+    <InputTextArea @ref="_inputAreaRef" Value="@Value" ValueExpression="ValueExpression" ValueChanged="OnValueChanged" DisplayName="@DisplayName" AdditionalAttributes="Attributes" />
+}
+else
+{
+    <InputText @ref="_inputRef" Value="@Value" ValueExpression="ValueExpression" ValueChanged="OnValueChanged" DisplayName="@DisplayName" AdditionalAttributes="Attributes" />
+}
+
+@inherits RgfInput<string>
+@code {
+
+    [Parameter]
+    public bool Multiline { get; set; } = default;
+
+    [Parameter]
+    public bool Password { get; set; } = default;
+
+    [Parameter]
+    public int? MaxLength { get; set; }
+
+    private InputTextArea? _inputAreaRef { get; set; }
+    private InputText? _inputRef { get; set; }
+
+    protected override void OnParametersSet()
+    {
+        _baseCssClass = "form-control form-control-sm";
+
+        if (Password)
+        {
+            AdditionalAttributes["type"] = "password";
+        }
+
+        if (MaxLength != null && MaxLength > 0)
+        {
+            AdditionalAttributes["maxlength"] = MaxLength;
+        }
+
+        base.OnParametersSet();
+    }
+
+    protected override Task OnAfterRenderAsync(bool firstRender)
+    {
+        _elementReference = Multiline ? _inputAreaRef?.Element : _inputRef?.Element;
+        return base.OnAfterRenderAsync(firstRender);
+    }
+}

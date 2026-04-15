@@ -1,0 +1,48 @@
+﻿@if (!string.IsNullOrEmpty(Label))
+{
+    <label for="@Id" class="@($"form-label {LabelCssClass ?? ""}".TrimEnd())">@Label</label>
+}
+<InputNumber @ref="_inputRef" TValue="TValue" Value="@Value" ValueExpression="ValueExpression" ValueChanged="OnValueChanged" DisplayName="@DisplayName" AdditionalAttributes="Attributes" />
+
+@typeparam TValue
+@inherits RgfInput<TValue>
+@code {
+
+    [Parameter]
+    public bool HideSpinButton { get; set; } = default;
+
+    [Parameter]
+    public int? Min { get; set; }
+
+    [Parameter]
+    public int? Max { get; set; }
+
+    private InputNumber<TValue>? _inputRef { get; set; }
+
+    protected override void OnParametersSet()
+    {
+        _baseCssClass = "form-control form-control-sm";
+        if (HideSpinButton || Readonly)
+        {
+            _baseCssClass += " hide-spin-button";
+        }
+
+        if (Min != null)
+        {
+            AdditionalAttributes["min"] = Min;
+        }
+
+        if (Max != null)
+        {
+            AdditionalAttributes["max"] = Max;
+        }
+
+        base.OnParametersSet();
+    }
+
+    protected override Task OnAfterRenderAsync(bool firstRender)
+    {
+        _elementReference = _inputRef?.Element;
+        return base.OnAfterRenderAsync(firstRender);
+    }
+}

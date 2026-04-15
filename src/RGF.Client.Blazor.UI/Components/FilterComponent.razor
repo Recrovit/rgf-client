@@ -1,0 +1,65 @@
+﻿<RgfFilterComponent @ref="_rgfFilterRef" EntityParameters="EntityParameters">
+    <FilterTemplate Context="RgfFilterComp">
+        <FilterConditionComponent FilterComponent="RgfFilterComp" Condition="RgfFilterComp.Condition" />
+    </FilterTemplate>
+    <FooterTemplate Context="RgfFilterComp">
+        <div class="rg-filter-settings">
+            <div class="rg-filter-sqltimeout">
+                <label class="col-form-label text-nowrap pe-1">@RecroDict.GetRgfUiString("SQLTimeout"):</label>
+                <RgfInputNumber TValue="int?" @bind-Value="RgfFilterComp.FilterSettings.SQLTimeout" HideSpinButton="true" Min="0" MinWidth="2.6rem"
+                                Tooltip="@RecroDict.GetRgfUiString("SQLTimeoutTooltip")" />
+            </div>
+            <div class="rg-predef-name input-group input-group-sm">
+                <RgfComboBox TValue="int?" Value="@RgfFilterComp.FilterSettings.FilterSettingsId" Text="@RgfFilterComp.FilterSettings.SettingsName" AllowCustom="true"
+                             Tooltip="@RecroDict.GetRgfUiString("SavedName")"
+                             DataSource="RgfFilterComp.FilterHandler.PredefinedFilters.Select(e=> new KeyValuePair<int?, string>(e.FilterSettingsId, e.SettingsName))"
+                             InputChanged="OnInputChanged" />
+            </div>
+            <div class="rg-predef-save">
+                <div class="ps-1" style="width:max-content;">
+                    <RgfComboBox TValue="string" @bind-Value="RgfFilterComp.FilterSettings.RoleId" DataSource="RgfFilterComp.VisibleRoles"
+                                 Tooltip="@RecroDict.GetRgfUiString("RoleVisibilitySettingTooltip")"
+                                 Disabled="RgfFilterComp.FilterSettings.IsReadonly == true || !RgfFilterComp.IsPublicFilterSettingAllowed || string.IsNullOrEmpty(RgfFilterComp.FilterSettings.SettingsName)" />
+                </div>
+                <div class="px-1">
+                    <RgfButton IconName="bi-floppy" CssClass="btn-success" Tooltip="@RecroDict.GetRgfUiString("SaveFilterSettings")"
+                               Disabled="RgfFilterComp.FilterSettings.IsReadonly == true || string.IsNullOrEmpty(RgfFilterComp.FilterSettings.SettingsName) || !RgfFilterComp.IsPublicFilterSettingAllowed && RgfFilterComp.FilterSettings.RoleId != null"
+                               OnClick="(arg) => RgfFilterComp.OnSavePredefinedFilter()" />
+                    <RgfButton IconName="bi-trash" CssClass="btn-danger" Tooltip="@RecroDict.GetRgfUiString("DeleteSavedSettings")"
+                               Disabled="RgfFilterComp.FilterSettings.IsReadonly == true || RgfFilterComp.FilterSettings.FilterSettingsId == null || !RgfFilterComp.IsPublicFilterSettingAllowed && RgfFilterComp.FilterSettings.RoleId != null"
+                               OnClick="(arg) => RgfFilterComp.OnDeletePredefinedFilter()" />
+                </div>
+            </div>
+        </div>
+        <div class="rg-filter-save">
+            <div class="ps-1 checkbox-lg">
+                <RgfCheckBox Switch="true" @bind-Value="RgfFilterComp.IsFilterActive" Label="@($"{RecroDict.GetRgfUiString("Filter")} {RecroDict.GetRgfUiString("Off")}/{RecroDict.GetRgfUiString("On")}")" />
+            </div>
+            <div class="d-flex justify-content-end">
+                <div class="px-1">
+                    <RgfButton CssClass="btn-secondary" MinWidth="5rem" Label="@RecroDict.GetRgfUiString("Cancel")" OnClick="RgfFilterComp.OnCancel" />
+                </div>
+                <div class="px-1">
+                    <RgfButton CssClass="btn-primary" MinWidth="5rem" Label="OK" OnClick="RgfFilterComp.OnOk" />
+                </div>
+            </div>
+        </div>
+    </FooterTemplate>
+</RgfFilterComponent>
+
+@inject IRecroDictService RecroDict
+@code {
+
+    [Parameter, EditorRequired]
+    public RgfEntityParameters EntityParameters { get; set; } = null!;
+
+    private IRgManager Manager => EntityParameters.Manager!;
+    private RgfFilterParameters FilterParameters { get => EntityParameters.FilterParameters; }
+
+    private RgfFilterComponent _rgfFilterRef { get; set; } = null!;
+
+    private void OnInputChanged(KeyValuePair<object?, string> item)
+    {
+        _rgfFilterRef.OnSetPredefinedFilter(item.Key as int?, item.Value);
+    }
+}

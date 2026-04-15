@@ -1,0 +1,17 @@
+﻿
+@if (_settingsDialog != null)
+{
+    @_settingsDialog
+}
+
+@code {
+
+    [Parameter, EditorRequired]
+    public RgfDataComponentBase BaseDataComponent { get; set; } = null!;
+
+    [Parameter, EditorRequired]
+    public RenderFragment<RgfGridColumnSettingsComponent> SettingsTemplate { get; set; } = null!;
+
+    [Parameter]
+    public RenderFragment<RgfGridColumnSettingsComponent>? FooterTemplate { get; set; }
+}

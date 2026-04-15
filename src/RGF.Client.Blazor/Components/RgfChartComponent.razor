@@ -1,0 +1,21 @@
+﻿@using Microsoft.AspNetCore.Components.Forms
+@using Recrovit.RecroGridFramework.Client.Blazor.Parameters
+
+@if (_showComponent)
+{
+    @_chartDialog
+}
+
+<RgfDynamicDialog @ref="_dynamicDialog" />
+
+@code {
+
+    [Parameter, EditorRequired]
+    public RgfEntityParameters EntityParameters { get; set; } = null!;
+
+    [Parameter, EditorRequired]
+    public RenderFragment<RgfChartComponent> ContentTemplate { get; set; } = null!;
+
+    [Parameter, EditorRequired]
+    public RenderFragment<RgfChartComponent> FooterTemplate { get; set; } = null!;
+}

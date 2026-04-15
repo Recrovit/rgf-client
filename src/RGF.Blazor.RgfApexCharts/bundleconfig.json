@@ -1,0 +1,8 @@
+[
+  {
+    "outputFileName": "wwwroot/scripts/recrovit-rgf-apexcharts.min.js",
+    "inputFiles": [
+      "wwwroot/scripts/recrovit-rgf-apexcharts.js"
+    ]
+  }
+]

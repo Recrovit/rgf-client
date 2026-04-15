@@ -1,0 +1,22 @@
+﻿<div style="width:fit-content">
+    @GridTemplate(this)
+</div>
+
+@CreateColumnSettings()
+
+@if(_headerMenu != null)
+{
+    @_headerMenu
+}
+
+<RgfDynamicDialog @ref="_dynamicDialog" />
+
+@inherits RgfDataComponentBase
+@code {
+
+    [Parameter, EditorRequired]
+    public ComponentBase GridComponent { get; set; } = null!;
+
+    [Parameter, EditorRequired]
+    public RenderFragment<RgfGridComponent> GridTemplate { get; set; } = null!;
+}

@@ -1,0 +1,24 @@
+﻿@using Microsoft.AspNetCore.Components.Forms
+
+@if (_showComponent)
+{
+    <EditForm EditContext="@_emptyEditContext">
+        <div tabindex="-1" style="outline: none;" @onkeyup="HandleKeyUp">
+            @_filterDialog
+        </div>
+    </EditForm>
+}
+
+<RgfDynamicDialog @ref="_dynamicDialog" />
+
+@code {
+
+    [Parameter, EditorRequired]
+    public RgfEntityParameters EntityParameters { get; set; } = null!;
+
+    [Parameter, EditorRequired]
+    public RenderFragment<RgfFilterComponent> FilterTemplate { get; set; } = null!;
+
+    [Parameter, EditorRequired]
+    public RenderFragment<RgfFilterComponent> FooterTemplate { get; set; } = null!;
+}

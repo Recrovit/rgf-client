@@ -1,0 +1,32 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+  <PropertyGroup>
+    <RootNamespace>Recrovit.RecroGridFramework.Client.Blazor</RootNamespace>
+    <AssemblyName>Recrovit.RecroGridFramework.Client.Blazor</AssemblyName>
+    <StaticWebAssetFingerprintingEnabled>false</StaticWebAssetFingerprintingEnabled>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <!--<Version>10.x.x</Version>-->
+    <Description>RecroGrid Framework Blazor UI Abstraction</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <SupportedPlatform Include="browser" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\RGF.Client\RGF.Client.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="Components\RgfComponentWrapper.razor.css" CssScope="rgf-wrapper-comp" />
+    <None Update="Components\RgfGridComponent.razor.css" CssScope="rgf-grid-comp" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(Configuration)'=='Release'">
+    <Content Update="wwwroot\scripts\recrovit-rgf-blazor.js" CopyToPublishDirectory="Never" />
+    <Content Update="wwwroot\scripts\recrovit-rgf-blazor-legacy.js" CopyToPublishDirectory="Never" />
+  </ItemGroup>
+
+</Project>

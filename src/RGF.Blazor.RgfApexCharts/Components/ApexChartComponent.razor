@@ -1,0 +1,23 @@
+﻿<ApexChart TItem="ChartSerieData"
+           Title="@ChartSettings.Title"
+           Options="@ChartSettings.Options"
+           Width="@ChartSettings.Width"
+           Height="@ChartSettings.Height"
+           @ref=_chartRef>
+
+    @foreach (var serie in ChartSettings.Series)
+    {
+        <ApexPointSeries TItem="ChartSerieData"
+                         Items="@serie.Data"
+                         Name="@serie.Name"
+                         SeriesType="(SeriesType)ChartSettings.SeriesType"
+                         XValue="@(e => e.X)"
+                         YValue="@(e => e.Y)"
+                         ShowDataLabels="ChartSettings.ShowDataLabels" />
+    }
+</ApexChart>
+
+@code {
+    [Parameter, EditorRequired]
+    public ApexChartSettings ChartSettings { get; set; } = null!;
+}

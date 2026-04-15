@@ -1,0 +1,58 @@
+﻿<div class="@_formClass">
+    <InputCheckbox @ref="_inputRef" Value="@Value" ValueExpression="ValueExpression" ValueChanged="OnValueChanged" DisplayName="@DisplayName" AdditionalAttributes="Attributes" />
+    @if (!string.IsNullOrEmpty(Label))
+    {
+        <label for="@Id" class="@($"form-check-label {LabelCssClass ?? ""}".TrimEnd())">@Label</label>
+    }
+</div>
+
+@inherits RgfInput<bool>
+@code {
+
+    [Parameter]
+    public bool Switch { get; set; } = default;
+
+    [Parameter]
+    public bool Reverse { get; set; } = default;
+
+    [Parameter]
+    public string? WrapperCssClass { get; set; }
+
+    private InputCheckbox? _inputRef { get; set; }
+
+    private string _formClass { get; set; } = default!;
+
+    protected override void OnParametersSet()
+    {
+        AdditionalAttributes["rgf-bs-checkbox"] = "";
+        if (Readonly)
+        {
+            Disabled = true;
+        }
+        _formClass = Switch ? "text-nowrap form-check form-switch" : "text-nowrap form-check";
+
+        if (!string.IsNullOrEmpty(WrapperCssClass))
+        {
+            _formClass += " " + WrapperCssClass;
+        }
+
+        if (Reverse)
+        {
+            _formClass += " form-check-reverse";
+            if (LabelCssClass?.Contains("pe-1") != true)
+            {
+                LabelCssClass = ("pe-1 " + (LabelCssClass ?? "")).Trim();
+            }
+        }
+
+        _baseCssClass = "form-check-input form-check";
+
+        base.OnParametersSet();
+    }
+
+    protected override Task OnAfterRenderAsync(bool firstRender)
+    {
+        _elementReference = _inputRef?.Element;
+        return base.OnAfterRenderAsync(firstRender);
+    }
+}

@@ -1,0 +1,39 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+  <PropertyGroup>
+    <RootNamespace>Recrovit.RecroGridFramework.Client.Blazor.UI</RootNamespace>
+    <AssemblyName>Recrovit.RecroGridFramework.Client.Blazor.UI</AssemblyName>
+    <StaticWebAssetFingerprintingEnabled>false</StaticWebAssetFingerprintingEnabled>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <!--<Version>10.x.x</Version>-->
+    <Description>RecroGrid Framework Blazor UI.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <SupportedPlatform Include="browser" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\RGF.Blazor.RgfApexCharts\RGF.Blazor.RgfApexCharts.csproj" />
+    <ProjectReference Include="..\RGF.Client.Blazor\RGF.Client.Blazor.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="Components\Base\RgfCheckBox.razor.css" CssScope="rgf-bs-checkbox" />
+    <None Update="Components\Base\RgfSplitter.razor.css" CssScope="rgf-bs-splitter" />
+    <None Update="Components\Base\RgfComboBox.razor.css" CssScope="rgf-bs-combobox" />
+    <None Update="Components\ChartComponent.razor.css" CssScope="rgf-bs-apexcharts" />
+    <None Update="Components\GridColumnSettingsComponent.razor.css" CssScope="rgf-bs-grid-column-settings" />
+    <None Update="Components\TreeNodeComponent.razor.css" CssScope="rgf-bs-tree" />
+    <None Update="Components\GridComponent.razor.css" CssScope="rgf-bs-grid" />
+    <None Update="Components\RgfRootComponent.razor.css" CssScope="rgf-bs-root" />
+    <None Update="Components\DialogComponent.razor.css" CssScope="rgf-bs-dialog" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(Configuration)'=='Release'">
+    <Content Update="wwwroot\scripts\recrovit-rgf-blazor-ui.js" CopyToPublishDirectory="Never" />
+  </ItemGroup>
+
+</Project>

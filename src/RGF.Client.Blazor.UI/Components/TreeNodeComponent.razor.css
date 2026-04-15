@@ -1,0 +1,50 @@
+﻿.tree-node {
+    margin-left: 0.25rem;
+}
+
+.data-node {
+    cursor: pointer;
+    margin-bottom: 0;
+}
+
+    .data-node.table-primary, .data-node .table-primary,
+    .data-node.table-secondary, .data-node .table-secondary,
+    .data-node.table-success, .data-node .table-success,
+    .data-node.table-danger, .data-node .table-danger,
+    .data-node.table-warning, .data-node .table-warning,
+    .data-node.table-info, .data-node .table-info,
+    .data-node.table-light, .data-node .table-light,
+    .data-node.table-dark, .data-node .table-dark {
+        color: var(--bs-table-color);
+        background-color: var(--bs-table-bg);
+    }
+
+    .data-node:hover {
+        color: var(--bs-table-hover-color);
+        background-color: var(--bs-table-hover-bg);
+    }
+
+::deep .cell-content {
+    display: inline-block;
+}
+
+.collapse {
+    transition: max-height .5s ease;
+    max-height: 0;
+    overflow: hidden;
+    margin-left: 24px;
+}
+
+    .collapse.expanded {
+        max-height: 500vh;
+        overflow-x: visible;
+        overflow-y: auto;
+    }
+
+.tree-toggle-icon i {
+    transition: transform 0.3s;
+}
+
+    .tree-toggle-icon i.open {
+        transform: rotate(90deg);
+    }
