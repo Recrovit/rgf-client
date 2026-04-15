@@ -148,12 +148,16 @@ public static class IRgListHandlerExtensions
         return new KeyValuePair<int, RgfEntityKey>(idx, entityKey ?? new());
     }
 
+    [Obsolete("Use MenuEventDispatcher instead")]
     public static List<RgfDynamicDictionary> GetSelectedRowsData(this IRgListHandler handler, Dictionary<int, RgfEntityKey> selectedItems)
+        => handler.GetRowsByAbsoluteIndexes(selectedItems.Keys);
+
+    public static List<RgfDynamicDictionary> GetRowsByAbsoluteIndexes(this IRgListHandler handler, IEnumerable<int> absoluteIndexes)
     {
         var list = new List<RgfDynamicDictionary>();
-        foreach (var item in selectedItems)
+        foreach (var idx in absoluteIndexes)
         {
-            var rowData = handler.GetRowData(item.Key);
+            var rowData = handler.GetRowData(idx);
             if (rowData != null)
             {
                 list.Add(rowData);
@@ -420,8 +424,17 @@ internal class RgListHandler : IDisposable, IRgListHandler
                         }
                         else
                         {
-                            context.Toast = context.Toast.Recreate(progressType: args.ProgressType, progressArgs: args, delay: args.ProgressType != RgfProgressType.Success ? 0 : null);
-                            await _manager.ToastManager.RaiseEventAsync(context.Toast, this);
+                            RgfToastEventArgs toast;
+                            if (args.ProgressType == RgfProgressType.Info || args.ProgressType == RgfProgressType.Warning)
+                            {
+                                toast = new RgfToastEventArgs(context.Toast.Title, args.Message, args.ProgressType == RgfProgressType.Info ? RgfToastType.Info : RgfToastType.Warning, delay: 0);
+                            }
+                            else
+                            {
+                                context.Toast = context.Toast.Recreate(progressType: args.ProgressType, progressArgs: args, delay: args.ProgressType != RgfProgressType.Success ? 0 : null);
+                                toast = context.Toast;
+                            }
+                            await _manager.ToastManager.RaiseEventAsync(toast, this);
                         }
                         await _manager.BroadcastMessages(args.CoreMessages, this);
                     }
@@ -574,7 +587,19 @@ internal class RgListHandler : IDisposable, IRgListHandler
         ListParam.ExternalColumns = [];
         if (!changed)
         {
-            changed = oldExternalColumns.Count != _externalColumns.Count || oldExternalColumns.Any(old => !_externalColumns.Any(e => e.ExternalSettings?.FullPath == old.FullPath)) == true;
+            if (oldExternalColumns.Count != _externalColumns.Count)
+            {
+                changed = true;
+            }
+            else
+            {
+                var oldPaths = new HashSet<string>(oldExternalColumns.Select(e => e.FullPath ?? string.Empty), StringComparer.Ordinal);
+                var newPaths = new HashSet<string>(_externalColumns.Select(e => e.ExternalSettings?.FullPath ?? string.Empty), StringComparer.Ordinal);
+                if (!oldPaths.SetEquals(newPaths))
+                {
+                    changed = true;
+                }
+            }
         }
         foreach (var ext in _externalColumns)
         {
