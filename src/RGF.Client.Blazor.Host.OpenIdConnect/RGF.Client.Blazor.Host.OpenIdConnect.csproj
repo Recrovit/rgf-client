@@ -1,0 +1,32 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>Recrovit.RecroGridFramework.Client.Blazor.Host.OpenIdConnect</RootNamespace>
+    <AssemblyName>Recrovit.RecroGridFramework.Client.Blazor.Host.OpenIdConnect</AssemblyName>
+    <BlazorWebAssemblyOmitDebugProxyOutput>true</BlazorWebAssemblyOmitDebugProxyOutput>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <!--<Version>10.x.x</Version>-->
+    <Description>RecroGrid Framework ASP.NET Core host helpers for SSR server-proxy and OpenID Connect.</Description>
+    <PackageTags>recrogrid dotnet blazor serverproxy oidc</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!--<FrameworkReference Include="Microsoft.AspNetCore.App" />-->
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Server" Version="10.0.5" />
+  </ItemGroup>
+
+  <ItemGroup Condition="Exists('$(RepositoryRoot)..\Recrovit.AspNetCore.Authentication.OpenIdConnect\src\Recrovit.AspNetCore.Authentication.OpenIdConnect.csproj')">
+    <ProjectReference Include="$(RepositoryRoot)..\Recrovit.AspNetCore.Authentication.OpenIdConnect\src\Recrovit.AspNetCore.Authentication.OpenIdConnect.csproj" />
+  </ItemGroup>
+
+  <ItemGroup Condition="!Exists('$(RepositoryRoot)..\Recrovit.AspNetCore.Authentication.OpenIdConnect\src\Recrovit.AspNetCore.Authentication.OpenIdConnect.csproj')">
+    <PackageReference Include="Recrovit.AspNetCore.Authentication.OpenIdConnect" Version="10.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\RGF.Client.Blazor\RGF.Client.Blazor.csproj" />
+  </ItemGroup>
+
+</Project>

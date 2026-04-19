@@ -10,6 +10,10 @@
       <Build Solution="Debug|*" Project="false" />
     </Project>
   </Folder>
+  <Folder Name="/External/">
+    <Project Path="../Recrovit.AspNetCore.Authentication.OpenIdConnect/src/Recrovit.AspNetCore.Authentication.OpenIdConnect.csproj" />
+    <Project Path="../Recrovit.AspNetCore.Components.Routing/src/Recrovit.AspNetCore.Components.Routing.csproj" />
+  </Folder>
   <Folder Name="/Solution Items/">
     <File Path=".gitignore" />
     <File Path="Directory.Build.props" />
