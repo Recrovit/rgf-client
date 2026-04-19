@@ -9,6 +9,7 @@
   <PropertyGroup>
     <!--<Version>10.x.x</Version>-->
     <Description>RecroGrid Framework Blazor UI.</Description>
+    <PackageTags>recrogrid dotnet blazor bootstrap</PackageTags>
   </PropertyGroup>
 
   <ItemGroup>

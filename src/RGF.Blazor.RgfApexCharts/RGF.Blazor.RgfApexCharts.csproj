@@ -7,8 +7,9 @@
   </PropertyGroup>
 
   <PropertyGroup>
-    <Version>10.0.0</Version>
+    <!--<Version>10.x.x</Version>-->
     <Description>RecroGrid Framework Blazor ApexCharts.</Description>
+    <PackageTags>recrogrid dotnet blazor chart apexcharts</PackageTags>
   </PropertyGroup>
 
   <ItemGroup>
