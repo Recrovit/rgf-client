@@ -110,9 +110,9 @@ public static class RgfBlazorConfigurationExtension
         return services;
     }
 
-    public static IServiceCollection AddRgfBlazorServerProxyClientServices(this IServiceCollection services, IConfiguration configuration, ILogger? logger = null)
+    public static IServiceCollection AddRgfBlazorServerProxyClientServices(this IServiceCollection services, IConfiguration configuration, ILogger? logger = null, string? proxyBaseAddress = null)
     {
-        AddRgfBlazorServicesCore(services, configuration, logger, RgfApiAuthMode.ServerProxy);
+        AddRgfBlazorServicesCore(services, configuration, logger, RgfApiAuthMode.ServerProxy, proxyBaseAddress);
         ConfigureAuthenticationPrincipalSynchronization(services, configuration);
         services.AddAuthorizationCore();
         services.AddCascadingAuthenticationState();
@@ -145,9 +145,9 @@ public static class RgfBlazorConfigurationExtension
     }
 
     private static IServiceCollection AddRgfBlazorServicesCore(IServiceCollection services, IConfiguration configuration, ILogger? logger,
-        RgfApiAuthMode authMode)
+        RgfApiAuthMode authMode, string? proxyBaseAddressOverride = null)
     {
-        services.AddRgfServices(configuration, logger, authMode);
+        services.AddRgfServices(configuration, logger, authMode, proxyBaseAddressOverride);
         services.TryAddSingleton<RgfAuthenticationEndpointResolver>();
 
         if (RgfClientConfiguration.ClientVersions.TryAdd(RgfHeaderKeys.RgfClientBlazorVersion, RgfBlazorConfiguration.Version))

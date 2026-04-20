@@ -33,12 +33,12 @@ public class RgfClientConfiguration
 public static class RgfClientConfigurationExtension
 {
     public static IServiceCollection AddRgfServices(this IServiceCollection services, IConfiguration configuration, ILogger? logger = null,
-        RgfApiAuthMode authMode = RgfApiAuthMode.None)
+        RgfApiAuthMode authMode = RgfApiAuthMode.None, string? proxyBaseAddressOverride = null)
     {
         var config = configuration.GetSection("Recrovit:RecroGridFramework");
         var externalBaseAddress = config.GetValue<string>("API:BaseAddress", string.Empty)!.TrimEnd('/');
         var configuredProxyBaseAddress = config.GetValue<string>("API:ProxyBaseAddress", string.Empty);
-        var effectiveProxyBaseAddress = ResolveProxyBaseAddress(authMode, externalBaseAddress, configuredProxyBaseAddress);
+        var effectiveProxyBaseAddress = ResolveProxyBaseAddress(authMode, externalBaseAddress, configuredProxyBaseAddress, proxyBaseAddressOverride);
         var root = config.GetValue("AppRootPath", config.GetValue("AppRootUrl", ""));
         if (!string.IsNullOrEmpty(root))
         {
@@ -56,7 +56,7 @@ public static class RgfClientConfigurationExtension
         if (string.IsNullOrEmpty(ApiService.BaseAddress))
         {
             var msg = authMode is RgfApiAuthMode.ServerProxy or RgfApiAuthMode.ServerProxySsr
-                ? "The proxy base address is missing or invalid. Set 'Recrovit:RecroGridFramework:API:ProxyBaseAddress'."
+                ? "The proxy base address is missing or invalid. Pass the proxyBaseAddress parameter or set 'Recrovit:RecroGridFramework:API:ProxyBaseAddress'."
                 : "The 'Recrovit:RecroGridFramework:API:BaseAddress' configuration setting is missing or invalid.";
             logger?.LogCritical(msg);
             throw new InvalidOperationException(msg);
@@ -85,8 +85,13 @@ public static class RgfClientConfigurationExtension
         return services;
     }
 
-    private static string ResolveProxyBaseAddress(RgfApiAuthMode authMode, string externalBaseAddress, string configuredProxyBaseAddress)
+    private static string ResolveProxyBaseAddress(RgfApiAuthMode authMode, string externalBaseAddress, string configuredProxyBaseAddress, string? proxyBaseAddressOverride)
     {
+        if (!string.IsNullOrWhiteSpace(proxyBaseAddressOverride))
+        {
+            return proxyBaseAddressOverride.TrimEnd('/');
+        }
+
         if (!string.IsNullOrWhiteSpace(configuredProxyBaseAddress))
         {
             return configuredProxyBaseAddress.TrimEnd('/');

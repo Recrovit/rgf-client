@@ -22,6 +22,7 @@ builder.Services.AddRgfBlazorWasmBearerServices(builder.Configuration, logger);
 
 // Blazor Web App client + server-proxy mode:
 // builder.Services.AddRgfBlazorServerProxyClientServices(builder.Configuration, logger);
+// builder.Services.AddRgfBlazorServerProxyClientServices(builder.Configuration, logger, "https://{HOST-DOMAIN}");
 
 // Blazor Web App host + SSR-auth proxy mode:
 // builder.Services.AddRgfBlazorServerProxySsrServices(builder.Configuration, logger);
