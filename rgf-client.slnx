@@ -27,6 +27,11 @@
     <File Path="Directory.Build.targets" />
     <File Path="README.md" />
   </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/RGF.Client.Blazor.Tests/RGF.Client.Blazor.Tests.csproj" />
+    <Project Path="tests/RGF.Client.Blazor.UI.Tests/RGF.Client.Blazor.UI.Tests.csproj" />
+    <Project Path="tests/RGF.Client.Tests/RGF.Client.Tests.csproj" />
+  </Folder>
   <Project Path="src/RGF.Abstraction/RGF.Abstraction.csproj" />
   <Project Path="src/RGF.Blazor.RgfApexCharts/RGF.Blazor.RgfApexCharts.csproj" />
   <Project Path="src/RGF.Client.Blazor.Host.OpenIdConnect/RGF.Client.Blazor.Host.OpenIdConnect.csproj" />
