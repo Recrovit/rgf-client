@@ -78,13 +78,14 @@ public static class RgfBlazorConfigurationExtension
 
     public static IServiceCollection AddRgfBlazorWasmBearerServices(this IServiceCollection services, IConfiguration configuration, ILogger? logger = null, Type? authorizationMessageHandlerType = null)
     {
+        logger = ResolveRegistrationLogger(services, logger);
         AddRgfBlazorServicesCore(services, configuration, logger, RgfApiAuthMode.WasmBearer);
         services.AddScoped<IRgfAccessTokenAccessor, WasmRgfAccessTokenAccessor>();
         ConfigureWasmAuthHttpClient(services, authorizationMessageHandlerType, logger);
         return services;
     }
 
-    private static void ConfigureWasmAuthHttpClient(IServiceCollection services, Type? authorizationMessageHandlerType, ILogger? logger)
+    private static void ConfigureWasmAuthHttpClient(IServiceCollection services, Type? authorizationMessageHandlerType, ILogger logger)
     {
         if (authorizationMessageHandlerType == null || !typeof(DelegatingHandler).IsAssignableFrom(authorizationMessageHandlerType))
         {
@@ -92,7 +93,7 @@ public static class RgfBlazorConfigurationExtension
             authorizationMessageHandlerType = typeof(RgfAuthorizationMessageHandler);
         }
 
-        logger?.LogInformation("RecroGrid Framework Blazor registration: WebAssembly bearer auth with handler '{AuthorizationMessageHandlerTypeName}'.", authorizationMessageHandlerType.Name);
+        logger.LogInformation("RecroGrid Framework Blazor registration: WebAssembly bearer auth with handler '{AuthorizationMessageHandlerTypeName}'.", authorizationMessageHandlerType.Name);
 
         services.Configure<HttpClientFactoryOptions>(ApiService.RgfAuthApiClientName, httpClientOptions =>
         {
@@ -105,13 +106,15 @@ public static class RgfBlazorConfigurationExtension
 
     public static IServiceCollection AddRgfBlazorWithoutAuthServices(this IServiceCollection services, IConfiguration configuration, ILogger? logger = null)
     {
+        logger = ResolveRegistrationLogger(services, logger);
         AddRgfBlazorServicesCore(services, configuration, logger, RgfApiAuthMode.None);
-        logger?.LogInformation("RecroGrid Framework Blazor registration: without built-in authentication handling.");
+        logger.LogInformation("RecroGrid Framework Blazor registration: without built-in authentication handling.");
         return services;
     }
 
-    public static IServiceCollection AddRgfBlazorServerProxyClientServices(this IServiceCollection services, IConfiguration configuration, ILogger? logger = null, string? proxyBaseAddress = null)
+    public static IServiceCollection AddRgfBlazorServerProxyClientServices(this IServiceCollection services, IConfiguration configuration, string? proxyBaseAddress = null, ILogger? logger = null)
     {
+        logger = ResolveRegistrationLogger(services, logger);
         AddRgfBlazorServicesCore(services, configuration, logger, RgfApiAuthMode.ServerProxy, proxyBaseAddress);
         ConfigureAuthenticationPrincipalSynchronization(services, configuration);
         services.AddAuthorizationCore();
@@ -121,19 +124,20 @@ public static class RgfBlazorConfigurationExtension
         services.AddSingleton<RgfAuthenticationPrincipalSnapshotSynchronizer>();
         services.AddSingleton<IRgfAuthenticationFailureHandler>(serviceProvider => serviceProvider.GetRequiredService<IRgfAuthenticationSessionMonitor>());
         services.DecorateAuthenticationStateProvider();
-        logger?.LogInformation("RecroGrid Framework Blazor registration: client server-proxy auth via configured proxy base address.");
+        logger.LogInformation("RecroGrid Framework Blazor registration: client server-proxy auth via configured proxy base address.");
         return services;
     }
 
     public static IServiceCollection AddRgfBlazorServerProxySsrServices(this IServiceCollection services, IConfiguration configuration, ILogger? logger = null)
     {
+        logger = ResolveRegistrationLogger(services, logger);
         services.TryAddScoped<IRgfServerRequestCookieAccessor, NoOpRgfServerRequestCookieAccessor>();
         services.AddTransient<RgfServerProxyAuthCookieHandler>();
         services.TryAddSingleton<IRgfAuthenticationSessionMonitor, NoOpRgfAuthenticationSessionMonitor>();
 
         AddRgfBlazorServicesCore(services, configuration, logger, RgfApiAuthMode.ServerProxySsr);
         ConfigureServerProxySsrHttpClients(services, logger);
-        logger?.LogInformation("RecroGrid Framework Blazor registration: SSR server-proxy auth via configured proxy base address.");
+        logger.LogInformation("RecroGrid Framework Blazor registration: SSR server-proxy auth via configured proxy base address.");
         return services;
     }
 
@@ -144,7 +148,7 @@ public static class RgfBlazorConfigurationExtension
         services.TryAddSingleton<RgfAuthenticationPrincipalFactory>();
     }
 
-    private static IServiceCollection AddRgfBlazorServicesCore(IServiceCollection services, IConfiguration configuration, ILogger? logger,
+    private static IServiceCollection AddRgfBlazorServicesCore(IServiceCollection services, IConfiguration configuration, ILogger logger,
         RgfApiAuthMode authMode, string? proxyBaseAddressOverride = null)
     {
         services.AddRgfServices(configuration, logger, authMode, proxyBaseAddressOverride);
@@ -163,9 +167,9 @@ public static class RgfBlazorConfigurationExtension
         return services;
     }
 
-    private static void ConfigureServerProxySsrHttpClients(IServiceCollection services, ILogger? logger)
+    private static void ConfigureServerProxySsrHttpClients(IServiceCollection services, ILogger logger)
     {
-        logger?.LogInformation("RecroGrid Framework Blazor registration: SSR server-proxy handler '{AuthorizationMessageHandlerTypeName}' attached to RGF HTTP clients.", nameof(RgfServerProxyAuthCookieHandler));
+        logger.LogInformation("RecroGrid Framework Blazor registration: SSR server-proxy handler '{AuthorizationMessageHandlerTypeName}' attached to RGF HTTP clients.", nameof(RgfServerProxyAuthCookieHandler));
 
         services.AddHttpClient(_ssrProxyClientName, httpClient =>
         {
@@ -254,4 +258,7 @@ public static class RgfBlazorConfigurationExtension
     public static string GetJQueryUiCssHref() => $"{RgfClientConfiguration.AppRootPath}/_content/{_executingAssemblyName}/lib/jqueryui/themes/base/jquery-ui.min.css";
 
     public static IEnumerable<string> SriptReferences { get; private set; } = [];
+
+    private static ILogger ResolveRegistrationLogger(IServiceCollection services, ILogger? logger) =>
+        RegistrationLoggerResolver.Resolve(services, logger, typeof(RgfBlazorConfigurationExtension));
 }

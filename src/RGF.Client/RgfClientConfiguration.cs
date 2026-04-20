@@ -35,6 +35,7 @@ public static class RgfClientConfigurationExtension
     public static IServiceCollection AddRgfServices(this IServiceCollection services, IConfiguration configuration, ILogger? logger = null,
         RgfApiAuthMode authMode = RgfApiAuthMode.None, string? proxyBaseAddressOverride = null)
     {
+        var registrationLogger = RegistrationLoggerResolver.Resolve(services, logger, typeof(RgfClientConfigurationExtension));
         var config = configuration.GetSection("Recrovit:RecroGridFramework");
         var externalBaseAddress = config.GetValue<string>("API:BaseAddress", string.Empty)!.TrimEnd('/');
         var configuredProxyBaseAddress = config.GetValue<string>("API:ProxyBaseAddress", string.Empty);
@@ -50,7 +51,7 @@ public static class RgfClientConfigurationExtension
         RgfClientConfiguration.ProxyApiBaseAddress = effectiveProxyBaseAddress;
         RgfClientConfiguration.ApiAuthMode = authMode;
 
-        logger?.LogInformation("AddRgfServices: AppRootPath={AppRootPath}, ProxyApiBaseAddress={ProxyApiBaseAddress}, ExternalApiBaseAddress={ExternalApiBaseAddress}, ApiAuthMode={ApiAuthMode}",
+        registrationLogger.LogInformation("AddRgfServices: AppRootPath={AppRootPath}, ProxyApiBaseAddress={ProxyApiBaseAddress}, ExternalApiBaseAddress={ExternalApiBaseAddress}, ApiAuthMode={ApiAuthMode}",
             RgfClientConfiguration.AppRootPath, RgfClientConfiguration.ProxyApiBaseAddress, RgfClientConfiguration.ExternalApiBaseAddress, RgfClientConfiguration.ApiAuthMode);
 
         if (string.IsNullOrEmpty(ApiService.BaseAddress))
@@ -58,7 +59,7 @@ public static class RgfClientConfigurationExtension
             var msg = authMode is RgfApiAuthMode.ServerProxy or RgfApiAuthMode.ServerProxySsr
                 ? "The proxy base address is missing or invalid. Pass the proxyBaseAddress parameter or set 'Recrovit:RecroGridFramework:API:ProxyBaseAddress'."
                 : "The 'Recrovit:RecroGridFramework:API:BaseAddress' configuration setting is missing or invalid.";
-            logger?.LogCritical(msg);
+            registrationLogger.LogCritical(msg);
             throw new InvalidOperationException(msg);
         }
 
