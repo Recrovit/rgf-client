@@ -25,6 +25,7 @@
     <File Path=".gitignore" />
     <File Path="Directory.Build.props" />
     <File Path="Directory.Build.targets" />
+    <File Path="README.md" />
   </Folder>
   <Project Path="src/RGF.Abstraction/RGF.Abstraction.csproj" />
   <Project Path="src/RGF.Blazor.RgfApexCharts/RGF.Blazor.RgfApexCharts.csproj" />
