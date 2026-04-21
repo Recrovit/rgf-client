@@ -35,16 +35,17 @@ public sealed class RgfClientConfigurationExtensionTests : IDisposable
         AssertContainsDescriptor<IRgfApiService, ApiService>(services, ServiceLifetime.Singleton);
         AssertContainsDescriptor<IRgfAccessTokenAccessor, NoOpRgfAccessTokenAccessor>(services, ServiceLifetime.Scoped);
         AssertContainsDescriptor<IRgfAuthenticationFailureHandler, NoOpRgfAuthenticationFailureHandler>(services, ServiceLifetime.Singleton);
-        AssertContainsDescriptor<IRgfEventNotificationService, RgfEventNotificationService>(services, ServiceLifetime.Scoped);
-        AssertContainsDescriptor<IRecroSecService, RecroSecService>(services, ServiceLifetime.Scoped);
-        AssertContainsDescriptor<IRecroDictService, RecroDictService>(services, ServiceLifetime.Scoped);
-        AssertContainsDescriptor<IRgfMenuService, MenuService>(services, ServiceLifetime.Scoped);
+        AssertContainsDescriptor<IRgfEventNotificationService>(services, ServiceLifetime.Scoped);
+        AssertContainsDescriptor<IRecroSecService>(services, ServiceLifetime.Scoped);
+        AssertContainsDescriptor<IRecroDictService>(services, ServiceLifetime.Scoped);
+        AssertContainsDescriptor<IRgfMenuService>(services, ServiceLifetime.Scoped);
         AssertContainsDescriptor<IRgfProgressService, RgfProgressService>(services, ServiceLifetime.Transient);
 
         using var serviceProvider = services.BuildServiceProvider();
         var httpClientFactory = serviceProvider.GetRequiredService<IHttpClientFactory>();
         var apiClient = httpClientFactory.CreateClient(ApiService.RgfApiClientName);
         var authClient = httpClientFactory.CreateClient(ApiService.RgfAuthApiClientName);
+        Assert.NotNull(serviceProvider.GetRequiredService<IRgfEventNotificationService>());
 
         Assert.Equal(new Uri("https://api.example.test"), apiClient.BaseAddress);
         Assert.Equal(new Uri("https://api.example.test"), authClient.BaseAddress);
@@ -230,10 +231,9 @@ public sealed class RgfClientConfigurationExtensionTests : IDisposable
         var recroSec = new FakeRecroSecService { UserLanguageValue = "hun" };
 
         services.AddLogging();
+        services.AddRgfServices(CreateConfiguration(), authMode: RgfApiAuthMode.WasmBearer);
         services.AddSingleton<IRecroDictService>(recroDict);
         services.AddSingleton<IRecroSecService>(recroSec);
-
-        RgfClientConfiguration.ApiAuthMode = RgfApiAuthMode.WasmBearer;
 
         using var serviceProvider = services.BuildServiceProvider();
 
@@ -268,10 +268,9 @@ public sealed class RgfClientConfigurationExtensionTests : IDisposable
         var recroSec = new FakeRecroSecService { UserLanguageValue = "eng" };
 
         services.AddLogging();
+        services.AddRgfServices(CreateConfiguration(), authMode: RgfApiAuthMode.WasmBearer);
         services.AddSingleton<IRecroDictService>(recroDict);
         services.AddSingleton<IRecroSecService>(recroSec);
-
-        RgfClientConfiguration.ApiAuthMode = RgfApiAuthMode.WasmBearer;
 
         using var serviceProvider = services.BuildServiceProvider();
 
@@ -309,6 +308,15 @@ public sealed class RgfClientConfigurationExtensionTests : IDisposable
         Assert.Contains(services, descriptor =>
             descriptor.ServiceType == typeof(TService) &&
             descriptor.ImplementationType == typeof(TImplementation) &&
+            descriptor.Lifetime == lifetime);
+    }
+
+    private static void AssertContainsDescriptor<TService>(
+        IServiceCollection services,
+        ServiceLifetime lifetime)
+    {
+        Assert.Contains(services, descriptor =>
+            descriptor.ServiceType == typeof(TService) &&
             descriptor.Lifetime == lifetime);
     }
 

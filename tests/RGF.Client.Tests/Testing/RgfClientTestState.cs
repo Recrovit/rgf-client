@@ -6,17 +6,18 @@ namespace Recrovit.RecroGridFramework.Client.Tests.Testing;
 
 internal static class RgfClientTestState
 {
+    private static readonly Type ConfigurationType = typeof(RgfClientConfiguration);
     private static readonly FieldInfo LoggerFactoryField = typeof(RgfLoggerFactory)
         .GetField("LoggerFactory", BindingFlags.Static | BindingFlags.NonPublic)
         ?? throw new InvalidOperationException("Unable to locate RgfLoggerFactory.LoggerFactory field.");
 
     public static void Reset()
     {
-        RgfClientConfiguration.IsInitialized = false;
-        RgfClientConfiguration.AppRootPath = string.Empty;
-        RgfClientConfiguration.ExternalApiBaseAddress = string.Empty;
-        RgfClientConfiguration.ProxyApiBaseAddress = string.Empty;
-        RgfClientConfiguration.ApiAuthMode = RgfApiAuthMode.None;
+        SetConfigurationProperty(nameof(RgfClientConfiguration.IsInitialized), false);
+        SetConfigurationProperty(nameof(RgfClientConfiguration.AppRootPath), string.Empty);
+        SetConfigurationProperty(nameof(RgfClientConfiguration.ExternalApiBaseAddress), string.Empty);
+        SetConfigurationProperty(nameof(RgfClientConfiguration.ProxyApiBaseAddress), string.Empty);
+        SetConfigurationProperty(nameof(RgfClientConfiguration.ApiAuthMode), RgfApiAuthMode.None);
         RgfClientConfiguration.MinimumRgfCoreVersion = new Version(10, 0, 0);
         RgfClientConfiguration.ClientVersions.Clear();
 
@@ -28,4 +29,12 @@ internal static class RgfClientTestState
 
     public static int CountClientVersionHeaders()
         => RgfClientConfiguration.ClientVersions.Count(pair => pair.Key == RgfHeaderKeys.RgfClientVersion);
+
+    private static void SetConfigurationProperty(string propertyName, object? value)
+    {
+        var property = ConfigurationType.GetProperty(propertyName, BindingFlags.Static | BindingFlags.Public)
+            ?? throw new InvalidOperationException($"Unable to locate RgfClientConfiguration.{propertyName} property.");
+
+        property.SetValue(null, value);
+    }
 }
