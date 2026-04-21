@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Recrovit.AspNetCore.Authentication.OpenIdConnect.Configuration;
 using Recrovit.RecroGridFramework.Client.Blazor.Host.OpenIdConnect.Proxy;
+using Recrovit.RecroGridFramework.Client.Blazor.SessionAuth;
 using Recrovit.RecroGridFramework.Client.Handlers;
 using System.Reflection;
 
@@ -41,7 +42,7 @@ public static class RgfBlazorServerProxyOpenIdConnectHostExtensions
     public static WebApplicationBuilder AddRgfBlazorServerProxyOpenIdConnectHost(this WebApplicationBuilder builder)
     {
         builder.AddRecrovitOpenIdConnectInfrastructure();
-        builder.Services.AddRgfBlazorServerProxySsrServices(builder.Configuration);
+        builder.Services.AddRgfBlazorSessionAuthSsrServices(builder.Configuration);
         builder.Services.AddRgfBlazorServerProxyOpenIdConnectHostServices();
 
         return builder;
