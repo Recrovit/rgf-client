@@ -4,7 +4,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Http;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using Microsoft.JSInterop;
 using Recrovit.RecroGridFramework.Abstraction.Contracts.Constants;
 using Recrovit.RecroGridFramework.Abstraction.Contracts.Services;
@@ -64,13 +63,12 @@ public class RgfBlazorConfiguration
 
     private static readonly Lazy<string> _version = new Lazy<string>(() => Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyFileVersionAttribute>()!.Version);
 
-    internal static readonly Version MinimumRgfCoreVersion = new Version(10, 0, 0);//RGF.Core MinVersion
+    public static Version MinimumRgfCoreVersion { get; } = new Version(10, 0, 0);//RGF.Core MinVersion
 }
 
 public static class RgfBlazorConfigurationExtension
 {
     private static readonly string _executingAssemblyName = Assembly.GetExecutingAssembly().GetName().Name!;
-    private const string _ssrProxyClientName = "Recrovit.RGF.Blazor.ServerProxy";
 
     [Obsolete("Use AddRgfBlazorWasmBearerServices for Blazor WebAssembly with bearer tokens.")]
     public static IServiceCollection AddRgfBlazorServices(this IServiceCollection services, IConfiguration configuration, ILogger? logger = null, Type? authorizationMessageHandlerType = null) =>
@@ -112,42 +110,6 @@ public static class RgfBlazorConfigurationExtension
         return services;
     }
 
-    public static IServiceCollection AddRgfBlazorServerProxyClientServices(this IServiceCollection services, IConfiguration configuration, string? proxyBaseAddress = null, ILogger? logger = null)
-    {
-        logger = ResolveRegistrationLogger(services, logger);
-        AddRgfBlazorServicesCore(services, configuration, logger, RgfApiAuthMode.ServerProxy, proxyBaseAddress);
-        ConfigureAuthenticationPrincipalSynchronization(services, configuration);
-        services.AddAuthorizationCore();
-        services.AddCascadingAuthenticationState();
-        services.AddAuthenticationStateDeserialization();
-        services.AddSingleton<IRgfAuthenticationSessionMonitor, RgfAuthenticationSessionMonitor>();
-        services.AddSingleton<RgfAuthenticationPrincipalSnapshotSynchronizer>();
-        services.AddSingleton<IRgfAuthenticationFailureHandler>(serviceProvider => serviceProvider.GetRequiredService<IRgfAuthenticationSessionMonitor>());
-        services.DecorateAuthenticationStateProvider();
-        logger.LogInformation("RecroGrid Framework Blazor registration: client server-proxy auth via configured proxy base address.");
-        return services;
-    }
-
-    public static IServiceCollection AddRgfBlazorServerProxySsrServices(this IServiceCollection services, IConfiguration configuration, ILogger? logger = null)
-    {
-        logger = ResolveRegistrationLogger(services, logger);
-        services.TryAddScoped<IRgfServerRequestCookieAccessor, NoOpRgfServerRequestCookieAccessor>();
-        services.AddTransient<RgfServerProxyAuthCookieHandler>();
-        services.TryAddSingleton<IRgfAuthenticationSessionMonitor, NoOpRgfAuthenticationSessionMonitor>();
-
-        AddRgfBlazorServicesCore(services, configuration, logger, RgfApiAuthMode.ServerProxySsr);
-        ConfigureServerProxySsrHttpClients(services, logger);
-        logger.LogInformation("RecroGrid Framework Blazor registration: SSR server-proxy auth via configured proxy base address.");
-        return services;
-    }
-
-    private static void ConfigureAuthenticationPrincipalSynchronization(IServiceCollection services, IConfiguration configuration)
-    {
-        services.AddOptions<RgfAuthenticationOptions>()
-            .Bind(configuration.GetSection("Recrovit:RecroGridFramework").GetSection("Authentication"));
-        services.TryAddSingleton<RgfAuthenticationPrincipalFactory>();
-    }
-
     private static IServiceCollection AddRgfBlazorServicesCore(IServiceCollection services, IConfiguration configuration, ILogger logger,
         RgfApiAuthMode authMode, string? proxyBaseAddressOverride = null)
     {
@@ -167,40 +129,17 @@ public static class RgfBlazorConfigurationExtension
         return services;
     }
 
-    private static void ConfigureServerProxySsrHttpClients(IServiceCollection services, ILogger logger)
-    {
-        logger.LogInformation("RecroGrid Framework Blazor registration: SSR server-proxy handler '{AuthorizationMessageHandlerTypeName}' attached to RGF HTTP clients.", nameof(RgfServerProxyAuthCookieHandler));
-
-        services.AddHttpClient(_ssrProxyClientName, httpClient =>
-        {
-            httpClient.BaseAddress = new Uri(ApiService.BaseAddress);
-        });
-
-        foreach (var clientName in new[] { ApiService.RgfApiClientName, ApiService.RgfAuthApiClientName, _ssrProxyClientName })
-        {
-            services.Configure<HttpClientFactoryOptions>(clientName, httpClientOptions =>
-            {
-                httpClientOptions.HttpMessageHandlerBuilderActions.Add(builder =>
-                {
-                    builder.AdditionalHandlers.Add(builder.Services.GetRequiredService<RgfServerProxyAuthCookieHandler>());
-                });
-            });
-        }
-    }
-
     public static Task InitializeRgfBlazorServerAsync(this IServiceProvider serviceProvider) => serviceProvider.InitializeRgfBlazorAsync(false);
 
     public static async Task InitializeRgfBlazorAsync(this IServiceProvider serviceProvider, bool clientSideRendering = true)
     {
         await serviceProvider.InitializeRgfClientAsync(clientSideRendering);
-        if (clientSideRendering)
+
+        foreach (var initializationHook in serviceProvider.GetServices<IRgfBlazorInitializationHook>())
         {
-            var authenticationSessionMonitor = serviceProvider.GetService<IRgfAuthenticationSessionMonitor>();
-            if (authenticationSessionMonitor != null)
-            {
-                await authenticationSessionMonitor.ProbeAsync(CancellationToken.None);
-            }
+            await initializationHook.InitializeAsync(serviceProvider, clientSideRendering, CancellationToken.None);
         }
+
         if (clientSideRendering)
         {
             await LoadResourcesAsync(serviceProvider);

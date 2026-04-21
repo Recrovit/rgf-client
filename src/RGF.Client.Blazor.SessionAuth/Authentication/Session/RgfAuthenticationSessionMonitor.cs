@@ -1,8 +1,9 @@
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.Logging;
+using Recrovit.RecroGridFramework.Client.Blazor.Services;
 using Recrovit.RecroGridFramework.Client.Services;
 
-namespace Recrovit.RecroGridFramework.Client.Blazor.Services;
+namespace Recrovit.RecroGridFramework.Client.Blazor.SessionAuth.Authentication.Session;
 
 internal sealed class RgfAuthenticationSessionMonitor(
     IHttpClientFactory httpClientFactory,
@@ -11,7 +12,9 @@ internal sealed class RgfAuthenticationSessionMonitor(
     ILogger<RgfAuthenticationSessionMonitor> logger) : IRgfAuthenticationSessionMonitor
 {
     private readonly object _sync = new();
+    private readonly SemaphoreSlim _probeLock = new(1, 1);
     private bool _hasValidSession = true;
+    private bool _hasConfirmedSession;
     private bool _routeAuthenticationRequired;
     private int _componentAuthenticationRequirementCount;
     private int _loginNavigationStarted;
@@ -29,19 +32,44 @@ internal sealed class RgfAuthenticationSessionMonitor(
 
     public event Action? SessionStateChanged;
 
+    public Task EnsureValidatedAsync(CancellationToken cancellationToken)
+        => ProbeCoreAsync(force: false, cancellationToken);
+
     public async Task ProbeAsync(CancellationToken cancellationToken)
+        => await ProbeCoreAsync(force: true, cancellationToken);
+
+    private async Task ProbeCoreAsync(bool force, CancellationToken cancellationToken)
     {
-        using var httpClient = httpClientFactory.CreateClient(ApiService.RgfApiClientName);
-        using var response = await httpClient.GetAsync(authenticationEndpoints.SessionPath, cancellationToken);
-        if (response.IsSuccessStatusCode)
+        if (!force && !ShouldProbe())
         {
             return;
         }
 
-        if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized && IsReauthenticationRequired(response))
+        await _probeLock.WaitAsync(cancellationToken);
+        try
         {
-            logger.LogInformation("Authentication session probe returned 401, switching the client to anonymous mode.");
-            InvalidateSession(redirectIfRequired: false);
+            if (!force && !ShouldProbe())
+            {
+                return;
+            }
+
+            using var httpClient = httpClientFactory.CreateClient(ApiService.RgfApiClientName);
+            using var response = await httpClient.GetAsync(authenticationEndpoints.SessionPath, cancellationToken);
+            if (response.IsSuccessStatusCode)
+            {
+                MarkSessionValidated();
+                return;
+            }
+
+            if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized && IsReauthenticationRequired(response))
+            {
+                logger.LogInformation("Authentication session probe returned 401, switching the client to anonymous mode.");
+                InvalidateSession(redirectIfRequired: false);
+            }
+        }
+        finally
+        {
+            _probeLock.Release();
         }
     }
 
@@ -100,6 +128,31 @@ internal sealed class RgfAuthenticationSessionMonitor(
         }
     }
 
+    private bool ShouldProbe()
+    {
+        lock (_sync)
+        {
+            return !_hasConfirmedSession;
+        }
+    }
+
+    private void MarkSessionValidated()
+    {
+        var stateChanged = false;
+
+        lock (_sync)
+        {
+            stateChanged = !_hasValidSession;
+            _hasValidSession = true;
+            _hasConfirmedSession = true;
+        }
+
+        if (stateChanged)
+        {
+            SessionStateChanged?.Invoke();
+        }
+    }
+
     private void InvalidateSession(bool redirectIfRequired)
     {
         var stateChanged = false;
@@ -112,6 +165,8 @@ internal sealed class RgfAuthenticationSessionMonitor(
                 _hasValidSession = false;
                 stateChanged = true;
             }
+
+            _hasConfirmedSession = false;
 
             shouldRedirect = redirectIfRequired && (_routeAuthenticationRequired || _componentAuthenticationRequirementCount > 0);
         }

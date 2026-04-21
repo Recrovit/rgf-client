@@ -1,8 +1,8 @@
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Rendering;
-using Recrovit.RecroGridFramework.Client.Blazor.Services;
+using Recrovit.RecroGridFramework.Client.Blazor.SessionAuth.Authentication.Session;
 
-namespace Recrovit.RecroGridFramework.Client.Blazor.Components;
+namespace Recrovit.RecroGridFramework.Client.Blazor.SessionAuth.Authorization.RouteAccess;
 
 public sealed class RgfAuthenticationRequirementScope : ComponentBase, IDisposable
 {

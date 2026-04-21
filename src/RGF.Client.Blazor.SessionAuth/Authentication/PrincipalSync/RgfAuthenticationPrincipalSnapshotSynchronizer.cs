@@ -3,9 +3,11 @@ using System.Net.Http.Json;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.Extensions.Logging;
+using Recrovit.RecroGridFramework.Client.Blazor.Services;
+using Recrovit.RecroGridFramework.Client.Blazor.SessionAuth.Authentication.Session;
 using Recrovit.RecroGridFramework.Client.Services;
 
-namespace Recrovit.RecroGridFramework.Client.Blazor.Services;
+namespace Recrovit.RecroGridFramework.Client.Blazor.SessionAuth.Authentication.PrincipalSync;
 
 internal sealed class RgfAuthenticationPrincipalSnapshotSynchronizer(
     IHttpClientFactory httpClientFactory,

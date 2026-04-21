@@ -1,7 +1,7 @@
 using System.Security.Claims;
 using Microsoft.Extensions.Options;
 
-namespace Recrovit.RecroGridFramework.Client.Blazor.Services;
+namespace Recrovit.RecroGridFramework.Client.Blazor.SessionAuth.Authentication.PrincipalSync;
 
 internal sealed class RgfAuthenticationPrincipalSnapshot
 {

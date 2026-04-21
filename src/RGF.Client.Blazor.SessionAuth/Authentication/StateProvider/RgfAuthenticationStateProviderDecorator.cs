@@ -1,7 +1,9 @@
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.Extensions.DependencyInjection;
+using Recrovit.RecroGridFramework.Client.Blazor.SessionAuth.Authentication.PrincipalSync;
+using Recrovit.RecroGridFramework.Client.Blazor.SessionAuth.Authentication.Session;
 
-namespace Recrovit.RecroGridFramework.Client.Blazor.Services;
+namespace Recrovit.RecroGridFramework.Client.Blazor.SessionAuth.Authentication.StateProvider;
 
 internal static class RgfAuthenticationStateProviderDecorator
 {

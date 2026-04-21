@@ -1,6 +1,6 @@
 using Recrovit.RecroGridFramework.Client.Services;
 
-namespace Recrovit.RecroGridFramework.Client.Blazor.Services;
+namespace Recrovit.RecroGridFramework.Client.Blazor.SessionAuth.Authentication.Session;
 
 internal sealed class NoOpRgfAuthenticationSessionMonitor : IRgfAuthenticationSessionMonitor
 {
@@ -18,6 +18,8 @@ internal sealed class NoOpRgfAuthenticationSessionMonitor : IRgfAuthenticationSe
         add { }
         remove { }
     }
+
+    public Task EnsureValidatedAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 
     public Task ProbeAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 

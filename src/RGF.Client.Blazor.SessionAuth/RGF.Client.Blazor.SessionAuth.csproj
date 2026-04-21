@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+  <PropertyGroup>
+    <RootNamespace>Recrovit.RecroGridFramework.Client.Blazor.SessionAuth</RootNamespace>
+    <AssemblyName>Recrovit.RecroGridFramework.Client.Blazor.SessionAuth</AssemblyName>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <!--<Version>10.x.x</Version>-->
+    <Description>RecroGrid Framework Blazor session-auth integration for route-aware client and SSR scenarios.</Description>
+    <PackageTags>recrogrid dotnet blazor sessionauth</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <SupportedPlatform Include="browser" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Authentication" Version="10.0.5" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\RGF.Client.Blazor\RGF.Client.Blazor.csproj" />
+    <ProjectReference Include="..\RGF.Client\RGF.Client.csproj" />
+  </ItemGroup>
+
+  <ItemGroup Condition="Exists('$(RepositoryRoot)..\Recrovit.AspNetCore.Components.Routing\src\Recrovit.AspNetCore.Components.Routing.csproj')">
+    <ProjectReference Include="$(RepositoryRoot)..\Recrovit.AspNetCore.Components.Routing\src\Recrovit.AspNetCore.Components.Routing.csproj" />
+  </ItemGroup>
+
+  <ItemGroup Condition="!Exists('$(RepositoryRoot)..\Recrovit.AspNetCore.Components.Routing\src\Recrovit.AspNetCore.Components.Routing.csproj')">
+    <PackageReference Include="Recrovit.AspNetCore.Components.Routing" Version="10.0.0" />
+  </ItemGroup>
+
+</Project>

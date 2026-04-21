@@ -1,7 +1,7 @@
 using Recrovit.RecroGridFramework.Client.Handlers;
 using Recrovit.RecroGridFramework.Client.Services;
 
-namespace Recrovit.RecroGridFramework.Client.Blazor.Handlers;
+namespace Recrovit.RecroGridFramework.Client.Blazor.SessionAuth.Proxy;
 
 /// <summary>
 /// Forwards the incoming authentication cookie when SSR code calls the local host proxy.

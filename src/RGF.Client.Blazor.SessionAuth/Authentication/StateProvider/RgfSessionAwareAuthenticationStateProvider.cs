@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Components.Authorization;
+using Recrovit.RecroGridFramework.Client.Blazor.SessionAuth.Authentication.PrincipalSync;
+using Recrovit.RecroGridFramework.Client.Blazor.SessionAuth.Authentication.Session;
 
-namespace Recrovit.RecroGridFramework.Client.Blazor.Services;
+namespace Recrovit.RecroGridFramework.Client.Blazor.SessionAuth.Authentication.StateProvider;
 
 internal sealed class RgfSessionAwareAuthenticationStateProvider : AuthenticationStateProvider, IDisposable
 {

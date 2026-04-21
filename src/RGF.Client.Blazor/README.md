@@ -38,12 +38,7 @@ The `Components` folder contains the main Blazor building blocks of the framewor
 
 These components provide the base rendering and interaction model for RecroGrid features inside Blazor applications.
 
-The package also includes smaller helper components such as:
-
-- `RgfAuthenticationRequirementScope`
-- `RgfRouteAuthenticationTracker`
-
-These support security-aware rendering, and authentication-sensitive UI behavior.
+The package also includes smaller helper components that support the base Blazor integration surface.
 
 ### Blazor configuration and registration
 
@@ -54,7 +49,6 @@ It is responsible for:
 - extending the base service registration from [`Recrovit.RecroGridFramework.Client`](https://www.nuget.org/packages/Recrovit.RecroGridFramework.Client/)
 - registering Blazor-specific authentication modes
 - configuring WebAssembly bearer-token scenarios
-- configuring server-proxy and SSR server-proxy scenarios
 - loading JavaScript modules, stylesheet resources, and server-provided script references
 - registering application-specific entity, menu, dialog, and chart components
 
@@ -64,13 +58,9 @@ This makes the package the primary setup point for RecroGrid in Blazor applicati
 
 The package contains Blazor-specific authentication helpers and runtime services such as:
 
-- `RgfAuthenticationSessionMonitor`
-- `RgfAuthenticationStateProviderDecorator`
-- `RgfSessionAwareAuthenticationStateProvider`
-- `RgfAuthenticationPrincipalSnapshotSynchronizer`
 - `RgfAuthorizationMessageHandler`
 
-These services coordinate authentication state, unauthorized responses, login redirects, and session-awareness with the Blazor runtime and the configured HTTP pipeline.
+For route-aware session authentication scenarios, use the dedicated [`Recrovit.RecroGridFramework.Client.Blazor.SessionAuth`](https://www.nuget.org/packages/Recrovit.RecroGridFramework.Client.Blazor.SessionAuth/) package.
 
 ### Parameters, templates, and dynamic composition
 
@@ -121,4 +111,5 @@ This makes [`Recrovit.RecroGridFramework.Client.Blazor`](https://www.nuget.org/p
 - [`Recrovit.RecroGridFramework.Client`](https://www.nuget.org/packages/Recrovit.RecroGridFramework.Client/): client-side API access, runtime services, and orchestration used by the Blazor layer
 - [`Recrovit.RecroGridFramework.Core`](https://www.nuget.org/packages/Recrovit.RecroGridFramework.Core/): server-side RecroGrid Framework Core implementation and API surface
 - [`Recrovit.RecroGridFramework.Client.Blazor`](https://www.nuget.org/packages/Recrovit.RecroGridFramework.Client.Blazor/): core Blazor integration for the RecroGrid client stack
+- [`Recrovit.RecroGridFramework.Client.Blazor.SessionAuth`](https://www.nuget.org/packages/Recrovit.RecroGridFramework.Client.Blazor.SessionAuth/): route-aware session authentication integration for Blazor clients and SSR hosts
 - [`Recrovit.RecroGridFramework.Client.Blazor.UI`](https://www.nuget.org/packages/Recrovit.RecroGridFramework.Client.Blazor.UI/): higher-level UI components built on top of the Blazor integration layer
