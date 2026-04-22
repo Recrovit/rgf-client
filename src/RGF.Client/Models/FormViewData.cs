@@ -9,10 +9,11 @@ namespace Recrovit.RecroGridFramework.Client.Models;
 
 public class FormViewData
 {
-    public FormViewData(List<RgfForm.Tab> formTabs, RgfDynamicDictionary dataRec)
+    public FormViewData(List<RgfForm.Tab> formTabs, RgfDynamicDictionary dataRec, RgfEntityKey? entityKey = null)
     {
         FormTabs = formTabs;
         DataRec = dataRec;
+        EntityKey = entityKey;
     }
 
 
@@ -20,7 +21,7 @@ public class FormViewData
 
     public List<RgfForm.Tab> FormTabs { get; set; }
 
-    public RgfEntityKey? EntityKey { get; internal set; }
+    public RgfEntityKey? EntityKey { get; private set; }
 
     public string? StyleSheetUrl { get; set; }
 }

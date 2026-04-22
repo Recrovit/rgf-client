@@ -1,7 +1,9 @@
-﻿using Recrovit.RecroGridFramework.Abstraction.Infrastructure.Events;
+﻿#nullable enable
+using Recrovit.RecroGridFramework.Abstraction.Infrastructure.Events;
 using Recrovit.RecroGridFramework.Abstraction.Infrastructure.Security;
 using System.Collections.Generic;
 using System.Globalization;
+using System;
 using System.Security.Claims;
 using System.Threading.Tasks;
 
@@ -9,6 +11,10 @@ namespace Recrovit.RecroGridFramework.Abstraction.Contracts.Services;
 
 public interface IRecroSecService
 {
+    EventDispatcher<EventArgs> AuthenticationStateChanged { get; }
+
+    string? UserName { get; }
+
     bool IsAuthenticated { get; }
 
     bool IsAdmin { get; }
@@ -19,17 +25,17 @@ public interface IRecroSecService
 
     Dictionary<string, string> Roles { get; }
 
-    Task<string> GetAccessTokenAsync();
+    Task<string?> GetAccessTokenAsync();
 
     string UserLanguage { get; }
 
-    Task<string> SetUserLanguageAsync(string language);
+    Task<string?> SetUserLanguageAsync(string? language);
 
     EventDispatcher<DataEventArgs<string>> LanguageChangedEvent { get; }
 
-    Task<RgfPermissions> GetEntityPermissionsAsync(string entityName, string objectKey = null, int expiration = 60);
+    Task<RgfPermissions> GetEntityPermissionsAsync(string entityName, string? objectKey = null, int expiration = 60);
 
-    Task<RgfPermissions> GetPermissionsAsync(string objectName, string objectKey = null, int expiration = 60);
+    Task<RgfPermissions> GetPermissionsAsync(string objectName, string? objectKey = null, int expiration = 60);
 
     Task<List<RecroSecResult>> GetPermissionsAsync(IEnumerable<RecroSecQuery> query, int expiration = 60);
 }

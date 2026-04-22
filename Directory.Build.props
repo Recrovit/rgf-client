@@ -5,6 +5,10 @@
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <!-- Custom Properties -->
+  <PropertyGroup>
     <RepositoryRoot>$(MSBuildThisFileDirectory)</RepositoryRoot>
   </PropertyGroup>
 
@@ -14,14 +18,14 @@
     <!--<Description>RecroGrid Framework Client - Blazor - UI</Description>-->
     <Company>Recrovit Kft.</Company>
     <Authors>$(Company)</Authors>
-    <Copyright>© Recrovit Kft. Licensed under LGPL-2.1-only.</Copyright>
+    <Copyright>Copyright (c) 2011-2026 Recrovit Kft.</Copyright>
     <RepositoryUrl>https://github.com/RecroGridFramework/rgf-client</RepositoryUrl>
   </PropertyGroup>
 
   <!-- Versioning -->
   <PropertyGroup>
-    <Version>10.0.0</Version>
-    <FileVersion>$(Version).1$([System.DateTime]::Now.ToString(MMdd))</FileVersion>
+    <Version>10.1.0</Version>
+    <FileVersion>$(Version).1$([System.DateTime]::Now.ToString("MMdd"))</FileVersion>
     <InformationalVersion>$(FileVersion)</InformationalVersion>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
   </PropertyGroup>
@@ -29,8 +33,8 @@
   <!-- Publishing -->
   <PropertyGroup Condition="'$(IsPackable)' != 'false'">
     <PackageProjectUrl>https://recrogridframework.com/</PackageProjectUrl>
-    <PackageTags>recrogrid dotnet blazor bootstrap</PackageTags>
-    <PackageLicenseExpression>LGPL-2.1-only</PackageLicenseExpression>
+    <PackageTags>recrogrid dotnet</PackageTags>
+    <PackageLicenseExpression>LGPL-2.1-or-later</PackageLicenseExpression>
     <PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageOutputPath>$(RepositoryRoot)..\dist</PackageOutputPath>
