@@ -81,9 +81,10 @@
                         int rowIdx = index++;
                         var attributes = rowData.Get<RgfDynamicDictionary>("__attributes");
                         string? rowClass = attributes?.Get<string>("class");
-                        if (RgfGrid.SelectedItems.ContainsKey(ListHandler.GetAbsoluteRowIndex(rowData)))
+                        var selected = RgfGrid.SelectedItems.ContainsKey(ListHandler.GetAbsoluteRowIndex(rowData));
+                        if (selected)
                         {
-                            rowClass = rowClass == null ? "table-primary" : rowClass + " table-primary";
+                            rowClass = "table-primary".EnsureContains(rowClass, ' ');
                         }
                         <tr @ref="_rowRef[rowIdx]" data-row="@rowIdx"
                             class="@rowClass"
@@ -92,8 +93,13 @@
                             @foreach (var prop in ListHandler.SortedVisibleColumns)
                             {
                                 var propAttributes = attributes?.Get<RgfDynamicDictionary>(prop.Alias);
+                                var colClass = propAttributes?.Get<string>("class");
+                                if (selected)
+                                {
+                                    colClass = "table-primary".EnsureContains(colClass, ' ');
+                                }
                                 <td data-cell="@prop.Id"
-                                    class="@(propAttributes?.Get<string>("class"))"
+                                    class="@colClass"
                                     style="@(propAttributes?.Get<string>("style"))"
                                     data-bs-toggle="@(propAttributes?.Get<string?>("data-bs-toggle"))">
                                     @RgfGrid.RenderContentItem(prop, rowData)

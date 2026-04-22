@@ -4,7 +4,7 @@
   <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
   <PropertyGroup>
     <!-- A target framework version is required by Visual Studio.  It can be any version with a targeting pack installed. -->
-    <TargetFrameworkVersion>v4.7.2</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
     <!-- The configuration and platform will be used to determine which assemblies to include from solution and
 				 project documentation sources -->
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
@@ -43,7 +43,7 @@
     <BuildAssemblerVerbosity>OnlyWarningsAndErrors</BuildAssemblerVerbosity>
     <SaveComponentCacheCapacity>100</SaveComponentCacheCapacity>
     <HelpTitle>RGF.Abstraction</HelpTitle>
-    <HelpFileVersion>10.0.0</HelpFileVersion>
+    <HelpFileVersion>10.1.0</HelpFileVersion>
     <NamingMethod>MemberName</NamingMethod>
     <ContentPlacement>AboveNamespaces</ContentPlacement>
     <RootNamespaceContainer>True</RootNamespaceContainer>
@@ -66,6 +66,7 @@
       <NamespaceSummaryItem name="(global)" isDocumented="True" />
       <NamespaceSummaryItem name="Recrovit.RecroGridFramework.Abstraction.Models" isDocumented="True" />
     </NamespaceSummaries>
+    <TargetFrameworkProfile />
   </PropertyGroup>
   <!-- There are no properties for these groups.  AnyCPU needs to appear in order for Visual Studio to perform
 			 the build.  The others are optional common platform types that may appear. -->

@@ -1,0 +1,128 @@
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using Recrovit.RecroGridFramework.Client.Blazor.SessionAuth.Authentication.Session
+
+<RgfRouteAuthenticationTracker PageType="RouteData.PageType" />
+
+@if (_requiresAuthentication)
+{
+    @if (_authorizationCompleted && _isAuthorized)
+    {
+        <RgfAuthenticationRequirementScope>
+            @DefaultContent
+        </RgfAuthenticationRequirementScope>
+    }
+}
+else
+{
+    @DefaultContent
+}
+
+@inject IRgfAuthenticationSessionMonitor SessionMonitor
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject IAuthorizationPolicyProvider AuthorizationPolicyProvider
+@inject IAuthorizationService AuthorizationService
+@inject NavigationManager NavigationManager
+@inject RgfAuthenticationEndpointResolver AuthenticationEndpoints
+@code {
+    [Parameter, EditorRequired]
+    public RouteData RouteData { get; set; } = default!;
+
+    [Parameter]
+    public RenderFragment? DefaultContent { get; set; }
+
+    private bool _requiresAuthentication;
+    private bool _authorizationCompleted = true;
+    private bool _isAuthorized;
+    private RouteData? _completedProtectedRoute;
+    private RouteData? _pendingProtectedRoute;
+    private long _evaluationVersion;
+    private int _loginRedirectStarted;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _requiresAuthentication = RgfRouteAuthorizationMetadata.RequiresAuthentication(RouteData.PageType);
+        if (!_requiresAuthentication)
+        {
+            ResetProtectedRouteState();
+            return;
+        }
+
+        if (_authorizationCompleted && _isAuthorized && ReferenceEquals(_completedProtectedRoute, RouteData))
+        {
+            return;
+        }
+
+        if (!_authorizationCompleted && ReferenceEquals(_pendingProtectedRoute, RouteData))
+        {
+            return;
+        }
+
+        _authorizationCompleted = false;
+        _isAuthorized = false;
+        _pendingProtectedRoute = RouteData;
+
+        var routeData = RouteData;
+        var evaluationVersion = Interlocked.Increment(ref _evaluationVersion);
+
+        await SessionMonitor.EnsureValidatedAsync(CancellationToken.None);
+        if (!IsCurrentEvaluation(evaluationVersion, routeData))
+        {
+            return;
+        }
+
+        var authenticationState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        if (!IsCurrentEvaluation(evaluationVersion, routeData))
+        {
+            return;
+        }
+
+        var policy = await AuthorizationPolicy.CombineAsync(
+            AuthorizationPolicyProvider,
+            RgfRouteAuthorizationMetadata.GetAuthorizeData(routeData.PageType));
+
+        var isAuthorized = policy is null
+            || (await AuthorizationService.AuthorizeAsync(authenticationState.User, resource: null, policy)).Succeeded;
+
+        if (!IsCurrentEvaluation(evaluationVersion, routeData))
+        {
+            return;
+        }
+
+        _authorizationCompleted = true;
+        _pendingProtectedRoute = null;
+        _completedProtectedRoute = isAuthorized ? routeData : null;
+        _isAuthorized = isAuthorized;
+
+        if (!isAuthorized)
+        {
+            NavigateToLoginOnce();
+        }
+    }
+
+    private bool IsCurrentEvaluation(long evaluationVersion, RouteData routeData)
+        => evaluationVersion == Interlocked.Read(ref _evaluationVersion)
+            && ReferenceEquals(_pendingProtectedRoute, routeData);
+
+    private void ResetProtectedRouteState()
+    {
+        Interlocked.Increment(ref _evaluationVersion);
+        _authorizationCompleted = true;
+        _isAuthorized = false;
+        _completedProtectedRoute = null;
+        _pendingProtectedRoute = null;
+        _loginRedirectStarted = 0;
+    }
+
+    private void NavigateToLoginOnce()
+    {
+        if (Interlocked.Exchange(ref _loginRedirectStarted, 1) != 0)
+        {
+            return;
+        }
+
+        var currentUri = new Uri(NavigationManager.Uri, UriKind.Absolute);
+        var returnUrl = $"{currentUri.PathAndQuery}{currentUri.Fragment}";
+        NavigationManager.NavigateTo($"{AuthenticationEndpoints.LoginPath}?returnUrl={Uri.EscapeDataString(returnUrl)}", forceLoad: true);
+    }
+}

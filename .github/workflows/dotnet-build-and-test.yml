@@ -1,0 +1,66 @@
+name: .NET Build and Test
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    env:
+      PROJECTS_TO_BUILD: |
+        src/RGF.Abstraction/RGF.Abstraction.csproj
+        src/RGF.Client/RGF.Client.csproj
+        src/RGF.Client.Blazor/RGF.Client.Blazor.csproj
+        src/RGF.Client.Blazor.Host.OpenIdConnect/RGF.Client.Blazor.Host.OpenIdConnect.csproj
+        src/RGF.Client.Blazor.SessionAuth/RGF.Client.Blazor.SessionAuth.csproj
+        src/RGF.Blazor.RgfApexCharts/RGF.Blazor.RgfApexCharts.csproj
+        src/RGF.Client.Blazor.UI/RGF.Client.Blazor.UI.csproj
+        tests/RGF.Client.Tests/RGF.Client.Tests.csproj
+        tests/RGF.Client.Blazor.Tests/RGF.Client.Blazor.Tests.csproj
+        tests/RGF.Client.Blazor.SessionAuth.Tests/RGF.Client.Blazor.SessionAuth.Tests.csproj
+        tests/RGF.Client.Blazor.UI.Tests/RGF.Client.Blazor.UI.Tests.csproj
+
+      TEST_PROJECTS: |
+        tests/RGF.Client.Tests/RGF.Client.Tests.csproj
+        tests/RGF.Client.Blazor.Tests/RGF.Client.Blazor.Tests.csproj
+        tests/RGF.Client.Blazor.SessionAuth.Tests/RGF.Client.Blazor.SessionAuth.Tests.csproj
+        tests/RGF.Client.Blazor.UI.Tests/RGF.Client.Blazor.UI.Tests.csproj
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore dependencies
+        shell: bash
+        run: |
+          while IFS= read -r project; do
+            [ -z "$project" ] && continue
+            dotnet restore "$project" -p:RestoreForce=true
+          done <<< "$PROJECTS_TO_BUILD"
+
+      - name: Build
+        shell: bash
+        run: |
+          while IFS= read -r project; do
+            [ -z "$project" ] && continue
+            dotnet build "$project" --configuration Release --no-restore
+          done <<< "$PROJECTS_TO_BUILD"
+
+      - name: Run tests
+        shell: bash
+        run: |
+          while IFS= read -r project; do
+            [ -z "$project" ] && continue
+            dotnet test --project "$project" --configuration Release --no-build --no-restore
+          done <<< "$TEST_PROJECTS"

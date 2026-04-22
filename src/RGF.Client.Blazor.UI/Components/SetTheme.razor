@@ -20,20 +20,39 @@
         { "small", "small" }
     };
 
-    private void OnThemeChange(ChangeEventArgs<string> args)
+    private bool _settingsInitialized;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        _jsRuntime.InvokeVoidAsync("eval", $"document.getElementsByTagName('html')[0].setAttribute('data-bs-theme', '{args.NewValue}');");
+        if (_settingsInitialized)
+        {
+            return;
+        }
+
+        try
+        {
+            var settings = await _jsRuntime.InvokeAsync<ThemeSettings>(RGFClientBlazorUIConfiguration.JsBlazorUiNamespace + ".SetTheme.getSettings", Themes.Keys.ToArray(), _sizes.Keys.ToArray());
+
+            ThemeName = Themes.ContainsKey(settings.ThemeName) ? settings.ThemeName : Themes.Keys.First();
+            Size = _sizes.ContainsKey(settings.Size) ? settings.Size : _sizes.Keys.First();
+
+            _settingsInitialized = true;
+            StateHasChanged();
+        }
+        catch (InvalidOperationException) { }
+        catch (JSDisconnectedException) { }
     }
 
-    private async Task OnSizeChange(ChangeEventArgs<string> args)
+    private Task OnThemeChange(ChangeEventArgs<string> args) =>
+        _jsRuntime.InvokeVoidAsync(RGFClientBlazorUIConfiguration.JsBlazorUiNamespace + ".SetTheme.setTheme", args.NewValue ?? string.Empty).AsTask();
+
+    private Task OnSizeChange(ChangeEventArgs<string> args) =>
+        _jsRuntime.InvokeVoidAsync(RGFClientBlazorUIConfiguration.JsBlazorUiNamespace + ".SetTheme.setSize", args.OldValue ?? string.Empty, args.NewValue ?? string.Empty).AsTask();
+
+    private sealed class ThemeSettings
     {
-        if (!string.IsNullOrEmpty(args.OldValue))
-        {
-            await _jsRuntime.InvokeVoidAsync("eval", $"$('body').removeClass('{args.OldValue}')");
-        }
-        if (!string.IsNullOrEmpty(args.NewValue))
-        {
-            await _jsRuntime.InvokeVoidAsync("eval", $"$('body').addClass('{args.NewValue}')");
-        }
+        public string ThemeName { get; set; } = string.Empty;
+
+        public string Size { get; set; } = string.Empty;
     }
 }

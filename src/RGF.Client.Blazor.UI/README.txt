@@ -11,20 +11,9 @@ Open ~/Program.cs file and register the RecroGrid Framework Blazor UI Services i
 
 //await builder.Build().RunAsync();
 
-var loggerFactory = builder.Services.BuildServiceProvider().GetRequiredService<ILoggerFactory>();
-var logger = loggerFactory.CreateLogger<Program>();
-
 // Standalone WASM / bearer-token OIDC mode:
-builder.Services.AddRgfBlazorWasmBearerServices(builder.Configuration, logger);
+builder.Services.AddRgfBlazorWasmBearerServices(builder.Configuration);
 
-// Blazor App without built-in auth handling:
-// builder.Services.AddRgfBlazorWithoutAuthServices(builder.Configuration, logger);
-
-// Blazor Web App client + server-proxy mode:
-// builder.Services.AddRgfBlazorServerProxyClientServices(builder.Configuration, logger);
-
-// Blazor Web App host + SSR-auth proxy mode:
-// builder.Services.AddRgfBlazorServerProxySsrServices(builder.Configuration, logger);
 
 var host = builder.Build();
 
@@ -70,7 +59,6 @@ wwwroot/appsettings.json
     "RecroGridFramework": {
       "API": {
         "BaseAddress": "https://{API-DOMAIN}" // required for direct API modes
-        "ProxyBaseAddress": "https://{HOST-DOMAIN}" // required for proxy modes
       }
     }
   }
