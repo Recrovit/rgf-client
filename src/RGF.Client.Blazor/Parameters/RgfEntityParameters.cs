@@ -20,6 +20,13 @@ public class RgfEntityParameters : RgfSessionParams
     /// </summary>
     public bool DeferredInitialization { get; set; }
 
+    /// <summary>
+    /// Gets or sets a value indicating whether the initial entity initialization
+    /// should skip the first automatic list data request while still loading
+    /// skeleton metadata and initializing the manager.
+    /// </summary>
+    public bool SkipInitialDataLoad { get; set; }
+
     public IRgManager? Manager { get; internal set; }
 
     public RgfEntityParameters? ParentEntityParameters { get; internal set; }

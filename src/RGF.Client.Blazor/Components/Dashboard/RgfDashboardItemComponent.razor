@@ -1,0 +1,221 @@
+@using Recrovit.RecroGridFramework.Abstraction.Contracts.API
+@using Recrovit.RecroGridFramework.Abstraction.Contracts.Services
+@using Recrovit.RecroGridFramework.Client.Services.Dashboard
+
+<div id="@_resizeHostId" class="rgf-dashboard-runtime-item">
+    @if (_hasTechnicalError)
+    {
+    }
+    else if (_entityParameters != null)
+    {
+        @if (Item.ViewReference.ViewType is RgfDashboardViewType.Chart or RgfDashboardViewType.ChartData)
+        {
+            <div class="rgf-dashboard-chart-initializer" aria-hidden="true">
+                @_entityComponent
+            </div>
+            @if (_managerInitialized)
+            {
+                if (Item.ViewReference.ViewType == RgfDashboardViewType.ChartData)
+                {
+                    <div class="rgf-dashboard-grid-host">
+                        @_chartComponent
+                    </div>
+                }
+                else
+                {
+                    @_chartComponent
+                }
+            }
+        }
+        else
+        {
+            <div class="rgf-dashboard-grid-host">
+                @_entityComponent
+            </div>
+        }
+    }
+    else
+    {
+        <div class="rgf-dashboard-item-loading">@RecroDict.GetRgfUiDashboard("LoadingItem")</div>
+    }
+</div>
+
+@implements IDisposable
+@code {
+    [Parameter, EditorRequired]
+    public RgfDashboardItem Item { get; set; } = null!;
+
+    [Parameter]
+    public RgfSessionParams? SessionParams { get; set; }
+
+    [Parameter]
+    public int LayoutCommitVersion { get; set; }
+
+    [Inject]
+    private ILogger<RgfDashboardItemComponent> Logger { get; set; } = null!;
+
+    [Inject]
+    private IRecroDictService RecroDict { get; set; } = null!;
+
+    private RgfEntityParameters? _entityParameters;
+    private RenderFragment? _entityComponent;
+    private RenderFragment? _chartComponent;
+    private bool _managerInitialized;
+    private bool _hasTechnicalError;
+    private int _currentDashboardItemId;
+    private string? _currentEntityName;
+    private RgfDashboardViewType _currentViewType;
+    private int? _currentSettingsId;
+    private int _lastLayoutCommitVersion;
+    private readonly string _resizeHostId = $"rgf-dashboard-chart-host-{Guid.NewGuid():N}";
+
+    protected override void OnParametersSet()
+    {
+        if (Item == null || Item.ViewReference == null || string.IsNullOrWhiteSpace(Item.ViewReference.EntityName))
+        {
+            ResetRuntimeState();
+            _hasTechnicalError = true;
+            Logger.LogWarning(
+                "Dashboard item reference is missing. DashboardItemId={DashboardItemId}, EntityName={EntityName}, ViewType={ViewType}.",
+                Item?.DashboardItemId,
+                Item?.ViewReference?.EntityName,
+                Item?.ViewReference?.ViewType);
+            return;
+        }
+
+        var entityName = Item.ViewReference.EntityName.Trim();
+        var shouldReinitialize = _entityParameters == null
+            || _currentDashboardItemId != Item.DashboardItemId
+            || !string.Equals(_currentEntityName, entityName, StringComparison.OrdinalIgnoreCase)
+            || _currentViewType != Item.ViewReference.ViewType
+            || _currentSettingsId != Item.ViewReference.SettingsId;
+
+        if (!shouldReinitialize)
+        {
+            if (_lastLayoutCommitVersion != LayoutCommitVersion)
+            {
+                _lastLayoutCommitVersion = LayoutCommitVersion;
+                _ = OnLayoutCommittedAsync();
+            }
+
+            return;
+        }
+
+        ResetRuntimeState();
+        _currentDashboardItemId = Item.DashboardItemId;
+        _currentEntityName = entityName;
+        _currentViewType = Item.ViewReference.ViewType;
+        _currentSettingsId = Item.ViewReference.SettingsId;
+        _entityParameters = new RgfEntityParameters(entityName, SessionParams)
+        {
+            GridId = null
+        };
+
+        if (_currentViewType == RgfDashboardViewType.Grid || _currentViewType == RgfDashboardViewType.Tree)
+        {
+            _entityParameters.DisplayMode = Item.ViewReference.ViewType == RgfDashboardViewType.Tree ? RfgDisplayMode.Tree : RfgDisplayMode.Grid;
+            _entityParameters.GridParameters = new RgfGridParameters()
+            {
+                InitialGridSettingsId = Item.ViewReference.SettingsId
+            };
+        }
+        else if (_currentViewType is RgfDashboardViewType.Chart or RgfDashboardViewType.ChartData)
+        {
+            _entityParameters.SkipInitialDataLoad = true;
+        }
+
+        _entityParameters.EventDispatcher.Subscribe(RgfEntityEventKind.Initialized, OnEntityInitializedAsync, true, this);
+        _entityComponent = RgfEntityComponent.Create(_entityParameters, Logger);
+        _chartComponent = CreateChartComponent();
+        _lastLayoutCommitVersion = LayoutCommitVersion;
+    }
+
+    private async Task OnEntityInitializedAsync(IRgfEventArgs<RgfEntityEventArgs> args)
+    {
+        try
+        {
+            if (_entityParameters?.Manager == null)
+            {
+                _hasTechnicalError = true;
+                Logger.LogWarning(
+                    "Dashboard item manager was not initialized. DashboardItemId={DashboardItemId}, EntityName={EntityName}.",
+                    Item.DashboardItemId,
+                    Item.ViewReference.EntityName);
+                return;
+            }
+
+            _managerInitialized = true;
+        }
+        catch (Exception ex)
+        {
+            _hasTechnicalError = true;
+            Logger.LogError(
+                ex,
+                "Dashboard item initialization failed. DashboardItemId={DashboardItemId}, EntityName={EntityName}.",
+                Item.DashboardItemId,
+                Item.ViewReference.EntityName);
+        }
+
+        StateHasChanged();
+    }
+
+    private RenderFragment? CreateChartComponent()
+    {
+        if (Item.ViewReference.ViewType is not (RgfDashboardViewType.Chart or RgfDashboardViewType.ChartData))
+        {
+            return null;
+        }
+
+        if (!RgfBlazorConfiguration.TryGetComponentType(RgfBlazorConfiguration.ComponentType.Chart, out var chartType) || chartType == null)
+        {
+            _hasTechnicalError = true;
+            Logger.LogWarning(
+                "Chart component is not registered. DashboardItemId={DashboardItemId}, EntityName={EntityName}, ViewType={ViewType}.",
+                Item.DashboardItemId,
+                Item.ViewReference.EntityName,
+                Item.ViewReference.ViewType);
+            return null;
+        }
+
+        return builder =>
+        {
+            var sequence = 0;
+            builder.OpenComponent(sequence++, chartType);
+            builder.AddAttribute(sequence++, nameof(RgfChartComponent.EntityParameters), _entityParameters);
+            builder.AddAttribute(sequence++, nameof(RgfChartComponent.Embedded), true);
+            builder.AddAttribute(sequence++, "InitialChartSettingsId", Item.ViewReference.SettingsId);
+            builder.AddAttribute(sequence++, "HideChartControls", true);
+            builder.AddAttribute(sequence++, "DataOnly", Item.ViewReference.ViewType == RgfDashboardViewType.ChartData);
+            builder.AddAttribute(sequence++, "ResizeHostId", _resizeHostId);
+            builder.CloseComponent();
+        };
+    }
+
+    private Task OnLayoutCommittedAsync()
+    {
+        if (_entityParameters == null
+            || !_managerInitialized
+            || _currentViewType is not (RgfDashboardViewType.Chart or RgfDashboardViewType.ChartData))
+        {
+            return Task.CompletedTask;
+        }
+
+        return _entityParameters.ChartParameters.EventDispatcher.RaiseEventAsync(RgfChartEventKind.LayoutCommitted, this);
+    }
+
+    public void Dispose()
+    {
+        ResetRuntimeState();
+    }
+
+    private void ResetRuntimeState()
+    {
+        _entityParameters?.UnsubscribeFromAll(this);
+        _entityParameters = null;
+        _entityComponent = null;
+        _chartComponent = null;
+        _managerInitialized = false;
+        _lastLayoutCommitVersion = LayoutCommitVersion;
+        _hasTechnicalError = false;
+    }
+}

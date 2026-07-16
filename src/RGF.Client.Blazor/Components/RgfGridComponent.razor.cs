@@ -41,7 +41,6 @@ public partial class RgfGridComponent : RgfDataComponentBase
         var param = new RgfMenuParameters()
         {
             MenuItems = menu,
-            Navbar = false,
             OnMenuItemSelect = OnHeaderMenuCommand,
             ContextMenuPosition = menuPosition,
             OnMouseLeave = () =>

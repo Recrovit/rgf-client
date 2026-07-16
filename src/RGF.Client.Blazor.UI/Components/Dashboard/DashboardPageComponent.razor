@@ -1,0 +1,600 @@
+@using Microsoft.JSInterop
+@using Recrovit.RecroGridFramework.Client.Blazor.Components.Dashboard
+@using Recrovit.RecroGridFramework.Client.Services.Dashboard
+
+@if (_isCatalogLoading)
+{
+    <div class="rgf-dashboard-page-status">
+        <SpinnerComponent Status="@RecroDict.GetRgfUiDashboard("LoadingDashboards")" />
+    </div>
+}
+else
+{
+    <div class="rgf-dashboard-page">
+        <div class="rgf-dashboard-page-toolbar p-2">
+            <div class="rgf-dashboard-page-toolbar-content d-flex flex-wrap align-items-center gap-2">
+                <div class="rgf-dashboard-page-toolbar-actions d-flex flex-wrap align-items-end gap-2">
+                    <RgfComboBox TValue="int?"
+                                 @key="_dashboardSelectorRenderKey"
+                                 Value="_selectedDashboardId"
+                                 ValueExpression="() => _selectedDashboardId"
+                                 ValueChanged="OnSelectedDashboardChangedAsync"
+                                 DataSource="_dashboardOptions"
+                                 IncludeEmptyItem="true"
+                                 Width="16rem" />
+                    @if (!_isMobileEditBlocked)
+                    {
+                        <RgfButton IconName="bi-plus-lg" CssClass="btn-outline-secondary"
+                                   Tooltip="@RecroDict.GetRgfUiDashboard("NewDashboard")"
+                                   Disabled="@(!CanCreateDashboard)"
+                                   OnClick="CreateDashboardAsync" />
+                        <RgfButton IconName="bi-copy" CssClass="btn-outline-secondary"
+                                   Tooltip="@RecroDict.GetRgfUiDashboard("CloneDashboard")"
+                                   Disabled="@(!CanCloneDashboard)"
+                                   OnClick="CloneDashboardAsync" />
+                        <RgfButton IconName="bi-pencil" CssClass="@(_isDesignerOpen ? "btn-success" : "btn-outline-secondary")"
+                                   Tooltip="@RecroDict.GetRgfUiDashboard("EditDashboard")"
+                                   Disabled="@(!CanEditDashboard)"
+                                   OnClick="EditDashboardAsync" />
+                    }
+                </div>
+            </div>
+        </div>
+
+        @if (!string.IsNullOrEmpty(_errorMessage))
+        {
+            <div class="rgf-dashboard-page-status text-danger">@_errorMessage</div>
+        }
+        else if (_isDashboardLoading)
+        {
+            <div class="rgf-dashboard-page-status">
+                <SpinnerComponent Status="@RecroDict.GetRgfUiDashboard("LoadingDashboard")" />
+            </div>
+        }
+        else if (_isDesignerOpen && _editorDashboard != null)
+        {
+            <RgfDynamicDialog @ref="_dynamicDialog" />
+            <DashboardDesignerComponent @key="_designerRenderKey" Parameters="_designerParameters" />
+        }
+        else if (_dashboard != null)
+        {
+            <RgfDashboardComponent Dashboard="_dashboard" />
+        }
+    </div>
+}
+
+@inject IRecroSecService _recroSec
+@inject IRecroDictService RecroDict
+@inject IRgfApiService ApiService
+@inject IJSRuntime JsRuntime
+@inject ILogger<DashboardPageComponent> Logger
+@implements IAsyncDisposable
+@code {
+    private const double MobileEditMaxWidth = 767.98;
+
+    private List<KeyValuePair<int?, string>> _dashboardOptions = [];
+    private RgfDashboardDefinition? _dashboard;
+    private RgfDashboardDefinition? _editorDashboard;
+    private RgfDashboardDesignerParameters _designerParameters = new();
+    private RgfDynamicDialog _dynamicDialog = null!;
+    private DotNetObjectReference<DashboardPageComponent>? _viewportMonitorReference;
+    private int? _selectedDashboardId;
+    private bool _isCatalogLoading = true;
+    private bool _isDashboardLoading;
+    private bool _isDesignerOpen;
+    private bool _isMobileEditBlocked;
+    private bool _isSaving;
+    private bool _isDeleting;
+    private bool _isDirty;
+    private bool _isDashboardNameEditable;
+    private bool _isPublicDashboardSettingAllowed;
+    private int _dashboardSelectorRenderKey;
+    private int _designerRenderKey;
+    private string? _errorMessage;
+
+    private enum CatalogSelectionMode
+    {
+        Default = 0,
+        ForceNoSelection = 1
+    }
+
+    private string DashboardName => _editorDashboard?.Name ?? string.Empty;
+
+    private bool CanCreateDashboard => !_isMobileEditBlocked;
+
+    private bool CanSave
+        => _isDesignerOpen
+            && _editorDashboard != null
+            && _editorDashboard.IsReadonly != true
+            && !_isSaving
+            && !string.IsNullOrWhiteSpace(DashboardName)
+            && _isDirty;
+
+    private bool CanDelete
+        => _isDesignerOpen
+            && _editorDashboard?.DashboardId > 0
+            && _editorDashboard.IsReadonly != true
+            && !_isSaving
+            && !_isDeleting;
+
+    private bool CanCloneDashboard => !_isMobileEditBlocked && _dashboard != null && !_isDashboardLoading;
+
+    private bool CanEditDashboard => !_isMobileEditBlocked && _dashboard != null && _dashboard.IsReadonly != true && !_isDashboardLoading;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await base.OnInitializedAsync();
+
+        await RgfDashboardDefinitionHelper.InitializedAsync(RecroDict, _recroSec);
+
+        await LoadDashboardCatalogAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await base.OnAfterRenderAsync(firstRender);
+
+        if (!firstRender)
+        {
+            return;
+        }
+
+        _viewportMonitorReference = DotNetObjectReference.Create(this);
+
+        try
+        {
+            _isMobileEditBlocked = await JsRuntime.InvokeAsync<bool>(
+                $"{RGFClientBlazorUIConfiguration.JsBlazorUiNamespace}.Dashboard.initializeViewportMonitor",
+                _viewportMonitorReference,
+                MobileEditMaxWidth);
+        }
+        catch (InvalidOperationException)
+        {
+            return;
+        }
+        catch (JSDisconnectedException)
+        {
+            return;
+        }
+
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task LoadDashboardCatalogAsync(int? preferredDashboardId = null, RgfDashboardDefinition? preferredDashboard = null, CatalogSelectionMode selectionMode = CatalogSelectionMode.Default)
+    {
+        _isCatalogLoading = true;
+        _errorMessage = null;
+        await InvokeAsync(StateHasChanged);
+
+        try
+        {
+            var response = await ApiService.GetDashboardCatalogAsync();
+            if (response.Success)
+            {
+                ApplyCatalogResult(response.Result?.Result, preferredDashboardId, preferredDashboard, selectionMode);
+            }
+            else
+            {
+                _errorMessage = response.ErrorMessage;
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Unable to load dashboards.");
+            _errorMessage = ex.Message;
+        }
+        finally
+        {
+            _isCatalogLoading = false;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private Task CreateDashboardAsync(MouseEventArgs _)
+    {
+        _errorMessage = null;
+        _selectedDashboardId = null;
+        _dashboard = null;
+        ResetEditorState(RgfDashboardDefinitionHelper.CreateLocalDashboard(), isDirty: true, isNameEditable: true);
+        _isDesignerOpen = true;
+        ConfigureDesigner();
+        return Task.CompletedTask;
+    }
+
+    private Task CloneDashboardAsync(MouseEventArgs _)
+    {
+        if (!CanCloneDashboard || _dashboard == null)
+        {
+            return Task.CompletedTask;
+        }
+
+        var clonedDashboard = _dashboard.CreateClone();
+        clonedDashboard.Name = null;
+        _errorMessage = null;
+        _selectedDashboardId = null;
+        _dashboard = null;
+        ResetEditorState(clonedDashboard, isDirty: true, isNameEditable: true);
+        _isDesignerOpen = true;
+        ConfigureDesigner();
+        return Task.CompletedTask;
+    }
+
+    private Task EditDashboardAsync(MouseEventArgs _)
+    {
+        if (!CanEditDashboard || _dashboard == null)
+        {
+            return Task.CompletedTask;
+        }
+
+        if (_isDesignerOpen && !_isDirty)
+        {
+            _isDesignerOpen = false;
+            ConfigureDesigner();
+            return Task.CompletedTask;
+        }
+
+        _errorMessage = null;
+        ResetEditorState(_dashboard, isDirty: false, isNameEditable: false);
+        _isDesignerOpen = true;
+        ConfigureDesigner();
+        return Task.CompletedTask;
+    }
+
+    private async Task OnSelectedDashboardChangedAsync(int? dashboardId)
+    {
+        _selectedDashboardId = dashboardId;
+        _errorMessage = null;
+        _isDesignerOpen = false;
+
+        if (dashboardId is > 0)
+        {
+            await LoadDashboardAsync(dashboardId.Value);
+            return;
+        }
+
+        _dashboard = null;
+        ResetEditorState(null, isDirty: false);
+    }
+
+    private Task OnDashboardEditedAsync(RgfDashboardDefinition dashboard)
+    {
+        _editorDashboard = dashboard;
+        ConfigureDesigner();
+        return Task.CompletedTask;
+    }
+
+    private Task OnDesignerDirtyStateChangedAsync(bool isDirty)
+    {
+        _isDirty = isDirty;
+        ConfigureDesigner();
+        return Task.CompletedTask;
+    }
+
+    private async Task SaveDashboardAsync()
+    {
+        if (!CanSave || _editorDashboard == null)
+        {
+            return;
+        }
+
+        _isSaving = true;
+        _errorMessage = null;
+        ConfigureDesigner();
+
+        try
+        {
+            var payload = _editorDashboard.DeepCopy() ?? RgfDashboardDefinitionHelper.CreateLocalDashboard();
+            payload.Normalize();
+
+            var response = await ApiService.SaveDashboardAsync(payload);
+            if (response.Success)
+            {
+                var normalizedDashboard = NormalizeDashboardDefinition(response.Result?.Result);
+                if (TryValidateDashboardDefinition(normalizedDashboard, "dashboard save response"))
+                {
+                    _dashboard = normalizedDashboard;
+                    ResetEditorState(_dashboard, isDirty: false);
+                    _selectedDashboardId = _dashboard?.DashboardId > 0 ? _dashboard.DashboardId : null;
+                    _isDesignerOpen = false;
+                    await LoadDashboardCatalogAsync(_selectedDashboardId, _dashboard);
+                }
+                else
+                {
+                    _dashboard = null;
+                    _errorMessage = null;
+                }
+            }
+            else
+            {
+                _errorMessage = response.ErrorMessage;
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Unable to save dashboard.");
+            _errorMessage = ex.Message;
+        }
+        finally
+        {
+            _isSaving = false;
+            ConfigureDesigner();
+        }
+    }
+
+    private Task RequestDeleteDashboardAsync()
+    {
+        if (!CanDelete || _editorDashboard == null)
+        {
+            return Task.CompletedTask;
+        }
+
+        var titleSuffix = string.IsNullOrWhiteSpace(_editorDashboard.Name)
+            ? RecroDict.GetRgfUiDashboard("DashboardNameFallback", _editorDashboard.DashboardId)
+            : _editorDashboard.Name;
+
+        _dynamicDialog.PromptDeletionConfirmation(DeleteDashboardAsync, titleSuffix);
+        return Task.CompletedTask;
+    }
+
+    private async Task DeleteDashboardAsync()
+    {
+        if (_editorDashboard == null || _editorDashboard.DashboardId <= 0 || !CanDelete)
+        {
+            return;
+        }
+
+        _isDeleting = true;
+        _errorMessage = null;
+        ConfigureDesigner();
+        await InvokeAsync(StateHasChanged);
+
+        try
+        {
+            var response = await ApiService.DeleteDashboardAsync(_editorDashboard);
+            if (response.Success)
+            {
+                ClearDashboardSelection();
+                await InvokeAsync(StateHasChanged);
+                await LoadDashboardCatalogAsync(selectionMode: CatalogSelectionMode.ForceNoSelection);
+            }
+            else
+            {
+                _errorMessage = response.ErrorMessage;
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Unable to delete dashboard {DashboardId}.", _editorDashboard.DashboardId);
+            _errorMessage = ex.Message;
+            await InvokeAsync(StateHasChanged);
+        }
+        finally
+        {
+            _isDeleting = false;
+            ConfigureDesigner();
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private void ConfigureDesigner()
+    {
+        _designerParameters = new()
+        {
+            Dashboard = _editorDashboard ?? RgfDashboardDefinitionHelper.CreateLocalDashboard(),
+            DashboardEdited = EventCallback.Factory.Create<RgfDashboardDefinition>(this, OnDashboardEditedAsync),
+            DirtyStateChanged = EventCallback.Factory.Create<bool>(this, OnDesignerDirtyStateChangedAsync),
+            SaveRequested = EventCallback.Factory.Create(this, SaveDashboardAsync),
+            DeleteRequested = EventCallback.Factory.Create(this, RequestDeleteDashboardAsync),
+            CanSave = CanSave,
+            IsSaving = _isSaving,
+            CanDelete = CanDelete,
+            IsDeleting = _isDeleting,
+            ReadOnly = _editorDashboard?.IsReadonly == true,
+            IsNameEditable = _isDashboardNameEditable,
+            IsRoleSettingAllowed = _isPublicDashboardSettingAllowed
+        };
+    }
+
+    private async Task LoadDashboardAsync(int dashboardId)
+    {
+        _isDashboardLoading = true;
+        _errorMessage = null;
+
+        try
+        {
+            var response = await ApiService.GetDashboardAsync(dashboardId);
+            if (response.Success)
+            {
+                var normalizedDashboard = NormalizeDashboardDefinition(response.Result?.Result);
+                if (TryValidateDashboardDefinition(normalizedDashboard, "dashboard load response"))
+                {
+                    _dashboard = normalizedDashboard;
+                    ResetEditorState(_dashboard, isDirty: false);
+                }
+                else
+                {
+                    _dashboard = null;
+                    ResetEditorState(null, isDirty: false);
+                }
+            }
+            else if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+            {
+                _dashboard = null;
+                ResetEditorState(null, isDirty: false);
+            }
+            else
+            {
+                _errorMessage = response.ErrorMessage;
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Unable to load dashboard {DashboardId}.", dashboardId);
+            _errorMessage = ex.Message;
+        }
+        finally
+        {
+            _isDashboardLoading = false;
+        }
+    }
+
+    private void ApplyCatalogResult(RgfDashboardCatalogResult? result, int? preferredDashboardId, RgfDashboardDefinition? preferredDashboard, CatalogSelectionMode selectionMode)
+    {
+        result ??= new();
+        _isPublicDashboardSettingAllowed = result.IsPublicDashboardSettingAllowed;
+        _dashboardOptions = result.Dashboards?
+            .Select(item => new KeyValuePair<int?, string>(item.DashboardId, string.IsNullOrWhiteSpace(item.Name) ? RecroDict.GetRgfUiDashboard("DashboardNameFallback", item.DashboardId) : item.Name.Trim()))
+            .ToList() ?? [];
+
+        _dashboardSelectorRenderKey++;
+
+        if (selectionMode == CatalogSelectionMode.ForceNoSelection)
+        {
+            ClearDashboardSelection();
+            return;
+        }
+
+        var normalizedPreferredDashboard = NormalizeDashboardDefinition(preferredDashboard);
+        if (normalizedPreferredDashboard != null && !TryValidateDashboardDefinition(normalizedPreferredDashboard, "preferred dashboard catalog state"))
+        {
+            normalizedPreferredDashboard = null;
+        }
+
+        var normalizedSelectedDashboard = NormalizeDashboardDefinition(result.SelectedDashboard);
+        if (normalizedSelectedDashboard != null && !TryValidateDashboardDefinition(normalizedSelectedDashboard, "selected dashboard catalog state"))
+        {
+            normalizedSelectedDashboard = null;
+        }
+        var resolvedDashboardId = ResolveSelectedDashboardId(preferredDashboardId, normalizedPreferredDashboard, normalizedSelectedDashboard);
+
+        if (resolvedDashboardId.HasValue && _dashboardOptions.All(option => option.Key != resolvedDashboardId))
+        {
+            resolvedDashboardId = null;
+            normalizedPreferredDashboard = null;
+            normalizedSelectedDashboard = null;
+        }
+
+        _selectedDashboardId = resolvedDashboardId;
+        _dashboard = normalizedPreferredDashboard;
+
+        if (_dashboard == null && normalizedSelectedDashboard?.DashboardId > 0 && normalizedSelectedDashboard.DashboardId == _selectedDashboardId)
+        {
+            _dashboard = normalizedSelectedDashboard;
+        }
+
+        if (_dashboard == null && _selectedDashboardId != 0)
+        {
+            ResetEditorState(null, isDirty: false);
+        }
+        else if (_dashboard != null)
+        {
+            ResetEditorState(_dashboard, isDirty: false);
+        }
+    }
+
+    private void ClearDashboardSelection()
+    {
+        _selectedDashboardId = null;
+        _dashboard = null;
+        _isDesignerOpen = false;
+        _errorMessage = null;
+        ResetEditorState(null, isDirty: false);
+        _dashboardSelectorRenderKey++;
+    }
+
+    private static int? ResolveSelectedDashboardId(int? preferredDashboardId, RgfDashboardDefinition? preferredDashboard, RgfDashboardDefinition? selectedDashboard)
+    {
+        if (preferredDashboardId is > 0)
+        {
+            return preferredDashboardId;
+        }
+
+        if (preferredDashboard?.DashboardId > 0)
+        {
+            return preferredDashboard.DashboardId;
+        }
+
+        if (selectedDashboard?.DashboardId > 0)
+        {
+            return selectedDashboard.DashboardId;
+        }
+
+        return null;
+    }
+
+    private void ResetEditorState(RgfDashboardDefinition? dashboard, bool isDirty, bool isNameEditable = false)
+    {
+        _editorDashboard = RgfDashboardDefinitionHelper.CreateNormalizedCopy(dashboard);
+        _isDirty = isDirty;
+        _isDashboardNameEditable = isNameEditable;
+        _designerRenderKey++;
+        ConfigureDesigner();
+    }
+
+    private static RgfDashboardDefinition? NormalizeDashboardDefinition(RgfDashboardDefinition? dashboard)
+    {
+        if (dashboard == null)
+        {
+            return null;
+        }
+
+        return RgfDashboardDefinitionHelper.CreateNormalizedCopy(dashboard);
+    }
+
+    private bool TryValidateDashboardDefinition(RgfDashboardDefinition? dashboard, string context)
+    {
+        var validationResult = RgfDashboardLayoutValidator.Validate(dashboard);
+        if (!validationResult.IsValid)
+        {
+            Logger.LogWarning(
+                "Dashboard definition validation failed during {Context}. DashboardId={DashboardId}, Issues={Issues}.",
+                context,
+                dashboard?.DashboardId,
+                validationResult.Issues.Select(issue => new
+                {
+                    issue.Code,
+                    issue.Message,
+                    issue.PaneId,
+                    issue.DashboardItemId
+                }).ToArray());
+        }
+
+        return validationResult.IsValid;
+    }
+
+    [JSInvokable]
+    public Task OnViewportEditModeChanged(bool isBlocked)
+    {
+        if (_isMobileEditBlocked == isBlocked)
+        {
+            return Task.CompletedTask;
+        }
+
+        _isMobileEditBlocked = isBlocked;
+        return InvokeAsync(StateHasChanged);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_viewportMonitorReference == null)
+        {
+            return;
+        }
+
+        try
+        {
+            await JsRuntime.InvokeVoidAsync(
+                $"{RGFClientBlazorUIConfiguration.JsBlazorUiNamespace}.Dashboard.destroyViewportMonitor",
+                _viewportMonitorReference);
+        }
+        catch (InvalidOperationException)
+        {
+        }
+        catch (JSDisconnectedException)
+        {
+        }
+
+        _viewportMonitorReference.Dispose();
+    }
+}

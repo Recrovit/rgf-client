@@ -9,6 +9,7 @@ using Recrovit.RecroGridFramework.Abstraction.Contracts.API;
 using Recrovit.RecroGridFramework.Abstraction.Infrastructure.Events;
 using Recrovit.RecroGridFramework.Abstraction.Infrastructure.Security;
 using Recrovit.RecroGridFramework.Client.Handlers;
+using System.Collections.ObjectModel;
 using System.Data;
 using System.Security.Claims;
 
@@ -29,6 +30,7 @@ internal class RecroSecService : IRecroSecService, IDisposable
     private readonly NavigationManager _navigationMaanger;
     private readonly AuthenticationStateProvider? _authenticationStateProvider;
     private Task? _authenticationStateInitializationTask;
+    private static readonly IReadOnlyDictionary<string, string> EmptyRoles = new ReadOnlyDictionary<string, string>(new Dictionary<string, string>(StringComparer.Ordinal));
 
     public RecroSecService(IConfiguration configuration, ILogger<RecroSecService> logger, IRgfApiService apiService, IServiceProvider serviceProvider, IRgfAccessTokenAccessor accessTokenAccessor)
     {
@@ -94,7 +96,7 @@ internal class RecroSecService : IRecroSecService, IDisposable
                     var res = await SetLangAsync(language);
                     if (res)
                     {
-                        _ = await _apiService.GetUserStateAsync(new() { { "language", language } });//save language setting
+                        _ = await _apiService.SaveUserStateSettingsAsync(new() { { RgfUserStateSettingKeys.Language, language } });
                     }
                 }
             }
@@ -102,11 +104,13 @@ internal class RecroSecService : IRecroSecService, IDisposable
         return prev;
     }
 
-    public bool IsAdmin { get; private set; }
+    public bool IsAdmin => UserState.IsAdmin;
 
-    public Dictionary<string, string> Roles { get; private set; } = [];
+    public IReadOnlyDictionary<string, string> Roles => UserState.Roles ?? EmptyRoles;
 
     public ClaimsPrincipal CurrentUser { get; private set; } = new();
+
+    public RgfUserState UserState { get; private set; } = CreateDefaultUserState();
 
     public Task<string?> GetAccessTokenAsync() => _accessTokenAccessor.GetAccessTokenAsync();
 
@@ -156,12 +160,10 @@ internal class RecroSecService : IRecroSecService, IDisposable
     {
         try
         {
+            var previousUserState = UserState;
             var previousUserName = UserName;
             var previousIsAuthenticated = IsAuthenticated;
-            var previousIsAdmin = IsAdmin;
-            var previousRoleSignature = GetRoleSignature(Roles);
-            IsAdmin = false;
-            Roles = [];
+            var previousRoleSignature = GetRoleSignature(previousUserState.Roles ?? EmptyRoles);
             var authenticationState = await stateTask;
             CurrentUser = authenticationState.User ?? new();
             //var roles = CurrentUser.FindFirst("role")?.Value ?? CurrentUser.FindFirst("roles")?.Value : "?";
@@ -171,12 +173,8 @@ internal class RecroSecService : IRecroSecService, IDisposable
                 var resp = await _apiService.GetUserStateAsync();
                 if (resp.Success && resp.Result.IsValid)
                 {
-                    ApplyUserState(resp.Result);
-                    IsAdmin = resp.Result.IsAdmin;
-                    if (resp.Result.Roles != null)
-                    {
-                        Roles = resp.Result.Roles;
-                    }
+                    ApplyUserIdentityState(resp.Result);
+                    UpdateUserStateSnapshot(resp.Result);
                     if (!string.IsNullOrEmpty(resp.Result.Language))
                     {
                         await SetLangAsync(resp.Result.Language);
@@ -194,7 +192,7 @@ internal class RecroSecService : IRecroSecService, IDisposable
 
             var currentRoleSignature = GetRoleSignature(Roles);
             if (previousIsAuthenticated != IsAuthenticated
-                || previousIsAdmin != IsAdmin
+                || previousUserState.IsAdmin != IsAdmin
                 || !string.Equals(previousUserName, UserName, StringComparison.Ordinal)
                 || !string.Equals(previousRoleSignature, currentRoleSignature, StringComparison.Ordinal))
             {
@@ -269,16 +267,64 @@ internal class RecroSecService : IRecroSecService, IDisposable
 
     public EventDispatcher<EventArgs> AuthenticationStateChanged { get; } = new();
 
+    public EventDispatcher<DataEventArgs<RgfUserState>> UserStateChangedEvent { get; } = new();
+
     public EventDispatcher<DataEventArgs<string>> LanguageChangedEvent { get; } = new();
+
+    public async Task<bool> UpdateUserStateSettingsAsync(IDictionary<string, string?> settings)
+    {
+        var response = await _apiService.SaveUserStateSettingsAsync(new Dictionary<string, string?>(settings));
+        if (!response.Success)
+        {
+            return false;
+        }
+
+        var currentState = RgfUserState.DeepCopy(UserState)!;
+        var updatedSettings = currentState.Settings != null
+            ? new Dictionary<string, string>(currentState.Settings, StringComparer.Ordinal)
+            : new Dictionary<string, string>(StringComparer.Ordinal);
+        var updatedLanguage = currentState.Language;
+
+        foreach (var setting in settings)
+        {
+            if (string.IsNullOrWhiteSpace(setting.Value))
+            {
+                updatedSettings.Remove(setting.Key);
+                if (setting.Key == RgfUserStateSettingKeys.Language)
+                {
+                    updatedLanguage = null;
+                }
+                continue;
+            }
+
+            updatedSettings[setting.Key] = setting.Value;
+            if (setting.Key == RgfUserStateSettingKeys.Language)
+            {
+                updatedLanguage = setting.Value;
+            }
+        }
+
+        UpdateUserStateSnapshot(new RgfUserState()
+        {
+            IsValid = currentState.IsValid,
+            IsAdmin = currentState.IsAdmin,
+            Language = updatedLanguage,
+            UserName = currentState.UserName,
+            IsNewlyCreated = currentState.IsNewlyCreated,
+            Roles = currentState.Roles,
+            Settings = updatedSettings.Count == 0 ? null : updatedSettings
+        });
+        return true;
+    }
 
     private string? _userLanguage;
 
     private MemoryCache _recrosSecCache { get; } = new MemoryCache(new MemoryCacheOptions());
 
-    private static string GetRoleSignature(Dictionary<string, string> roles)
+    private static string GetRoleSignature(IReadOnlyDictionary<string, string> roles)
         => string.Join("|", roles.OrderBy(pair => pair.Key, StringComparer.Ordinal).Select(pair => $"{pair.Key}={pair.Value}"));
 
-    private void ApplyUserState(RgfUserState state)
+    private void ApplyUserIdentityState(RgfUserState state)
     {
         if (RgfClientConfiguration.ApiAuthMode is not (RgfApiAuthMode.ServerProxy or RgfApiAuthMode.ServerProxySsr))
         {
@@ -333,5 +379,36 @@ internal class RecroSecService : IRecroSecService, IDisposable
         }
 
         return new ClaimsIdentity(claims, authenticationType: "ServerProxy");
+    }
+
+    private void UpdateUserStateSnapshot(RgfUserState state)
+    {
+        UserState = NormalizeUserState(state);
+        _ = UserStateChangedEvent.InvokeAsync(new(UserState));
+    }
+
+    private static RgfUserState CreateDefaultUserState()
+    {
+        return new RgfUserState()
+        {
+            IsValid = false,
+            IsAdmin = false,
+            Roles = EmptyRoles
+        };
+    }
+
+    private static RgfUserState NormalizeUserState(RgfUserState state)
+    {
+        var snapshot = RgfUserState.DeepCopy(state) ?? CreateDefaultUserState();
+        return new RgfUserState()
+        {
+            IsValid = snapshot.IsValid,
+            IsAdmin = snapshot.IsAdmin,
+            Language = snapshot.Language,
+            UserName = snapshot.UserName,
+            IsNewlyCreated = snapshot.IsNewlyCreated,
+            Roles = snapshot.Roles ?? EmptyRoles,
+            Settings = snapshot.Settings
+        };
     }
 }

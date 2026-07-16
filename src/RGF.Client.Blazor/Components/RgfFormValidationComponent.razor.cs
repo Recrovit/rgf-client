@@ -118,8 +118,8 @@ public partial class RgfFormValidationComponent : ComponentBase, IRgfFormValidat
                     var data = BaseFormComponent.FormData.DataRec.GetItemData(property.Alias);
                     if (string.IsNullOrEmpty(data.ToString()))
                     {
-                        var message = _recroDict.GetRgfUiString("FieldIsRequired");
-                        AddFieldError(fieldIdentifier, string.Format(message, property.Label), false);
+                        var message = _recroDict.GetRgfUiString("FieldIsRequired", property.Label);
+                        AddFieldError(fieldIdentifier, message, false);
                     }
                 }
                 break;

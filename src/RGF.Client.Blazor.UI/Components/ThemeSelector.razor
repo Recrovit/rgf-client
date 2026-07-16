@@ -1,0 +1,131 @@
+﻿@using Recrovit.RecroGridFramework.Abstraction.Infrastructure.Events
+
+<RgfComboBox TValue="string" CssClass="ms-1" Width="auto" @bind-Value="Size" OnValueChanging="OnSizeChange" DataSource="_sizes" />
+<RgfComboBox TValue="string" CssClass="ms-1" Width="auto" @bind-Value="Theme" OnValueChanging="OnThemeChange" DataSource="_themes" />
+
+@inject IJSRuntime _jsRuntime
+@inject IRecroSecService _recroSec
+@implements IDisposable
+@code {
+
+    [Parameter]
+    public string Theme { get; set; } = "light";
+
+    [Parameter]
+    public string Size { get; set; } = "";
+
+    private Dictionary<string, string> _themes = new() {
+        { "light", "Light" },
+        { "dark", "Dark" }
+    };
+
+    private Dictionary<string, string> _sizes = new() {
+        { "rgf-small-ui", "Small" },
+        { "", "Default" },
+        { "rgf-large-ui", "Large" },
+    };
+
+    private bool _settingsInitialized;
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+
+        _recroSec.UserStateChangedEvent.Subscribe(OnUserStateChangedAsync);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await base.OnAfterRenderAsync(firstRender);
+
+        if (firstRender)
+        {
+            await ApplyUserState(_recroSec.UserState);
+            StateHasChanged();
+        }
+    }
+
+    private async Task OnThemeChange(ChangeEventArgs<string> args)
+    {
+        if (_themes.TryGetValue(args.NewValue, out var themeName))
+        {
+            await JsSetTheme(args.NewValue);
+            await _recroSec.UpdateUserStateSettingsAsync(new Dictionary<string, string?>() { { RgfUserStateSettingKeys.Theme, string.IsNullOrWhiteSpace(themeName) ? null : themeName } });
+        }
+    }
+
+    private async Task OnSizeChange(ChangeEventArgs<string> args)
+    {
+        if (_sizes.TryGetValue(args.NewValue, out var sizeName))
+        {
+            await JsSetSize(args.OldValue, args.NewValue);
+            await _recroSec.UpdateUserStateSettingsAsync(new Dictionary<string, string?>() { { RgfUserStateSettingKeys.Size, string.IsNullOrWhiteSpace(sizeName) ? null : sizeName } });
+        }
+    }
+
+    private async Task OnUserStateChangedAsync(DataEventArgs<RgfUserState> args)
+    {
+        await ApplyUserState(args.Value);
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task ApplyUserState(RgfUserState userState)
+    {
+        if (userState.Settings == null)
+        {
+            return;
+        }
+
+        if (!_settingsInitialized)
+        {
+            _settingsInitialized = true;
+            try
+            {
+                var initSettings = await _jsRuntime.InvokeAsync<ThemeSettings>(RGFClientBlazorUIConfiguration.JsBlazorUiNamespace + ".SetTheme.getSettings", _themes.Keys.ToArray(), _sizes.Keys.ToArray());
+
+                if (_themes.ContainsKey(initSettings.Theme))
+                {
+                    Theme = initSettings.Theme;
+                }
+                if (_sizes.ContainsKey(initSettings.Size))
+                {
+                    Size = initSettings.Size;
+                }
+            }
+            catch (InvalidOperationException) { }
+            catch (JSDisconnectedException) { }
+
+        }
+
+        if (userState.Settings.TryGetValue(RgfUserStateSettingKeys.Theme, out var themeName) && !string.IsNullOrEmpty(themeName))
+        {
+            var theme = _themes.FirstOrDefault(e => e.Value == themeName).Key;
+            Theme = theme;
+            await JsSetTheme(theme);
+        }
+
+        if (userState.Settings.TryGetValue(RgfUserStateSettingKeys.Size, out var sizeName) && !string.IsNullOrEmpty(sizeName))
+        {
+            var size = _sizes.FirstOrDefault(e => e.Value == sizeName).Key;
+            var oldSize = Size;
+            Size = size;
+            await JsSetSize(oldSize, size);
+        }
+    }
+
+    private ValueTask JsSetTheme(string theme) => _jsRuntime.InvokeVoidAsync(RGFClientBlazorUIConfiguration.JsBlazorUiNamespace + ".SetTheme.setTheme", theme);
+
+    private ValueTask JsSetSize(string? oldSize, string size) => _jsRuntime.InvokeVoidAsync(RGFClientBlazorUIConfiguration.JsBlazorUiNamespace + ".SetTheme.setSize", oldSize ?? string.Empty, size);
+
+    public void Dispose()
+    {
+        _recroSec.UserStateChangedEvent.Unsubscribe(this);
+    }
+
+    private sealed class ThemeSettings
+    {
+        public string Theme { get; set; } = string.Empty;
+
+        public string Size { get; set; } = string.Empty;
+    }
+}

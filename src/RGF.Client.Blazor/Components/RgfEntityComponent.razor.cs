@@ -108,11 +108,19 @@ public partial class RgfEntityComponent : ComponentBase, IDisposable
         var gridRequest = RgfGridRequest.Create(EntityParameters);
         gridRequest.EntityName = EntityParameters.EntityName;
         gridRequest.Skeleton = true;
+        gridRequest.SkipInitialData = EntityParameters.SkipInitialDataLoad;
         gridRequest.SelectParam = EntityParameters.SelectParam;
         gridRequest.EntityKey = EntityParameters.FormParameters?.FormViewKey.EntityKey;
         gridRequest.ListParam = EntityParameters.ListParam;
         gridRequest.FilterParent = EntityParameters.FilterParent;
         gridRequest.CustomParams = EntityParameters.CustomParameters;
+        if (EntityParameters.GridParameters?.InitialGridSettingsId.HasValue == true)
+        {
+            gridRequest.GridSettings = new RgfGridSettings
+            {
+                GridSettingsId = EntityParameters.GridParameters.InitialGridSettingsId
+            };
+        }
 
         Manager = new RgManager(gridRequest, _serviceProvider);
         Manager.RefreshEntity += Refresh;

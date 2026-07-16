@@ -45,7 +45,10 @@ Layout/MainLayout.razor
 @inherits LayoutComponentBase
 
 <RgfRootComponent >
-    <MenuComponent MenuParameters="new RgfMenuParameters() { MenuId = 10, Navbar = true }" />
+    <NavbarComponent MenuParameters="new RgfMenuParameters() { MenuId = 10 }"
+                     BrandText="Application"
+                     ShowThemeSelector="true"
+                     ShowLanguageSelector="true" />
 
     @Body
 

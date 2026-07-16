@@ -604,14 +604,14 @@ public class RgManager : IRgManager
         {
             if (count == items.Count())
             {
-                var msg = string.Format(_recroDict.GetRgfUiString("DelSuccess"), count);
+                var msg = _recroDict.GetRgfUiString("DelSuccess", count);
                 var toast = RgfToastEventArgs.CreateActionEvent(_recroDict.GetRgfUiString("Delete"), EntityDesc.Title, msg, RgfToastType.Success);
                 await ToastManager.RaiseEventAsync(toast, this);
             }
             else
             {
                 var messages = new RgfCoreMessages();
-                var msg = string.Format(_recroDict.GetRgfUiString("DelIncomplete"), count, items.Count() - count);
+                var msg = _recroDict.GetRgfUiString("DelIncomplete", count, items.Count() - count);
                 messages.Error = new() { { "BulkDelete", msg } };
                 await BroadcastMessages(messages, this);
             }

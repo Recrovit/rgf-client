@@ -7,7 +7,7 @@ using System.Collections.Concurrent;
 
 namespace Recrovit.RecroGridFramework.Client.Services;
 
-internal class RecroDictService : IRecroDictService
+internal class RecroDictService : IRecroDictService, IRecroDictFormatter
 {
     private readonly ILogger _logger;
     private readonly IRgfApiService _apiService;
@@ -81,6 +81,32 @@ internal class RecroDictService : IRecroDictService
             return "RecroDict has not been initialized";
         }
         return IRecroDictServiceExtension.GetItem(_rgfUi, resourceKey, $"RGF.UI.{resourceKey}");
+    }
+
+    public string GetRgfUiString(string resourceKey, params object[] args) => FormatResource("RGF.UI", resourceKey, GetRgfUiString(resourceKey), args);
+
+    public string FormatResource(string? scope, string resourceKey, string value, params object[] args)
+    {
+        var formatResult = RecroDictFormatHelper.Format(value, args);
+        if (!formatResult.ParameterCountMatches)
+        {
+            _logger.LogError("RecroDict formatting argument count mismatch. Scope:{Scope} ResourceKey:{ResourceKey} Expected:{ExpectedArgumentCount} Actual:{ActualArgumentCount}",
+                scope,
+                resourceKey,
+                formatResult.ExpectedArgumentCount,
+                formatResult.ActualArgumentCount);
+        }
+
+        if (!formatResult.Succeeded)
+        {
+            _logger.LogError(formatResult.Exception,
+                "RecroDict formatting failed. Scope:{Scope} ResourceKey:{ResourceKey} Template:{Template}",
+                scope,
+                resourceKey,
+                value);
+        }
+
+        return formatResult.Value;
     }
 }
 

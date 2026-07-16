@@ -1,0 +1,98 @@
+.rgf-dashboard-group {
+    display: flex;
+    flex: 1 1 auto;
+    align-self: stretch;
+    position: relative;
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    align-items: stretch;
+}
+
+.rgf-dashboard-group-empty {
+    align-items: stretch;
+}
+
+.rgf-dashboard-group-horizontal {
+    flex-direction: row;
+}
+
+.rgf-dashboard-group-vertical {
+    flex-direction: column;
+}
+
+.rgf-dashboard-group-segment {
+    display: flex;
+    flex: 1 1 0;
+    align-self: stretch;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.rgf-dashboard-group-dragging {
+    user-select: none;
+}
+
+.rgf-dashboard-group-handle {
+    position: relative;
+    flex: 0 0 0.75rem;
+    min-width: 0.75rem;
+    min-height: 0.75rem;
+    background: transparent;
+    touch-action: none;
+}
+
+.rgf-dashboard-group-handle::before {
+    content: "";
+    position: absolute;
+    inset: 0.125rem 0.25rem;
+    border-radius: 999px;
+    background: var(--bs-border-color, #dee2e6);
+    opacity: 0.9;
+    transition: background-color 0.15s ease, opacity 0.15s ease;
+}
+
+.rgf-dashboard-group-handle-interactive:hover::before,
+.rgf-dashboard-group-dragging .rgf-dashboard-group-handle::before {
+    background: var(--bs-primary, #0d6efd);
+    opacity: 1;
+}
+
+.rgf-dashboard-group-horizontal > .rgf-dashboard-group-handle {
+    cursor: ew-resize;
+}
+
+.rgf-dashboard-group-vertical > .rgf-dashboard-group-handle {
+    cursor: ns-resize;
+    width: 100%;
+    min-width: 0;
+}
+
+.rgf-dashboard-group-vertical > .rgf-dashboard-group-handle::before {
+    inset: 0.25rem 0.125rem;
+}
+
+.rgf-dashboard-group-handle[aria-disabled="true"] {
+    cursor: default;
+}
+
+.rgf-dashboard-group-handle[aria-disabled="true"]::before {
+    opacity: 0.65;
+}
+
+.rgf-dashboard-group-drag-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 2147483647;
+    background: transparent;
+}
+
+.rgf-dashboard-group-drag-overlay-horizontal {
+    cursor: ew-resize;
+}
+
+.rgf-dashboard-group-drag-overlay-vertical {
+    cursor: ns-resize;
+}

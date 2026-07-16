@@ -1,0 +1,138 @@
+﻿@using Recrovit.RecroGridFramework.Abstraction.Contracts.API
+@using Recrovit.RecroGridFramework.Client.Blazor.Components.Dashboard
+
+<RgfDashboardGroupResizeComponent Split="Split"
+                                  ParentPaneId="ParentPaneId"
+                                  ContainerElement="_groupElement"
+                                  ResizeEnabled="@(!ReadOnly)"
+                                  OnResizeCommitted="OnResizeCommittedAsync">
+    <ChildContent Context="resize">
+        @if (!resize.HasRenderablePanes)
+        {
+            <div class="rgf-dashboard-designer-group"></div>
+        }
+        else
+        {
+            <div @ref="_groupElement" class="rgf-dashboard-designer-group @(resize.IsVertical ? "rgf-dashboard-designer-group-vertical" : "rgf-dashboard-designer-group-horizontal") @(resize.IsDragging ? "rgf-dashboard-designer-group-dragging" : null)">
+                @for (var i = 0; i < resize.RenderablePanes.Count; i++)
+                {
+                    var splitPane = resize.RenderablePanes[i];
+                    var handleIndex = i;
+
+                    <div class="rgf-dashboard-designer-group-segment"
+                         style="@resize.GetSegmentStyle(splitPane, i)"
+                         data-pane-id="@splitPane.Pane.PaneId"
+                         @key="splitPane.Pane.PaneId">
+                        <DashboardDesignerPaneComponent Pane="splitPane.Pane"
+                                                        ItemIndex="ItemIndex"
+                                                        SessionParams="SessionParams"
+                                                        SelectedPaneId="@SelectedPaneId"
+                                                        OnPaneSelected="OnPaneSelected"
+                                                        OnResizeRequested="OnResizeRequested"
+                                                        ItemRenderKeys="ItemRenderKeys"
+                                                        ReadOnly="ReadOnly" />
+                    </div>
+
+                    if (i < resize.RenderablePanes.Count - 1)
+                    {
+                        <div class="@GetHandleCssClass()"
+                             role="separator"
+                             aria-orientation="@(resize.IsVertical ? "horizontal" : "vertical")"
+                             aria-disabled="@(ReadOnly)"
+                             data-leading-pane-id="@splitPane.Pane.PaneId"
+                             data-trailing-pane-id="@resize.RenderablePanes[handleIndex + 1].Pane.PaneId"
+                             @onpointerdown="resize.GetHandlePointerDownCallback(handleIndex)"
+                             @onpointerdown:preventDefault="true"></div>
+                    }
+                }
+            </div>
+        }
+
+        @if (resize.IsDragging)
+        {
+            <div class="rgf-dashboard-designer-group-drag-overlay @(resize.IsVertical ? "rgf-dashboard-designer-group-drag-overlay-vertical" : "rgf-dashboard-designer-group-drag-overlay-horizontal")"
+                 @onpointermove="resize.OverlayPointerMoveCallback"
+                 @onpointerup="resize.OverlayPointerUpCallback"
+                 @onpointercancel="resize.OverlayPointerUpCallback"
+                 @onpointerleave="resize.OverlayPointerUpCallback"
+                 @onpointerup:preventDefault="true"
+                 @onpointermove:preventDefault="true"></div>
+        }
+    </ChildContent>
+</RgfDashboardGroupResizeComponent>
+
+@code {
+    [Parameter, EditorRequired]
+    public RgfDashboardSplit Split { get; set; } = new();
+
+    [Parameter, EditorRequired]
+    public IReadOnlyDictionary<int, RgfDashboardItem> ItemIndex { get; set; } = new Dictionary<int, RgfDashboardItem>();
+
+    [Parameter]
+    public RgfSessionParams? SessionParams { get; set; }
+
+    [Parameter]
+    public string? ParentPaneId { get; set; }
+
+    [Parameter]
+    public string? SelectedPaneId { get; set; }
+
+    [Parameter]
+    public bool ReadOnly { get; set; }
+
+    [Parameter]
+    public EventCallback<string> OnPaneSelected { get; set; }
+
+    [Parameter]
+    public EventCallback<RgfDashboardGroupResizeRequest> OnResizeRequested { get; set; }
+
+    [Parameter]
+    public IReadOnlyDictionary<int, int> ItemRenderKeys { get; set; } = new Dictionary<int, int>();
+
+    private ElementReference _groupElement;
+    private bool _containerReferenceBound;
+
+    private string GetHandleCssClass()
+        => ReadOnly
+            ? "rgf-dashboard-designer-group-handle"
+            : "rgf-dashboard-designer-group-handle rgf-dashboard-designer-group-handle-interactive";
+
+    private Task OnResizeCommittedAsync(RgfDashboardGroupResizeCommit commit)
+    {
+        if (commit.LeadingIndex < 0
+            || commit.TrailingIndex < 0
+            || Split.Panes == null
+            || commit.LeadingIndex >= Split.Panes.Count
+            || commit.TrailingIndex >= Split.Panes.Count)
+        {
+            return Task.CompletedTask;
+        }
+
+        var leadingPaneId = Split.Panes[commit.LeadingIndex].Pane?.PaneId;
+        var trailingPaneId = Split.Panes[commit.TrailingIndex].Pane?.PaneId;
+        if (string.IsNullOrWhiteSpace(leadingPaneId) || string.IsNullOrWhiteSpace(trailingPaneId))
+        {
+            return Task.CompletedTask;
+        }
+
+        return OnResizeRequested.InvokeAsync(new RgfDashboardGroupResizeRequest
+        {
+            ParentPaneId = ParentPaneId,
+            LeadingPaneId = leadingPaneId,
+            TrailingPaneId = trailingPaneId,
+            LeadingSize = commit.LeadingSize,
+            TrailingSize = commit.TrailingSize
+        });
+    }
+
+    protected override Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && !_containerReferenceBound)
+        {
+            _containerReferenceBound = true;
+            StateHasChanged();
+        }
+
+        return Task.CompletedTask;
+    }
+}

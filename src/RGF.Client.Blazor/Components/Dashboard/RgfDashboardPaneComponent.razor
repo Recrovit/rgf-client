@@ -1,0 +1,125 @@
+@using Recrovit.RecroGridFramework.Abstraction.Contracts.API
+@using Recrovit.RecroGridFramework.Client.Services.Dashboard
+
+@if (HasSplit)
+{
+    <div class="rgf-dashboard-pane rgf-dashboard-pane-split" @key="PaneKey">
+        <div class="rgf-dashboard-pane-content">
+            <RgfDashboardGroupComponent Split="Pane!.Split!"
+                                                ItemIndex="ItemIndex"
+                                                SessionParams="SessionParams"
+                                                EmptyTemplate="EmptyTemplate"
+                                                ParentPaneId="@Pane?.PaneId"
+                                                IsResizable="IsResizable"
+                                                ResizeRequested="ResizeRequested"
+                                                LayoutCommitVersion="LayoutCommitVersion" />
+        </div>
+    </div>
+}
+else if (HasResolvedItem)
+{
+    <div class="rgf-dashboard-pane rgf-dashboard-pane-item" @key="PaneKey">
+        @if (ResolvedItem!.ShowHeader)
+        {
+            <div class="rgf-dashboard-pane-header">
+                <div class="rgf-dashboard-pane-title">
+                    <span class="rgf-dashboard-pane-title-text">@PaneMetadata.DisplayTitle</span>
+                </div>
+            </div>
+        }
+        <div class="rgf-dashboard-pane-content rgf-dashboard-pane-content-item">
+            <RgfDashboardRenderGuard PaneId="@Pane?.PaneId"
+                                     DashboardItemId="@Pane?.DashboardItemId"
+                                     FallbackContent="RenderEmpty()"
+                                     LogMessage="Dashboard pane rendering failed.">
+                <ChildContent>
+                    <RgfDashboardItemComponent @key="ResolvedItem.DashboardItemId"
+                                               Item="ResolvedItem"
+                                               SessionParams="SessionParams"
+                                               LayoutCommitVersion="LayoutCommitVersion" />
+                </ChildContent>
+            </RgfDashboardRenderGuard>
+        </div>
+    </div>
+}
+else
+{
+    <div class="@EmptyPaneCssClass" @key="PaneKey">
+        @RenderEmpty()
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired]
+    public RgfDashboardPane Pane { get; set; } = new();
+
+    [Parameter, EditorRequired]
+    public IReadOnlyDictionary<int, RgfDashboardItem> ItemIndex { get; set; } = new Dictionary<int, RgfDashboardItem>();
+
+    [Parameter]
+    public RgfSessionParams? SessionParams { get; set; }
+
+    [Parameter]
+    public RenderFragment? EmptyTemplate { get; set; }
+
+    [Parameter]
+    public bool IsResizable { get; set; }
+
+    [Parameter]
+    public EventCallback<RgfDashboardGroupResizeRequest> ResizeRequested { get; set; }
+
+    [Parameter]
+    public int LayoutCommitVersion { get; set; }
+
+    [Inject]
+    private ILogger<RgfDashboardPaneComponent> Logger { get; set; } = null!;
+
+    private RgfDashboardPaneMetadata PaneMetadata { get; set; } = new();
+    private string? _lastLoggedMissingItemReference;
+
+    private RgfDashboardItem? ResolvedItem => PaneMetadata.ResolvedItem;
+
+    private bool HasSplit => PaneMetadata.HasSplit;
+
+    private bool HasResolvedItem => ResolvedItem != null;
+
+    private bool HasMissingItemReference => PaneMetadata.HasMissingItemReference;
+
+    private string PaneKey => string.IsNullOrWhiteSpace(Pane?.PaneId) ? "splitter-pane" : Pane.PaneId;
+    private string EmptyPaneCssClass => "rgf-dashboard-pane rgf-dashboard-pane-empty";
+
+    protected override void OnParametersSet()
+    {
+        PaneMetadata = RgfDashboardDefinitionHelper.ResolvePaneMetadata(Pane, ItemIndex);
+
+        if (!HasMissingItemReference)
+        {
+            _lastLoggedMissingItemReference = null;
+            return;
+        }
+
+        var signature = $"{Pane?.PaneId}:{Pane?.DashboardItemId}";
+        if (string.Equals(_lastLoggedMissingItemReference, signature, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        _lastLoggedMissingItemReference = signature;
+        LogMissingItemReference();
+    }
+
+    private RenderFragment RenderEmpty() => builder =>
+    {
+        if (EmptyTemplate == null)
+        {
+            return;
+        }
+
+        builder.AddContent(0, EmptyTemplate);
+    };
+    private void LogMissingItemReference()
+        => Logger.LogWarning(
+            "Dashboard pane item reference could not be resolved. PaneId={PaneId}, DashboardItemId={DashboardItemId}.",
+            Pane?.PaneId,
+            Pane?.DashboardItemId);
+}

@@ -1,0 +1,16 @@
+.rgf-dashboard-page {
+    display: flex;
+    flex-direction: column;
+    height: calc(100vh - 7rem);
+    height: calc(100dvh - 7rem);
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.rgf-dashboard-page-status {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+    padding: 1rem;
+}

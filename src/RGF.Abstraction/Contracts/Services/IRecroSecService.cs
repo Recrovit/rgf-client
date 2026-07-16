@@ -1,17 +1,18 @@
-﻿#nullable enable
+﻿using Recrovit.RecroGridFramework.Abstraction.Contracts.API;
 using Recrovit.RecroGridFramework.Abstraction.Infrastructure.Events;
 using Recrovit.RecroGridFramework.Abstraction.Infrastructure.Security;
-using System.Collections.Generic;
 using System.Globalization;
-using System;
 using System.Security.Claims;
-using System.Threading.Tasks;
+
+#nullable enable
 
 namespace Recrovit.RecroGridFramework.Abstraction.Contracts.Services;
 
 public interface IRecroSecService
 {
     EventDispatcher<EventArgs> AuthenticationStateChanged { get; }
+
+    EventDispatcher<DataEventArgs<RgfUserState>> UserStateChangedEvent { get; }
 
     string? UserName { get; }
 
@@ -23,7 +24,9 @@ public interface IRecroSecService
 
     ClaimsPrincipal CurrentUser { get; }
 
-    Dictionary<string, string> Roles { get; }
+    RgfUserState UserState { get; }
+
+    IReadOnlyDictionary<string, string> Roles { get; }
 
     Task<string?> GetAccessTokenAsync();
 
@@ -32,6 +35,8 @@ public interface IRecroSecService
     Task<string?> SetUserLanguageAsync(string? language);
 
     EventDispatcher<DataEventArgs<string>> LanguageChangedEvent { get; }
+
+    Task<bool> UpdateUserStateSettingsAsync(IDictionary<string, string?> settings);
 
     Task<RgfPermissions> GetEntityPermissionsAsync(string entityName, string? objectKey = null, int expiration = 60);
 

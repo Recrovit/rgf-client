@@ -1,0 +1,645 @@
+@using Microsoft.JSInterop
+@using Recrovit.RecroGridFramework.Client.Models.Dashboard
+@using Recrovit.RecroGridFramework.Client.Services.Dashboard
+
+<div class="rgf-dashboard-designer">
+    <div class="rgf-dashboard-designer-body">
+        <div class="rgf-dashboard-designer-canvas">
+            <div @ref="_canvasSurfaceElement"
+                 class="rgf-dashboard-designer-canvas-surface @(_state.IsReadonly ? "rgf-dashboard-designer-canvas-surface-readonly" : "rgf-dashboard-designer-canvas-surface-resizable")"
+                 style="@CanvasSurfaceStyle">
+                <DashboardDesignerPaneComponent Pane="_state.Dashboard.Layout.RootPane"
+                                                ItemIndex="_itemIndex"
+                                                SessionParams="Parameters"
+                                                SelectedPaneId="@_state.SelectedPaneId"
+                                                OnPaneSelected="OnPaneSelectedAsync"
+                                                OnResizeRequested="OnResizeRequestedAsync"
+                                                ItemRenderKeys="_itemRenderKeys"
+                                                ReadOnly="_state.IsReadonly" />
+            </div>
+        </div>
+
+        <aside class="rgf-dashboard-designer-sidebar bg-body-tertiary border-start">
+            <div class="accordion rgf-dashboard-designer-accordion">
+                <div class="accordion-item">
+                    <h2 class="accordion-header">
+                        <button type="button"
+                                class="accordion-button @(IsAccordionOpen(SidebarAccordion.Dashboard) ? null : "collapsed")"
+                                aria-expanded="@IsAccordionOpen(SidebarAccordion.Dashboard)"
+                                @onclick="() => OpenAccordion(SidebarAccordion.Dashboard)">
+                            @RecroDict.GetRgfUiDashboard("DashboardSection")
+                        </button>
+                    </h2>
+                    <div class="accordion-collapse collapse@(IsAccordionOpen(SidebarAccordion.Dashboard) ? " show" : null)">
+                        <div class="accordion-body">
+                            <div class="rgf-dashboard-designer-dashboard-fields">
+                                <RgfInputText Label="@RecroDict.GetRgfUiDashboard("DashboardName")"
+                                              Value="@_state.Dashboard.Name"
+                                              ValueExpression="@(() => _state.Dashboard.Name)"
+                                              ValueChanged="OnDashboardNameChangedAsync"
+                                              Readonly="@(!_state.IsNameEditable || _state.IsReadonly)" />
+                                <RgfComboBox TValue="string"
+                                             Value="@_state.Dashboard.RoleId"
+                                             ValueExpression="@(() => _state.Dashboard.RoleId)"
+                                             ValueChanged="OnDashboardRoleIdChangedAsync"
+                                             DataSource="RecroSec.Roles"
+                                             IncludeEmptyItem="true"
+                                             Tooltip="@RecroDict.GetRgfUiString("RoleVisibilitySettingTooltip")"
+                                             Disabled="@(_state.IsReadonly || !Parameters.IsRoleSettingAllowed)" />
+                                <RgfInputText Label="@RecroDict.GetRgfUiDashboard("Description")"
+                                              Value="@_state.Dashboard.Description"
+                                              ValueExpression="@(() => _state.Dashboard.Description)"
+                                              ValueChanged="OnDashboardDescriptionChangedAsync"
+                                              Multiline="true"
+                                              Readonly="@_state.IsReadonly"
+                                              AdditionalAttributes="_descriptionAttributes" />
+                                <div class="rgf-dashboard-designer-dimension-grid">
+                                    <RgfInputNumber TValue="decimal?" Label="@RecroDict.GetRgfUiDashboard("WidthPx")"
+                                                    Value="@_state.Dashboard.Layout.Width"
+                                                    ValueExpression="@(() => _state.Dashboard.Layout.Width)"
+                                                    ValueChanged="OnDashboardWidthChangedAsync"
+                                                    Tooltip="@RecroDict.GetRgfUiDashboard("DashboardSizeTooltip")"
+                                                    HideSpinButton="true"
+                                                    Min="1"
+                                                    Readonly="@_state.IsReadonly" />
+                                    <RgfInputNumber TValue="decimal?" Label="@RecroDict.GetRgfUiDashboard("HeightPx")"
+                                                    Value="@_state.Dashboard.Layout.Height"
+                                                    ValueExpression="@(() => _state.Dashboard.Layout.Height)"
+                                                    ValueChanged="OnDashboardHeightChangedAsync"
+                                                    Tooltip="@RecroDict.GetRgfUiDashboard("DashboardSizeTooltip")"
+                                                    HideSpinButton="true"
+                                                    Min="1"
+                                                    Readonly="@_state.IsReadonly" />
+                                </div>
+                                <div class="rgf-dashboard-designer-dashboard-actions">
+                                    <RgfButton IconName="bi-floppy" CssClass="btn-success"
+                                               Tooltip="@RecroDict.GetRgfUiString("Save")"
+                                               Disabled="@(!Parameters.CanSave)"
+                                               OnClick="OnSaveClickedAsync" />
+                                    <RgfButton IconName="bi-trash" CssClass="btn-danger"
+                                               Tooltip="@RecroDict.GetRgfUiString("Delete")"
+                                               Disabled="@(!Parameters.CanDelete)"
+                                               OnClick="OnDeleteClickedAsync" />
+                                </div>
+                                @if (!string.IsNullOrWhiteSpace(_errorMessage))
+                                {
+                                    <div class="text-danger small">@_errorMessage</div>
+                                }
+                                else if (!string.IsNullOrWhiteSpace(_selector.EntityOptionsError))
+                                {
+                                    <div class="text-danger small">@_selector.EntityOptionsError</div>
+                                }
+                                else if (!string.IsNullOrWhiteSpace(_selector.SettingsError))
+                                {
+                                    <div class="text-danger small">@_selector.SettingsError</div>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="accordion-item">
+                    <h2 class="accordion-header">
+                        <button type="button"
+                                class="accordion-button @(IsAccordionOpen(SidebarAccordion.Panel) ? null : "collapsed")"
+                                aria-expanded="@IsAccordionOpen(SidebarAccordion.Panel)"
+                                @onclick="() => OpenAccordion(SidebarAccordion.Panel)">
+                            @RecroDict.GetRgfUiDashboard("PanelSection")
+                        </button>
+                    </h2>
+                    <div class="accordion-collapse collapse@(IsAccordionOpen(SidebarAccordion.Panel) ? " show" : null)">
+                        <div class="accordion-body rgf-dashboard-designer-panel-body">
+                            @if (_selectedPane == null)
+                            {
+                                <div class="rgf-dashboard-designer-sidebar-empty">
+                                    @RecroDict.GetRgfUiDashboard("NoPanelSelected")
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="rgf-dashboard-designer-section">
+                                    <div class="rgf-dashboard-designer-section-title">@RecroDict.GetRgfUiDashboard("SavedViewSection")</div>
+                                    @if (!CanAssignViewToSelectedPane)
+                                    {
+                                        <div class="small text-body-secondary">
+                                            @RecroDict.GetRgfUiDashboard("SavedViewLeafOnly")
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <div class="d-grid gap-2">
+                                            <RgfComboBox TValue="string"
+                                                         DataSource="_selector.EntityOptions.Select(e => new KeyValuePair<string, string>(e.EntityName, string.IsNullOrEmpty(e.Title) ? e.EntityName : e.Title))"
+                                                         Value="@_selector.SelectedEntityName"
+                                                         ValueExpression="@(() => _selector.SelectedEntityName)"
+                                                         ValueChanged="OnEntityChangedAsync"
+                                                         Disabled="@(_state.IsReadonly || _selector.IsEntityOptionsLoading || _selector.EntityOptions.Count == 0)"
+                                                         IncludeEmptyItem="true" />
+                                            <RgfComboBox TValue="RgfDashboardViewType"
+                                                         DataSource="_selector.AllowedViewTypes"
+                                                         Value="_selector.SelectedViewType"
+                                                         ValueExpression="@(() => _selector.SelectedViewType)"
+                                                         ValueChanged="OnViewTypeChangedAsync"
+                                                         Disabled="@(_state.IsReadonly || _selector.IsEntityOptionsLoading || _selector.AllowedViewTypes.Count == 0)" />
+                                            <RgfComboBox TValue="int?"
+                                                         DataSource="_selector.SavedViews"
+                                                         Value="_selector.SelectedSettingsId"
+                                                         ValueExpression="@(() => _selector.SelectedSettingsId)"
+                                                         ValueChanged="OnSettingsChangedAsync"
+                                                         Disabled="@(_state.IsReadonly || _selector.IsSettingsLoading || _selector.SavedViews.Count == 0)"
+                                                         IncludeEmptyItem="true" />
+                                            @if (_selector.HasMissingSelectedView)
+                                            {
+                                                <div class="small text-warning">
+                                                    @RecroDict.GetRgfUiDashboard("MissingSavedViewWarning", _selector.MissingSettingsName ?? _selector.MissingSettingsId?.ToString() ?? string.Empty)
+                                                </div>
+                                            }
+                                            <div class="d-flex flex-wrap gap-2">
+                                                <RgfButton IconName="bi-check2" CssClass="btn-outline-success"
+                                                           Tooltip="@RecroDict.GetRgfUiDashboard("AssignSavedView")"
+                                                           Disabled="@(!CanAssignSelectedView)"
+                                                           OnClick="AssignSelectedViewAsync" />
+                                            </div>
+                                        </div>
+                                    }
+                                </div>
+
+                                <div class="rgf-dashboard-designer-section">
+                                    <div class="d-grid gap-2">
+                                        @if (SelectedLeafItem != null)
+                                        {
+                                            <div class="checkbox-lg">
+                                                <RgfCheckBox Switch="true" Label="@RecroDict.GetRgfUiDashboard("PanelHeaderVisible")"
+                                                             Value="SelectedLeafItem.ShowHeader"
+                                                             ValueExpression="() => SelectedLeafItem!.ShowHeader"
+                                                             ValueChanged="OnSelectedPaneShowHeaderChangedAsync"
+                                                             Disabled="@_state.IsReadonly" />
+                                            </div>
+                                        }
+                                        <RgfInputText Label="@RecroDict.GetRgfUiDashboard("PanelTitle")"
+                                                      Value="@SelectedLeafItemTitle"
+                                                      ValueExpression="() => SelectedLeafItemTitle"
+                                                      ValueChanged="OnSelectedPaneTitleChangedAsync"
+                                                      Disabled="@(_state.IsReadonly || SelectedLeafItem == null || !SelectedLeafItem.ShowHeader)" />
+                                        <div class="d-flex flex-wrap gap-2">
+                                            <RgfButton IconName="bi-file-earmark-x" CssClass="btn-outline-danger"
+                                                       Tooltip="@RecroDict.GetRgfUiDashboard("RemoveSelectedPane")"
+                                                       Disabled="@_state.IsReadonly"
+                                                       OnClick="RemoveSelectedPaneAsync" />
+                                            @if (_selectedPane.Split == null && CanRefreshSelectedWidget)
+                                            {
+                                                <RgfButton IconName="bi-arrow-clockwise" CssClass="btn-outline-secondary"
+                                                           Tooltip="@RecroDict.GetRgfUiDashboard("RefreshSelectedPane")"
+                                                           Disabled="@_state.IsReadonly"
+                                                           OnClick="RefreshSelectedPaneAsync" />
+                                            }
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="rgf-dashboard-designer-section">
+                                    <div class="rgf-dashboard-designer-section-title">@RecroDict.GetRgfUiDashboard("LayoutSection")</div>
+                                    @if (_selectedPane.Split != null)
+                                    {
+                                        <div class="d-grid gap-2">
+                                            <RgfComboBox TValue="int" Label="@RecroDict.GetRgfUiDashboard("Split")"
+                                                         DataSource="_splitCountOptions"
+                                                         Value="SelectedSplitCountValue"
+                                                         ValueExpression="@(() => SelectedSplitCountValue)"
+                                                         ValueChanged="OnSplitCountChangedAsync"
+                                                         Disabled="@_state.IsReadonly" />
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <div class="d-grid gap-2">
+                                            <div class="rgf-dashboard-designer-split-controls">
+                                                <div class="rgf-dashboard-designer-split-selector">
+                                                    <RgfComboBox TValue="int" Label="@RecroDict.GetRgfUiDashboard("Split")"
+                                                                 DataSource="_splitCountOptions"
+                                                                 Value="SelectedSplitCountValue"
+                                                                 ValueExpression="@(() => SelectedSplitCountValue)"
+                                                                 ValueChanged="OnSplitCountChangedAsync"
+                                                                 Disabled="@_state.IsReadonly"
+                                                                 Width="5rem" />
+                                                </div>
+                                                <div class="d-flex align-items-end gap-2">
+                                                    <RgfButton IconName="bi-arrows-expand-vertical" CssClass="btn-outline-primary"
+                                                               Tooltip="@RecroDict.GetRgfUiDashboard("SplitPaneColumns")"
+                                                               Disabled="@_state.IsReadonly"
+                                                               OnClick="SplitSelectedPaneColumnsAsync" />
+                                                    <RgfButton IconName="bi-arrows-expand" CssClass="btn-outline-primary"
+                                                               Tooltip="@RecroDict.GetRgfUiDashboard("SplitPaneRows")"
+                                                               Disabled="@_state.IsReadonly"
+                                                               OnClick="SplitSelectedPaneRowsAsync" />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    }
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </aside>
+    </div>
+</div>
+
+@implements IAsyncDisposable
+@inject IRecroDictService RecroDict
+@inject IRecroSecService RecroSec
+@inject ILogger<DashboardDesignerComponent> Logger
+@inject IRgfApiService ApiService
+@inject IJSRuntime JsRuntime
+@code {
+    [Parameter, EditorRequired]
+    public RgfDashboardDesignerParameters Parameters { get; set; } = new();
+
+    private readonly Dictionary<string, object> _descriptionAttributes = new() { ["rows"] = 2 };
+    private readonly RgfDashboardDesignerState _state = new();
+    private readonly RgfDashboardSavedViewSelectorState _selector = new();
+    private readonly Dictionary<int, int> _itemRenderKeys = [];
+    private static readonly IReadOnlyList<KeyValuePair<int, string>> _splitCountOptions = [new(2, "2"), new(3, "3"), new(4, "4"), new(5, "5"), new(6, "6")];
+
+    private IReadOnlyDictionary<int, RgfDashboardItem> _itemIndex = new Dictionary<int, RgfDashboardItem>();
+    private RgfDashboardPane? _selectedPane;
+    private string? _loadedDashboardSnapshot;
+    private bool _loadedIsReadonly;
+    private bool _loadedIsNameEditable;
+    private string? _errorMessage;
+    private string? _lastLoggedValidationSignature;
+    private int _selectedSplitCount = 2;
+    private string? _savedViewSelectionSignature;
+    private SidebarAccordion _activeAccordion = SidebarAccordion.Dashboard;
+    private ElementReference _canvasSurfaceElement;
+    private DotNetObjectReference<DashboardDesignerComponent>? _selfRef;
+    private bool CanAssignViewToSelectedPane => _selectedPane is { Split: null };
+
+    private RgfDashboardItem? SelectedLeafItem
+        => _selectedPane?.DashboardItemId is int dashboardItemId && _itemIndex.TryGetValue(dashboardItemId, out var item)
+            ? item
+            : null;
+
+    private string? SelectedLeafItemTitle => SelectedLeafItem?.Title;
+
+    private int SelectedSplitCountValue => _selectedPane?.Split?.Panes.Count ?? _selectedSplitCount;
+
+    private bool CanRefreshSelectedWidget => _selectedPane?.DashboardItemId is int dashboardItemId && _itemIndex.ContainsKey(dashboardItemId);
+
+    private bool CanAssignSelectedView
+        => !_state.IsReadonly
+            && CanAssignViewToSelectedPane
+            && _selector.CanSubmitSelection;
+
+    private string CanvasSurfaceStyle
+        => $"flex:{GetSurfaceFlex()};" +
+           $"width:{GetInlineSize(_state.Dashboard.Layout.Width)};" +
+           $"height:{GetBlockSize(_state.Dashboard.Layout.Height)};" +
+           "max-inline-size:100%;min-inline-size:0;min-block-size:0;";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await _selector.LoadEntityOptionsAsync(Parameters.EntityOptions, ApiService, Logger);
+        _savedViewSelectionSignature = null;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await base.OnAfterRenderAsync(firstRender);
+
+        _selfRef ??= DotNetObjectReference.Create(this);
+        await JsRuntime.InvokeVoidAsync(
+            RGFClientBlazorUIConfiguration.JsBlazorUiNamespace + ".Dashboard.initializeRootResizable",
+            _canvasSurfaceElement,
+            _selfRef,
+            new
+            {
+                readOnly = _state.IsReadonly,
+                minWidth = 320,
+                minHeight = 240
+            });
+
+        if (await EnsureSavedViewSelectionAsync())
+        {
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    protected override void OnParametersSet()
+    {
+        Parameters ??= new();
+        Parameters.Dashboard ??= new();
+
+        var dashboardSnapshot = Parameters.Dashboard.SerializeSnapshot();
+        if (_loadedDashboardSnapshot == dashboardSnapshot
+            && _loadedIsReadonly == Parameters.ReadOnly
+            && _loadedIsNameEditable == Parameters.IsNameEditable)
+        {
+            RefreshDerivedState();
+            return;
+        }
+
+        _state.Load(Parameters.Dashboard, Parameters.IsNameEditable, Parameters.ReadOnly);
+        _loadedDashboardSnapshot = _state.Dashboard.SerializeSnapshot();
+        _loadedIsReadonly = Parameters.ReadOnly;
+        _loadedIsNameEditable = Parameters.IsNameEditable;
+        _errorMessage = null;
+        _activeAccordion = SidebarAccordion.Dashboard;
+        RefreshDerivedState();
+    }
+
+    private bool IsAccordionOpen(SidebarAccordion accordion) => _activeAccordion == accordion;
+
+    private void OpenAccordion(SidebarAccordion accordion) => _activeAccordion = accordion;
+
+    private Task OnSplitCountChangedAsync(int splitCount)
+    {
+        if (_selectedPane?.Split != null)
+        {
+            return ApplyCommandResultAsync(_state.SetSplitPaneCount(_selectedPane.PaneId, splitCount));
+        }
+
+        _selectedSplitCount = splitCount;
+        return Task.CompletedTask;
+    }
+
+    private Task SplitSelectedPaneColumnsAsync(MouseEventArgs _) => SplitSelectedPaneAsync(RgfDashboardSplitDirection.Columns);
+
+    private Task SplitSelectedPaneRowsAsync(MouseEventArgs _) => SplitSelectedPaneAsync(RgfDashboardSplitDirection.Rows);
+
+    private Task SplitSelectedPaneAsync(RgfDashboardSplitDirection direction)
+        => _selectedPane == null || _selectedPane.Split != null
+            ? Task.CompletedTask
+            : ApplyCommandResultAsync(_state.SplitPane(_selectedPane.PaneId, direction, _selectedSplitCount));
+
+    private Task RemoveSelectedPaneAsync(MouseEventArgs _)
+        => _selectedPane == null
+            ? Task.CompletedTask
+            : ApplyCommandResultAsync(_state.RemovePane(_selectedPane.PaneId));
+
+    private Task RefreshSelectedPaneAsync(MouseEventArgs _)
+    {
+        RefreshSelectedWidget();
+        return Task.CompletedTask;
+    }
+
+    private Task OnSelectedPaneShowHeaderChangedAsync(bool showHeader)
+        => _selectedPane == null || _selectedPane.Split != null
+            ? Task.CompletedTask
+            : ApplyCommandResultAsync(_state.SetPaneHeaderVisibility(_selectedPane.PaneId, showHeader));
+
+    private Task OnSelectedPaneTitleChangedAsync(string? title)
+        => _selectedPane == null || _selectedPane.Split != null || SelectedLeafItem == null
+            ? Task.CompletedTask
+            : ApplyCommandResultAsync(_state.SetPaneTitle(_selectedPane.PaneId, title));
+
+    private Task OnDashboardNameChangedAsync(string? name) => ApplyCommandResultAsync(_state.SetName(name));
+
+    private Task OnDashboardDescriptionChangedAsync(string? description) => ApplyCommandResultAsync(_state.SetDescription(description));
+
+    private Task OnDashboardRoleIdChangedAsync(string? roleId) => ApplyCommandResultAsync(_state.SetRoleId(roleId));
+
+    private Task OnDashboardWidthChangedAsync(decimal? width) => ApplyCommandResultAsync(_state.SetWidth(width));
+
+    private Task OnDashboardHeightChangedAsync(decimal? height) => ApplyCommandResultAsync(_state.SetHeight(height));
+
+    [JSInvokable]
+    public Task OnRootSizeChangedJsCallback(int? width, int? height)
+        => ApplyCommandResultAsync(_state.SetRootSize(
+            width is > 0 ? width.Value : null,
+            height is > 0 ? height.Value : null));
+
+    private async Task OnPaneSelectedAsync(string paneId)
+    {
+        await ApplyCommandResultAsync(_state.SelectPane(paneId), emitDashboardEdited: false);
+        if (_selectedPane != null)
+        {
+            OpenAccordion(SidebarAccordion.Panel);
+        }
+    }
+
+    private Task OnResizeRequestedAsync(RgfDashboardGroupResizeRequest request)
+        => ApplyCommandResultAsync(_state.ResizeSplit(
+            request.ParentPaneId,
+            request.LeadingPaneId,
+            request.TrailingPaneId,
+            request.LeadingSize,
+            request.TrailingSize));
+
+    private Task OnSaveClickedAsync(MouseEventArgs _) => Parameters.CanSave ? Parameters.SaveRequested.InvokeAsync() : Task.CompletedTask;
+
+    private Task OnDeleteClickedAsync(MouseEventArgs _) => Parameters.CanDelete ? Parameters.DeleteRequested.InvokeAsync() : Task.CompletedTask;
+
+    private async Task AssignSelectedViewAsync(MouseEventArgs _)
+    {
+        if (!CanAssignSelectedView || _selectedPane == null || string.IsNullOrWhiteSpace(_selector.SelectedEntityName))
+        {
+            return;
+        }
+
+        await ApplyCommandResultAsync(_state.AssignItem(_selectedPane.PaneId, new RgfDashboardViewReference
+        {
+            EntityName = _selector.SelectedEntityName,
+            ViewType = _selector.SelectedViewType,
+            SettingsId = _selector.SelectedSettingsId,
+            SettingsName = _selector.SelectedSettingsName
+        }));
+    }
+
+    private async Task InitializeAssignViewSelectionAsync(RgfDashboardViewReference viewReference)
+        => await _selector.InitializeFromViewReferenceAsync(
+            viewReference.EntityName,
+            viewReference.ViewType,
+            viewReference.SettingsId,
+            viewReference.SettingsName,
+            ApiService,
+            Logger);
+
+    private void ResetAssignViewSelection() => _selector.ResetSelection(clearEntity: true);
+
+    private Task OnEntityChangedAsync(string? entityName) => _selector.SelectEntityAsync(entityName, ApiService, Logger);
+
+    private Task OnViewTypeChangedAsync(RgfDashboardViewType viewType)
+    {
+        _selector.SelectViewType(viewType);
+        return Task.CompletedTask;
+    }
+
+    private Task OnSettingsChangedAsync(int? settingsId)
+    {
+        _selector.SelectSettings(settingsId);
+        return Task.CompletedTask;
+    }
+
+    private void RefreshSelectedWidget()
+    {
+        if (_selectedPane?.DashboardItemId is not int dashboardItemId || !_itemIndex.ContainsKey(dashboardItemId))
+        {
+            return;
+        }
+
+        _itemRenderKeys[dashboardItemId] = GetItemRenderKey(dashboardItemId) + 1;
+    }
+
+    private int GetItemRenderKey(int dashboardItemId)
+    {
+        if (!_itemRenderKeys.TryGetValue(dashboardItemId, out var key))
+        {
+            _itemRenderKeys[dashboardItemId] = key;
+        }
+
+        return key;
+    }
+
+    private async Task ApplyCommandResultAsync(RgfDashboardCommandResult result, bool emitDashboardEdited = true)
+    {
+        if (!result.Succeeded)
+        {
+            LogCommandFailure(result);
+            _errorMessage = null;
+            RefreshDerivedState();
+            return;
+        }
+
+        _errorMessage = null;
+        _loadedDashboardSnapshot = _state.Dashboard.SerializeSnapshot();
+        RefreshDerivedState();
+        await EnsureSavedViewSelectionAsync();
+
+        if (emitDashboardEdited)
+        {
+            await Parameters.DashboardEdited.InvokeAsync(_state.Dashboard);
+        }
+
+        await Parameters.DirtyStateChanged.InvokeAsync(_state.IsDirty);
+    }
+
+    private void RefreshDerivedState()
+    {
+        var previousSelectedPane = _selectedPane;
+        _itemIndex = RgfDashboardDefinitionHelper.BuildItemIndex(_state.Dashboard);
+
+        if (!_state.ValidationResult.IsValid)
+        {
+            var signature = string.Join("|", _state.ValidationResult.Issues.Select(issue => $"{issue.Code}:{issue.PaneId}:{issue.DashboardItemId}:{issue.Message}"));
+            if (!string.Equals(_lastLoggedValidationSignature, signature, StringComparison.Ordinal))
+            {
+                _lastLoggedValidationSignature = signature;
+                Logger.LogWarning(
+                    "Dashboard designer validation failed. DashboardId={DashboardId}, SelectedPaneId={SelectedPaneId}, Issues={Issues}.",
+                    _state.Dashboard.DashboardId,
+                    _state.SelectedPaneId,
+                    _state.ValidationResult.Issues.Select(issue => new
+                    {
+                        issue.Code,
+                        issue.Message,
+                        issue.PaneId,
+                        issue.DashboardItemId
+                    }).ToArray());
+            }
+        }
+        else
+        {
+            _lastLoggedValidationSignature = null;
+        }
+
+        _selectedPane = RgfDashboardDefinitionHelper.FindPane(_state.Dashboard.Layout.RootPane, _state.SelectedPaneId);
+
+        if (_selectedPane == null && previousSelectedPane != null)
+        {
+            OpenAccordion(SidebarAccordion.Dashboard);
+        }
+    }
+
+    private async Task<bool> EnsureSavedViewSelectionAsync()
+    {
+        var signature = GetSavedViewSelectionSignature();
+        if (string.Equals(_savedViewSelectionSignature, signature, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        _savedViewSelectionSignature = signature;
+
+        if (!CanAssignViewToSelectedPane || _selectedPane == null)
+        {
+            _selector.ResetSelection(clearEntity: true);
+            return true;
+        }
+
+        if (_selectedPane.DashboardItemId is int dashboardItemId
+            && _itemIndex.TryGetValue(dashboardItemId, out var item))
+        {
+            await InitializeAssignViewSelectionAsync(item.ViewReference);
+            return true;
+        }
+
+        ResetAssignViewSelection();
+        await _selector.EnsureDefaultEntitySelectionAsync(ApiService, Logger);
+        return true;
+    }
+
+    private string? GetSavedViewSelectionSignature()
+    {
+        if (!CanAssignViewToSelectedPane || _selectedPane == null)
+        {
+            return null;
+        }
+
+        if (_selectedPane.DashboardItemId is int dashboardItemId
+            && _itemIndex.TryGetValue(dashboardItemId, out var item))
+        {
+            var viewReference = item.ViewReference;
+            return FormattableString.Invariant(
+                $"{_selectedPane.PaneId}|{viewReference.EntityName}|{(int)viewReference.ViewType}|{viewReference.SettingsId}|{viewReference.SettingsName}");
+        }
+
+        return $"{_selectedPane.PaneId}|empty";
+    }
+
+    private static string GetInlineSize(decimal? width) => width is > 0 ? FormattableString.Invariant($"{width.Value}px") : "100%";
+
+    private static string GetBlockSize(decimal? height) => height is > 0 ? FormattableString.Invariant($"{height.Value}px") : "100%";
+
+    private string GetSurfaceFlex()
+        => _state.Dashboard.Layout.Width is > 0 || _state.Dashboard.Layout.Height is > 0
+            ? "0 0 auto"
+            : "1 1 auto";
+
+    private enum SidebarAccordion
+    {
+        Dashboard = 0,
+        Panel = 1
+    }
+
+    private void LogCommandFailure(RgfDashboardCommandResult result)
+        => Logger.LogWarning(
+            "Dashboard designer command failed. DashboardId={DashboardId}, SelectedPaneId={SelectedPaneId}, FailureCode={FailureCode}, ErrorMessage={ErrorMessage}, ValidationIssues={ValidationIssues}.",
+            _state.Dashboard.DashboardId,
+            _state.SelectedPaneId,
+            result.FailureCode,
+            result.ErrorMessage,
+            result.ValidationResult.Issues.Select(issue => new
+            {
+                issue.Code,
+                issue.Message,
+                issue.PaneId,
+                issue.DashboardItemId
+            }).ToArray());
+
+    public async ValueTask DisposeAsync()
+    {
+        try
+        {
+            await JsRuntime.InvokeVoidAsync(
+                RGFClientBlazorUIConfiguration.JsBlazorUiNamespace + ".Dashboard.destroyRootResizable",
+                _canvasSurfaceElement);
+        }
+        catch (JSDisconnectedException)
+        {
+        }
+
+        _selfRef?.Dispose();
+    }
+}

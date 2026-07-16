@@ -1,4 +1,12 @@
-﻿table.recro-grid td > div.cell-content {
+﻿html.rgf-small-ui {
+    font-size: 87.5%;
+}
+
+html.rgf-large-ui {
+    font-size: 112.5%;
+}
+
+table.recro-grid td > div.cell-content {
     width: 40px;
 }
 

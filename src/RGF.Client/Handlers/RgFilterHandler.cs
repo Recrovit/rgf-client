@@ -34,6 +34,8 @@ public interface IRgFilterHandler
 
     bool ResetFilter();
 
+    void ApplyFilterState(IEnumerable<RgfFilter.Condition>? conditions, int? sqlTimeout);
+
     Task SetFilterAsync(IEnumerable<RgfFilter.Condition>? conditions, int? sqlTimeout);
 
     RgfFilterSettings? SelectPredefinedFilter(int? filterSettingsId);
@@ -163,6 +165,12 @@ internal class RgFilterHandler : IRgFilterHandler
         }
 
         await _manager.ListHandler.SetFilterAsync(StoreFilter(), _manager.ListHandler.SQLTimeout);
+    }
+
+    public void ApplyFilterState(IEnumerable<RgfFilter.Condition>? conditions, int? sqlTimeout)
+    {
+        Conditions = conditions?.ToList() ?? [];
+        _manager.ListHandler.ApplyFilterState([.. Conditions], sqlTimeout);
     }
 
     public bool ResetFilter() => InitFilter(_jsonConditions);
@@ -425,8 +433,8 @@ internal class RgFilterHandler : IRgFilterHandler
 
     public async Task SetFilterAsync(IEnumerable<RgfFilter.Condition>? conditions, int? sqlTimeout)
     {
-        Conditions = conditions?.ToList() ?? [];
-        await _manager.ListHandler.SetFilterAsync([.. Conditions], sqlTimeout);
+        ApplyFilterState(conditions, sqlTimeout);
+        await _manager.ListHandler.RefreshDataAsync();
     }
 
     public RgfFilterSettings? SelectPredefinedFilter(int? filterSettingsId)

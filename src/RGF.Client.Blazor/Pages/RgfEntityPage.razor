@@ -1,11 +1,26 @@
 ﻿@page "/rgf/entity/{EntityName}"
 @page "/rgf/admin/{EntityName?}"
+@page "/rgf/dashboard"
 @rendermode @(new InteractiveWebAssemblyRenderMode(prerender: false))
 @* @attribute [RecrovitPageRoute(RecrovitRouteMode.ClientOnly, LayoutType = typeof(MainLayout))] *@
 
 @using Recrovit.RecroGridFramework.Client.Blazor.Components;
 
-<RgfEntityContent EntityName="@EntityName" Mode="@PageMode" />
+@if (string.IsNullOrWhiteSpace(EntityName))
+{
+    if (_dashboardPageComponentType != null)
+    {
+        <DynamicComponent Type="_dashboardPageComponentType" />
+    }
+    else
+    {
+        <p>Dashboard component is not registered.</p>
+    }
+}
+else
+{
+    <RgfEntityContent EntityName="@EntityName" Mode="@PageMode" />
+}
 
 @inject NavigationManager Navigation
 @code {
@@ -13,8 +28,15 @@
     [Parameter]
     public string? EntityName { get; set; }
 
+    private Type? _dashboardPageComponentType;
+
     private RgfEntityContent.RgfEntityPageMode PageMode =>
         Navigation.ToBaseRelativePath(Navigation.Uri).StartsWith("rgf/admin", StringComparison.OrdinalIgnoreCase)
             ? RgfEntityContent.RgfEntityPageMode.Legacy
             : RgfEntityContent.RgfEntityPageMode.Entity;
+
+    protected override void OnInitialized()
+    {
+        RgfBlazorConfiguration.TryGetComponentType(RgfBlazorConfiguration.ComponentType.DashboardPage, out _dashboardPageComponentType);
+    }
 }

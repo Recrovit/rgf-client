@@ -13,6 +13,7 @@ Its main responsibility is to turn the client-side services provided by [`Recrov
 In practice, this package is the layer that makes RecroGrid usable inside Blazor applications:
 
 - it provides the core Blazor components for rendering RecroGrid entities, grids, forms, filters, charts, toolbars, dialogs, pagers, and trees
+- it provides the dashboard runtime rendering infrastructure used to display pane-based dashboard layouts in Blazor
 - it connects Blazor component lifecycle and templating to the client-side managers and services from [`Recrovit.RecroGridFramework.Client`](https://www.nuget.org/packages/Recrovit.RecroGridFramework.Client/)
 - it adds Blazor-specific dependency injection and authentication registration helpers
 - it integrates JavaScript interop, static resources, and framework stylesheets into the Blazor runtime
@@ -35,10 +36,24 @@ The `Components` folder contains the main Blazor building blocks of the framewor
 - `RgfTreeComponent`
 - `RgfDynamicDialog`
 - `RgfPagerComponent`
+- `RgfDashboardComponent`
 
 These components provide the base rendering and interaction model for RecroGrid features inside Blazor applications.
 
 The package also includes smaller helper components that support the base Blazor integration surface.
+
+### Dashboard runtime rendering
+
+The package contains the runtime dashboard rendering layer centered around `RgfDashboardComponent`.
+
+This layer is responsible for:
+
+- rendering pane-based dashboard layouts from `RgfDashboardDefinition` data
+- resolving dashboard items into grid, tree, chart, and chart-data views at runtime
+- handling nested split-pane composition and resize behavior for rendered dashboards
+- validating normalized dashboard layouts before and during runtime rendering
+
+This is runtime dashboard infrastructure, not the packaged dashboard editor experience. Higher-level page shells and designer UI belong to [`Recrovit.RecroGridFramework.Client.Blazor.UI`](https://www.nuget.org/packages/Recrovit.RecroGridFramework.Client.Blazor.UI/).
 
 ### Blazor configuration and registration
 
@@ -50,9 +65,11 @@ It is responsible for:
 - registering Blazor-specific authentication modes
 - configuring WebAssembly bearer-token scenarios
 - loading JavaScript modules, stylesheet resources, and server-provided script references
-- registering application-specific entity, menu, dialog, and chart components
+- registering application-specific entity, menu, dialog, chart, and higher-level dashboard page components
 
 This makes the package the primary setup point for RecroGrid in Blazor applications.
+
+Higher-level packages can use this registration surface to override or register the active dashboard page component while still relying on the runtime dashboard renderer provided by this package.
 
 ### Authentication and session integration
 
@@ -101,7 +118,8 @@ At a high level, the flow looks like this:
 1. [`Recrovit.RecroGridFramework.Abstraction`](https://www.nuget.org/packages/Recrovit.RecroGridFramework.Abstraction/) provides the shared contracts and data models.
 2. [`Recrovit.RecroGridFramework.Client`](https://www.nuget.org/packages/Recrovit.RecroGridFramework.Client/) provides the client-side API access, orchestration, security, localization, and handler services.
 3. [`Recrovit.RecroGridFramework.Client.Blazor`](https://www.nuget.org/packages/Recrovit.RecroGridFramework.Client.Blazor/) exposes those capabilities through Blazor components, templates, JS interop, and Blazor-specific service registration.
-4. Higher-level UI packages and application-specific components build on this Blazor layer to provide final user-facing experiences.
+4. The dashboard runtime renderer in this package provides the reusable display layer for pane-based dashboards.
+5. Higher-level UI packages and application-specific components build on this Blazor layer to provide final user-facing experiences such as packaged dashboard pages and editors.
 
 This makes [`Recrovit.RecroGridFramework.Client.Blazor`](https://www.nuget.org/packages/Recrovit.RecroGridFramework.Client.Blazor/) the foundational Blazor package of the RecroGrid client stack.
 

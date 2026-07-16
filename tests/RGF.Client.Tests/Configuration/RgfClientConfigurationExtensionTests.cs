@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Recrovit.RecroGridFramework.Abstraction.Contracts.API;
 using Recrovit.RecroGridFramework.Abstraction.Contracts.Constants;
 using Recrovit.RecroGridFramework.Abstraction.Contracts.Services;
 using Recrovit.RecroGridFramework.Abstraction.Infrastructure.Events;
@@ -344,23 +345,32 @@ public sealed class RgfClientConfigurationExtensionTests : IDisposable
             => Task.FromResult(new ConcurrentDictionary<string, string>());
 
         public string GetRgfUiString(string resourceKey) => resourceKey;
+
+        public string FormatResource(string scope, string resourceKey, string value, params object[] args)
+            => RecroDictFormatHelper.Format(value, args).Value;
+
+        public string GetRgfUiString(string resourceKey, params object[] args) => resourceKey;
     }
 
     private sealed class FakeRecroSecService : IRecroSecService
     {
         public EventDispatcher<EventArgs> AuthenticationStateChanged { get; } = new();
 
+        public EventDispatcher<DataEventArgs<RgfUserState>> UserStateChangedEvent { get; } = new();
+
         public string? UserName => CurrentUser.Identity?.Name;
 
         public bool IsAuthenticated => CurrentUser.Identity?.IsAuthenticated == true;
 
-        public bool IsAdmin { get; set; }
+        public bool IsAdmin => UserState.IsAdmin;
 
         public List<string> RoleClaim { get; } = [];
 
         public ClaimsPrincipal CurrentUser { get; set; } = new(new ClaimsIdentity());
 
-        public Dictionary<string, string> Roles { get; } = [];
+        public RgfUserState UserState { get; } = new();
+
+        public IReadOnlyDictionary<string, string> Roles => UserState.Roles ?? new Dictionary<string, string>();
 
         public string UserLanguage => UserLanguageValue ?? "eng";
 
@@ -376,6 +386,9 @@ public sealed class RgfClientConfigurationExtensionTests : IDisposable
             UserLanguageValue = language;
             return Task.FromResult(previous);
         }
+
+        public Task<bool> UpdateUserStateSettingsAsync(IDictionary<string, string?> settings)
+            => Task.FromResult(false);
 
         public Task<RgfPermissions> GetEntityPermissionsAsync(string entityName, string? objectKey = null, int expiration = 60)
             => throw new NotSupportedException();

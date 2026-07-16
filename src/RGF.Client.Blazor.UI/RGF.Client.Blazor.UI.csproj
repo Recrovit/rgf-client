@@ -23,14 +23,15 @@
 
   <ItemGroup>
     <None Update="Components\Base\RgfCheckBox.razor.css" CssScope="rgf-bs-checkbox" />
-    <None Update="Components\Base\RgfSplitter.razor.css" CssScope="rgf-bs-splitter" />
     <None Update="Components\Base\RgfComboBox.razor.css" CssScope="rgf-bs-combobox" />
+    <None Update="Components\Base\RgfSplitter.razor.css" CssScope="rgf-bs-splitter" />
     <None Update="Components\ChartComponent.razor.css" CssScope="rgf-bs-apexcharts" />
-    <None Update="Components\GridColumnSettingsComponent.razor.css" CssScope="rgf-bs-grid-column-settings" />
-    <None Update="Components\TreeNodeComponent.razor.css" CssScope="rgf-bs-tree" />
-    <None Update="Components\GridComponent.razor.css" CssScope="rgf-bs-grid" />
-    <None Update="Components\RgfRootComponent.razor.css" CssScope="rgf-bs-root" />
     <None Update="Components\DialogComponent.razor.css" CssScope="rgf-bs-dialog" />
+    <None Update="Components\GridColumnSettingsComponent.razor.css" CssScope="rgf-bs-grid-column-settings" />
+    <None Update="Components\GridComponent.razor.css" CssScope="rgf-bs-grid" />
+    <None Update="Components\NavbarComponent.razor.css" CssScope="rgf-bs-navbar" />
+    <None Update="Components\RgfRootComponent.razor.css" CssScope="rgf-bs-root" />
+    <None Update="Components\TreeNodeComponent.razor.css" CssScope="rgf-bs-tree" />
   </ItemGroup>
 
   <ItemGroup Condition="'$(Configuration)'=='Release'">

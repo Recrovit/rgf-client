@@ -34,7 +34,6 @@ public class MenuRenderer
                 var param = new RgfMenuParameters()
                 {
                     MenuItems = menu.NestedMenu,
-                    Navbar = false,
                     Icon = icon,
                     OnMenuItemSelect = handleMenuCommand,
                     OnMenuRender = OnMenuRender,

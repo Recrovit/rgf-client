@@ -54,6 +54,8 @@ public interface IRgListHandler
 
     void InitFilter(RgfFilter.Condition[] conditions);
 
+    void ApplyFilterState(RgfFilter.Condition[] conditions, int? queryTimeout);
+
     Task RefreshDataAsync(int? gridSettingsId = null);
 
     Task RefreshRowAsync(RgfDynamicDictionary rowData);
@@ -735,10 +737,15 @@ internal class RgListHandler : IDisposable, IRgListHandler
         ListParam.UserFilter = conditions;
     }
 
-    public async Task SetFilterAsync(RgfFilter.Condition[] conditions, int? queryTimeout)
+    public void ApplyFilterState(RgfFilter.Condition[] conditions, int? queryTimeout)
     {
         InitFilter(conditions);
         ListParam.SQLTimeout = queryTimeout;
+    }
+
+    public async Task SetFilterAsync(RgfFilter.Condition[] conditions, int? queryTimeout)
+    {
+        ApplyFilterState(conditions, queryTimeout);
         await RefreshDataAsync();
     }
 

@@ -1,8 +1,6 @@
-using Recrovit.RecroGridFramework.Abstraction.Contracts.Constants;
-using Recrovit.RecroGridFramework.Client;
-using Recrovit.RecroGridFramework.Client.Blazor;
-using Recrovit.RecroGridFramework.Client.Blazor.UI;
 using Recrovit.RecroGridFramework.Client.Services;
+using Recrovit.RecroGridFramework.Client.Services.Dashboard;
+using System.Collections.Concurrent;
 using System.Reflection;
 
 namespace Recrovit.RecroGridFramework.Client.Blazor.UI.Tests.Testing;
@@ -45,6 +43,10 @@ internal static class RgfClientBlazorUiTestState
         .GetProperty("EntityComponentTypes", BindingFlags.Static | BindingFlags.NonPublic)
         ?? throw new InvalidOperationException("Unable to locate RgfBlazorConfiguration.EntityComponentTypes.");
 
+    private static readonly FieldInfo DashboardRecroDictField = typeof(RgfDashboardDefinitionHelper)
+        .GetField("RecroDictDashboard", BindingFlags.Static | BindingFlags.NonPublic)
+        ?? throw new InvalidOperationException("Unable to locate RgfDashboardDefinitionHelper.RecroDictDashboard.");
+
     public static void Reset()
     {
         UiScriptsLoadedField.SetValue(null, false);
@@ -68,6 +70,7 @@ internal static class RgfClientBlazorUiTestState
 
         RgfBlazorConfiguration.ClearEntityComponentTypes();
         BlazorScriptReferencesField.SetValue(null, Array.Empty<string>());
+        DashboardRecroDictField.SetValue(null, new ConcurrentDictionary<string, string>());
     }
 
     public static void ConfigureClientPaths(string appRootPath, string apiBaseAddress)

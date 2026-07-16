@@ -1,5 +1,4 @@
-﻿@using Microsoft.AspNetCore.Components.Forms
-@using Recrovit.RecroGridFramework.Client.Blazor.Parameters
+﻿@using Recrovit.RecroGridFramework.Client.Blazor.Parameters
 
 @if (_showComponent)
 {
@@ -12,6 +11,9 @@
 
     [Parameter, EditorRequired]
     public RgfEntityParameters EntityParameters { get; set; } = null!;
+
+    [Parameter]
+    public bool Embedded { get; set; }
 
     [Parameter, EditorRequired]
     public RenderFragment<RgfChartComponent> ContentTemplate { get; set; } = null!;
