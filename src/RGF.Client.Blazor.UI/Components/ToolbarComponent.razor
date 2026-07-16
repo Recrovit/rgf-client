@@ -35,12 +35,13 @@
                                                    CssClass="@(ToolbarParameters.QuickFilterEnabled ? "btn-success" : "btn-secondary")"
                                                    Tooltip="@RecroDict.GetRgfUiString("QuickFilter")"
                                                    OnClick="() => {ToolbarParameters.QuickFilterEnabled = !ToolbarParameters.QuickFilterEnabled;
-                                                        RgfToolbar.OnToolbarCommand(RgfToolbarEventKind.ToggleQuickFilter);}" />
+                                                            RgfToolbar.OnToolbarCommand(RgfToolbarEventKind.ToggleQuickFilter);}" />
                                     }
                                 }
                             </div>
                         }
-                        @if (EntityParameters.DisplayMode != RfgDisplayMode.Tree)
+                        @if (EntityParameters.DisplayMode != RfgDisplayMode.Tree &&
+                            (Manager.EntityDesc.Options.GetBoolValue("RGO_NoDetails") != true || RgfToolbar.BasePermissions.Delete))
                         {
                             <div class="btn-group me-2" role="group">
                                 @if (Manager.EntityDesc.Options.GetBoolValue("RGO_NoDetails") != true)
@@ -72,21 +73,24 @@
                                 }
                             </div>
                         }
-                        <div class="btn-group me-2" role="group">
-                            @if (EntityParameters.ParentEntityParameters?.Manager == null || EntityParameters.ParentEntityParameters.Manager.ValidFormKeyExists() == true)
-                            {
-                                <RgfButton IconName="bi-bar-chart-steps"
-                                           CssClass="@(EntityParameters.DisplayMode == RfgDisplayMode.Tree ? "btn-success" : "btn-secondary")"
-                                           Tooltip="TreeView"
-                                           OnClick="() => RgfToolbar.OnToolbarCommand(RgfToolbarEventKind.ToggleDisplayMode, new RgfDynamicDictionary() {{ nameof(RgfToolbarEventKind.ToggleDisplayMode), EntityParameters.DisplayMode == RfgDisplayMode.Tree ? RfgDisplayMode.Grid : RfgDisplayMode.Tree} })" />
-                            }
-                            @if (RgfToolbar.EnableChart)
-                            {
-                                <RgfButton IconName="bi-graph-up" CssClass="btn-secondary"
-                                           Tooltip="RecroChart"
-                                           OnClick="() => RgfToolbar.OnToolbarCommand(RgfToolbarEventKind.RecroChart)" />
-                            }
-                        </div>
+                        @if (EntityParameters.ParentEntityParameters?.Manager == null || EntityParameters.ParentEntityParameters.Manager.ValidFormKeyExists() == true || RgfToolbar.EnableChart)
+                        {
+                            <div class="btn-group me-2" role="group">
+                                @if (EntityParameters.ParentEntityParameters?.Manager == null || EntityParameters.ParentEntityParameters.Manager.ValidFormKeyExists() == true)
+                                {
+                                    <RgfButton IconName="bi-bar-chart-steps"
+                                               CssClass="@(EntityParameters.DisplayMode == RfgDisplayMode.Tree ? "btn-success" : "btn-secondary")"
+                                               Tooltip="TreeView"
+                                               OnClick="() => RgfToolbar.OnToolbarCommand(RgfToolbarEventKind.ToggleDisplayMode, new RgfDynamicDictionary() {{ nameof(RgfToolbarEventKind.ToggleDisplayMode), EntityParameters.DisplayMode == RfgDisplayMode.Tree ? RfgDisplayMode.Grid : RfgDisplayMode.Tree} })" />
+                                }
+                                @if (RgfToolbar.EnableChart)
+                                {
+                                    <RgfButton IconName="bi-graph-up" CssClass="btn-secondary"
+                                               Tooltip="RecroChart"
+                                               OnClick="() => RgfToolbar.OnToolbarCommand(RgfToolbarEventKind.RecroChart)" />
+                                }
+                            </div>
+                        }
                         @if (RgfToolbar.SettingsMenu != null)
                         {
                             <RgfHtml TagName="div" CssClass="dropdown me-2" Role="group"

@@ -1,0 +1,148 @@
+@using Recrovit.RecroGridFramework.Abstraction.Contracts.API
+
+<RgfDashboardGroupResizeComponent Split="Split"
+                                  ParentPaneId="ParentPaneId"
+                                  ContainerElement="_groupElement"
+                                  ResizeEnabled="IsResizable"
+                                  OnResizeCommitted="OnResizeCommittedAsync">
+    <ChildContent Context="resize">
+        @if (!resize.HasRenderablePanes)
+        {
+            <div class="rgf-dashboard-group rgf-dashboard-group-empty">
+                @if (EmptyTemplate != null)
+                {
+                    @EmptyTemplate
+                }
+            </div>
+        }
+        else
+        {
+            <div @ref="_groupElement"
+                 class="rgf-dashboard-group @(resize.IsVertical ? "rgf-dashboard-group-vertical" : "rgf-dashboard-group-horizontal") @(resize.IsDragging ? "rgf-dashboard-group-dragging" : null)">
+                @for (var i = 0; i < resize.RenderablePanes.Count; i++)
+                {
+                    var splitPane = resize.RenderablePanes[i];
+                    var handleIndex = i;
+
+                    <div class="rgf-dashboard-group-segment"
+                         style="@resize.GetSegmentStyle(splitPane, i)"
+                         data-pane-id="@splitPane.Pane.PaneId"
+                         @key="splitPane.Pane.PaneId">
+                        <RgfDashboardRenderGuard ParentPaneId="ParentPaneId"
+                                                 PaneId="@splitPane.Pane.PaneId"
+                                                 DashboardItemId="@splitPane.Pane.DashboardItemId"
+                                                 FallbackContent="@EmptyGroupPane"
+                                                 LogMessage="Dashboard group child pane rendering failed.">
+                            <ChildContent>
+                                <RgfDashboardPaneComponent Pane="splitPane.Pane"
+                                                           ItemIndex="ItemIndex"
+                                                           SessionParams="SessionParams"
+                                                           EmptyTemplate="EmptyTemplate"
+                                                           IsResizable="IsResizable"
+                                                           ResizeRequested="ResizeRequested"
+                                                           LayoutCommitVersion="LayoutCommitVersion" />
+                            </ChildContent>
+                        </RgfDashboardRenderGuard>
+                    </div>
+
+                    if (i < resize.RenderablePanes.Count - 1)
+                    {
+                        <div class="@GetHandleCssClass()"
+                             role="separator"
+                             aria-orientation="@(resize.IsVertical ? "horizontal" : "vertical")"
+                             aria-disabled="@(!IsResizable)"
+                             data-leading-pane-id="@splitPane.Pane.PaneId"
+                             data-trailing-pane-id="@resize.RenderablePanes[handleIndex + 1].Pane.PaneId"
+                             @onpointerdown="resize.GetHandlePointerDownCallback(handleIndex)"
+                             @onpointerdown:preventDefault="true"></div>
+                    }
+                }
+            </div>
+        }
+
+        @if (resize.IsDragging)
+        {
+            <div class="rgf-dashboard-group-drag-overlay @(resize.IsVertical ? "rgf-dashboard-group-drag-overlay-vertical" : "rgf-dashboard-group-drag-overlay-horizontal")"
+                 @onpointermove="resize.OverlayPointerMoveCallback"
+                 @onpointerup="resize.OverlayPointerUpCallback"
+                 @onpointercancel="resize.OverlayPointerUpCallback"
+                 @onpointerleave="resize.OverlayPointerUpCallback"
+                 @onpointerup:preventDefault="true"
+                 @onpointermove:preventDefault="true"></div>
+        }
+    </ChildContent>
+</RgfDashboardGroupResizeComponent>
+
+@code {
+    [Parameter, EditorRequired]
+    public RgfDashboardSplit Split { get; set; } = new();
+
+    [Parameter, EditorRequired]
+    public IReadOnlyDictionary<int, RgfDashboardItem> ItemIndex { get; set; } = new Dictionary<int, RgfDashboardItem>();
+
+    [Parameter]
+    public RgfSessionParams? SessionParams { get; set; }
+
+    [Parameter]
+    public RenderFragment? EmptyTemplate { get; set; }
+
+    [Parameter]
+    public bool IsResizable { get; set; }
+
+    [Parameter]
+    public string? ParentPaneId { get; set; }
+
+    [Parameter]
+    public EventCallback<RgfDashboardGroupResizeRequest> ResizeRequested { get; set; }
+
+    [Parameter]
+    public int LayoutCommitVersion { get; set; }
+
+    private ElementReference _groupElement;
+    private bool _containerReferenceBound;
+    private RenderFragment EmptyGroupPane => @<div class="rgf-dashboard-pane rgf-dashboard-pane-empty"></div>;
+
+    private string GetHandleCssClass()
+        => IsResizable
+            ? "rgf-dashboard-group-handle rgf-dashboard-group-handle-interactive"
+            : "rgf-dashboard-group-handle";
+
+    private async Task OnResizeCommittedAsync(RgfDashboardGroupResizeCommit commit)
+    {
+        if (commit.LeadingIndex < 0
+            || commit.TrailingIndex < 0
+            || Split.Panes == null
+            || commit.LeadingIndex >= Split.Panes.Count
+            || commit.TrailingIndex >= Split.Panes.Count)
+        {
+            return;
+        }
+
+        var leadingPaneId = Split.Panes[commit.LeadingIndex].Pane?.PaneId;
+        var trailingPaneId = Split.Panes[commit.TrailingIndex].Pane?.PaneId;
+        if (string.IsNullOrWhiteSpace(leadingPaneId) || string.IsNullOrWhiteSpace(trailingPaneId))
+        {
+            return;
+        }
+
+        await ResizeRequested.InvokeAsync(new RgfDashboardGroupResizeRequest
+        {
+            ParentPaneId = ParentPaneId,
+            LeadingPaneId = leadingPaneId,
+            TrailingPaneId = trailingPaneId,
+            LeadingSize = commit.LeadingSize,
+            TrailingSize = commit.TrailingSize
+        });
+    }
+
+    protected override Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && !_containerReferenceBound)
+        {
+            _containerReferenceBound = true;
+            StateHasChanged();
+        }
+
+        return Task.CompletedTask;
+    }
+}

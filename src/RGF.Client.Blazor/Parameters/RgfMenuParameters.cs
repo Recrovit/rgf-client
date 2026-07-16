@@ -1,4 +1,5 @@
-﻿using Recrovit.RecroGridFramework.Abstraction.Models;
+﻿using Microsoft.AspNetCore.Components;
+using Recrovit.RecroGridFramework.Abstraction.Models;
 using System.Drawing;
 
 namespace Recrovit.RecroGridFramework.Client.Blazor.Parameters;
@@ -7,6 +8,7 @@ public class RgfMenuParameters
 {
     public int? MenuId { get; set; }
 
+    [Obsolete]
     public bool Navbar { get; set; }
 
     public object? Icon { get; set; }

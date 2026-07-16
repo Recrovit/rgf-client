@@ -4,6 +4,7 @@ using Microsoft.JSInterop;
 using Recrovit.RecroGridFramework.Abstraction.Contracts.Services;
 using Recrovit.RecroGridFramework.Blazor.RgfApexCharts;
 using Recrovit.RecroGridFramework.Client.Blazor.UI.Components;
+using Recrovit.RecroGridFramework.Client.Blazor.UI.Components.Dashboard;
 using Recrovit.RecroGridFramework.Client.Services;
 using System.Reflection;
 
@@ -80,6 +81,11 @@ public class RGFClientBlazorUIConfiguration
         await jsRuntime.InvokeVoidAsync("eval", $"document.getElementById('{BlazorUICss}')?.remove();");
         await jsRuntime.InvokeVoidAsync("eval", $"document.getElementById('{BlazorUICssLib}')?.remove();");
         await jsRuntime.InvokeVoidAsync("eval", "document.getElementsByTagName('html')[0].removeAttribute('data-bs-theme');");
+
+        RgfBlazorConfiguration.UnregisterComponent(RgfBlazorConfiguration.ComponentType.Menu);
+        RgfBlazorConfiguration.UnregisterComponent(RgfBlazorConfiguration.ComponentType.Dialog);
+        RgfBlazorConfiguration.UnregisterComponent(RgfBlazorConfiguration.ComponentType.DashboardPage);
+
         await RgfApexChartsConfiguration.UnloadResourcesAsync(jsRuntime);
     }
 
@@ -90,9 +96,9 @@ public class RGFClientBlazorUIConfiguration
     internal const string BlazorUICssLib = "rgf-client-blazor-ui-lib";
     internal const string BootstrapSubmenuCssId = "rgf-bootstrap-submenu";
 
-    internal static string GetBootstrapCssHref() => $"{RgfClientConfiguration.AppRootPath}/_content/{_uiAssemblyName}/lib/bootstrap/dist/css/bootstrap.min.css";
+    public static string GetBootstrapCssHref() => $"{RgfClientConfiguration.AppRootPath}/_content/{_uiAssemblyName}/lib/bootstrap/dist/css/bootstrap.min.css";
 
-    internal static string GetBootstrapIconsCssHref() => $"{RgfClientConfiguration.AppRootPath}/_content/{_uiAssemblyName}/lib/bootstrap-icons/font/bootstrap-icons.min.css";
+    public static string GetBootstrapIconsCssHref() => $"{RgfClientConfiguration.AppRootPath}/_content/{_uiAssemblyName}/lib/bootstrap-icons/font/bootstrap-icons.min.css";
 
     internal static string GetStylesCssHref() => $"{RgfClientConfiguration.AppRootPath}/_content/{_uiAssemblyName}/css/styles.css";
 
@@ -117,6 +123,7 @@ public static class RGFClientBlazorUIConfigurationExtension
     {
         RgfBlazorConfiguration.RegisterComponent<MenuComponent>(RgfBlazorConfiguration.ComponentType.Menu);
         RgfBlazorConfiguration.RegisterComponent<DialogComponent>(RgfBlazorConfiguration.ComponentType.Dialog);
+        RgfBlazorConfiguration.RegisterComponent<DashboardPageComponent>(RgfBlazorConfiguration.ComponentType.DashboardPage);
         RgfBlazorConfiguration.RegisterEntityComponent<EntityComponent>(string.Empty);
 
         if (loadResources)
@@ -130,4 +137,5 @@ public static class RGFClientBlazorUIConfigurationExtension
         var logger = serviceProvider.GetRequiredService<ILogger<RGFClientBlazorUIConfiguration>>();
         logger?.LogInformation("RecroGrid Framework Blazor.UI v{Version} initialized.", RGFClientBlazorUIConfiguration.Version);
     }
+
 }

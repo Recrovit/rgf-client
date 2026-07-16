@@ -10,6 +10,7 @@ public enum RgfPermissionType
     Export = 1004,
     PublicGridSetting = 1005,
     PublicChartSetting = 1006,
+    PublicDashboardSetting = 1007,
 
     FEPApprove = 1101,
     FEPReject = 1102,

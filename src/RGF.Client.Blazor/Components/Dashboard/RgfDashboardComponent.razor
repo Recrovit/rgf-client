@@ -1,0 +1,176 @@
+@using System.Text.Json
+@using System.Text.Json.Serialization
+@using Recrovit.RecroGridFramework.Abstraction.Contracts.API
+@using Recrovit.RecroGridFramework.Client.Blazor.Parameters
+@using Recrovit.RecroGridFramework.Client.Models.Dashboard
+@using Recrovit.RecroGridFramework.Client.Services.Dashboard
+
+@if (!_validationResult.IsValid)
+{
+    <div class="rgf-dashboard-runtime rgf-dashboard-runtime-error" style="@RootStyle" role="alert">
+        <div class="rgf-dashboard-runtime-error-title">Dashboard layout is invalid.</div>
+    </div>
+}
+else if (IsRootEmptyLeaf)
+{
+    <div class="rgf-dashboard-runtime rgf-dashboard-runtime-empty" style="@RootStyle">
+        @EffectiveEmptyTemplate
+    </div>
+}
+else
+{
+    <div class="rgf-dashboard-runtime" style="@RootStyle">
+        <RgfDashboardPaneComponent Pane="_renderDashboard.Layout.RootPane"
+                                   ItemIndex="_itemIndex"
+                                   SessionParams="SessionParams"
+                                   EmptyTemplate="LeafEmptyTemplate"
+                                   IsResizable="true"
+                                   ResizeRequested="OnResizeRequestedAsync"
+                                   LayoutCommitVersion="_layoutCommitVersion" />
+    </div>
+}
+
+@inject ILogger<RgfDashboardComponent> Logger
+@inject IRecroDictService RecroDict
+@code {
+    [Parameter, EditorRequired]
+    public RgfDashboardDefinition Dashboard { get; set; } = new();
+
+    [Parameter]
+    public RgfSessionParams? SessionParams { get; set; }
+
+    [Parameter]
+    public RenderFragment? EmptyTemplate { get; set; }
+
+    private static readonly JsonSerializerOptions DashboardJsonOptions = new()
+    {
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+    };
+
+    private string? _dashboardSnapshot;
+    private int _layoutCommitVersion;
+    private IReadOnlyDictionary<int, RgfDashboardItem> _itemIndex = new Dictionary<int, RgfDashboardItem>();
+    private RgfDashboardDefinition _renderDashboard = new();
+    private RgfDashboardValidationResult _validationResult = new();
+    private string? _lastLoggedValidationSignature;
+
+    private bool IsRootEmptyLeaf
+        => _renderDashboard.Layout?.RootPane?.Split == null && _renderDashboard.Layout?.RootPane?.DashboardItemId == null;
+
+    private RenderFragment EffectiveEmptyTemplate => EmptyTemplate ?? (@<div class="rgf-dashboard-empty">@RecroDict.GetRgfUiDashboard("NoDashboardItems")</div>);
+
+    private RenderFragment LeafEmptyTemplate => @<div>@RecroDict.GetRgfUiDashboard("NoDashboardItem")</div>;
+
+    private string RootStyle
+        => $"flex:{GetRootFlex()};" +
+           $"width:{GetInlineSize(_renderDashboard.Layout?.Width)};" +
+           $"height:{GetBlockSize(_renderDashboard.Layout?.Height)};" +
+           "max-inline-size:100%;max-block-size:100%;min-inline-size:0;min-block-size:0;";
+
+    protected override void OnParametersSet()
+    {
+        Dashboard ??= new();
+        var normalizedDashboard = Dashboard.DeepCopy() ?? new();
+        normalizedDashboard.Normalize();
+
+        var snapshot = JsonSerializer.Serialize(normalizedDashboard, DashboardJsonOptions);
+        if (!string.Equals(_dashboardSnapshot, snapshot, StringComparison.Ordinal))
+        {
+            _renderDashboard = normalizedDashboard;
+            _dashboardSnapshot = snapshot;
+        }
+
+        _validationResult = RgfDashboardLayoutValidator.Validate(_renderDashboard, RgfDashboardValidationMode.Runtime);
+        LogValidationIssuesIfNeeded("dashboard parameter update");
+        _itemIndex = _renderDashboard.Layout.Items
+            .Where(item => item is { DashboardItemId: > 0 })
+            .GroupBy(item => item.DashboardItemId)
+            .ToDictionary(group => group.Key, group => group.First());
+    }
+
+    private Task OnResizeRequestedAsync(RgfDashboardGroupResizeRequest request)
+    {
+        Logger.LogInformation(
+            "Dashboard resize request received. ParentPaneId={ParentPaneId}, LeadingPaneId={LeadingPaneId}, TrailingPaneId={TrailingPaneId}, LeadingSize={LeadingSize}, TrailingSize={TrailingSize}.",
+            request.ParentPaneId,
+            request.LeadingPaneId,
+            request.TrailingPaneId,
+            request.LeadingSize,
+            request.TrailingSize);
+
+        if (RgfDashboardLayoutMutation.TryResizeSplit(
+            _renderDashboard,
+            request.ParentPaneId,
+            request.LeadingPaneId,
+            request.TrailingPaneId,
+            request.LeadingSize,
+            request.TrailingSize,
+            out var errorMessage))
+        {
+            Logger.LogInformation(
+                "Dashboard resize request applied. ParentPaneId={ParentPaneId}, LeadingPaneId={LeadingPaneId}, TrailingPaneId={TrailingPaneId}.",
+                request.ParentPaneId,
+                request.LeadingPaneId,
+                request.TrailingPaneId);
+            _validationResult = RgfDashboardLayoutValidator.Validate(_renderDashboard, RgfDashboardValidationMode.Runtime);
+            LogValidationIssuesIfNeeded("dashboard resize");
+            _itemIndex = _renderDashboard.Layout.Items
+                .Where(item => item is { DashboardItemId: > 0 })
+                .GroupBy(item => item.DashboardItemId)
+                .ToDictionary(group => group.Key, group => group.First());
+            _layoutCommitVersion++;
+            StateHasChanged();
+        }
+        else
+        {
+            Logger.LogWarning(
+                "Dashboard resize request rejected. ParentPaneId={ParentPaneId}, LeadingPaneId={LeadingPaneId}, TrailingPaneId={TrailingPaneId}, Error={ErrorMessage}.",
+                request.ParentPaneId,
+                request.LeadingPaneId,
+                request.TrailingPaneId,
+                errorMessage);
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private static string GetInlineSize(decimal? width)
+        => width is > 0 ? FormattableString.Invariant($"{width.Value}px") : "100%";
+
+    private static string GetBlockSize(decimal? height)
+        => height is > 0 ? FormattableString.Invariant($"{height.Value}px") : "100%";
+
+    private string GetRootFlex()
+        => _renderDashboard.Layout?.Width is > 0 || _renderDashboard.Layout?.Height is > 0
+            ? "0 0 auto"
+            : "1 1 auto";
+
+    private void LogValidationIssuesIfNeeded(string context)
+    {
+        if (_validationResult.IsValid)
+        {
+            _lastLoggedValidationSignature = null;
+            return;
+        }
+
+        var signature = string.Join("|", _validationResult.Issues.Select(issue => $"{issue.Code}:{issue.PaneId}:{issue.DashboardItemId}:{issue.Message}"));
+        if (string.Equals(_lastLoggedValidationSignature, signature, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        _lastLoggedValidationSignature = signature;
+
+        Logger.LogWarning(
+            "Dashboard runtime validation failed during {Context}. DashboardId={DashboardId}, Issues={Issues}.",
+            context,
+            _renderDashboard.DashboardId,
+            _validationResult.Issues.Select(issue => new
+            {
+                issue.Code,
+                issue.Message,
+                issue.PaneId,
+                issue.DashboardItemId
+            }).ToArray());
+    }
+}

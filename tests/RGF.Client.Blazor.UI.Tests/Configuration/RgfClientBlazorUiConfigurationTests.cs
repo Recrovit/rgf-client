@@ -6,11 +6,13 @@ using Recrovit.RecroGridFramework.Abstraction.Contracts.Services;
 using Recrovit.RecroGridFramework.Client.Blazor;
 using Recrovit.RecroGridFramework.Client.Blazor.UI;
 using Recrovit.RecroGridFramework.Client.Blazor.UI.Components;
+using Recrovit.RecroGridFramework.Client.Blazor.UI.Components.Dashboard;
 using Recrovit.RecroGridFramework.Client.Blazor.UI.Tests.Testing;
 using System.Reflection;
 
 namespace Recrovit.RecroGridFramework.Client.Blazor.UI.Tests.Configuration;
 
+[Collection(RgfBlazorUiStaticStateCollection.Name)]
 public sealed class RgfClientBlazorUiConfigurationTests : IDisposable
 {
     private const string ApiBaseAddress = "https://api.example.test";
@@ -212,6 +214,7 @@ public sealed class RgfClientBlazorUiConfigurationTests : IDisposable
 
         Assert.Equal(typeof(MenuComponent), RgfBlazorConfiguration.GetComponentType(RgfBlazorConfiguration.ComponentType.Menu));
         Assert.Equal(typeof(DialogComponent), RgfBlazorConfiguration.GetComponentType(RgfBlazorConfiguration.ComponentType.Dialog));
+        Assert.Equal(typeof(DashboardPageComponent), RgfBlazorConfiguration.GetComponentType(RgfBlazorConfiguration.ComponentType.DashboardPage));
         Assert.Equal(typeof(ChartComponent), RgfBlazorConfiguration.GetComponentType(RgfBlazorConfiguration.ComponentType.Chart));
         Assert.Equal(typeof(EntityComponent), RgfClientBlazorUiTestState.GetEntityComponentTypes()[string.Empty]);
     }
@@ -253,6 +256,7 @@ public sealed class RgfClientBlazorUiConfigurationTests : IDisposable
         Assert.Empty(apiService.Requests);
         Assert.Equal(typeof(MenuComponent), RgfBlazorConfiguration.GetComponentType(RgfBlazorConfiguration.ComponentType.Menu));
         Assert.Equal(typeof(DialogComponent), RgfBlazorConfiguration.GetComponentType(RgfBlazorConfiguration.ComponentType.Dialog));
+        Assert.Equal(typeof(DashboardPageComponent), RgfBlazorConfiguration.GetComponentType(RgfBlazorConfiguration.ComponentType.DashboardPage));
         Assert.Equal(typeof(ChartComponent), RgfBlazorConfiguration.GetComponentType(RgfBlazorConfiguration.ComponentType.Chart));
         Assert.Contains(loggerProvider.Entries, entry =>
             entry.Level == LogLevel.Information &&

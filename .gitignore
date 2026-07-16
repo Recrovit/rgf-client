@@ -429,7 +429,10 @@ FodyWeavers.xsd
 
 **/appsettings.*.json
 src/Directory.Build.targets
-.github/copilot-instructions.md
+
+.codex/config.toml
+**/AGENTS.md
 
 /docs/*/Help
 
+/.idea/*

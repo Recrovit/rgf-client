@@ -1,0 +1,179 @@
+@using Recrovit.RecroGridFramework.Abstraction.Contracts.API
+@using Recrovit.RecroGridFramework.Client.Blazor.Components.Dashboard
+@using Recrovit.RecroGridFramework.Client.Services.Dashboard
+
+@if (HasSplit)
+{
+    <div class="@PaneCssClass"
+         data-pane-id="@PaneKey"
+         @onclick="OnSelectAsync"
+         @onclick:stopPropagation="true">
+        <div class="rgf-dashboard-designer-pane-content">
+            <DashboardDesignerGroupComponent Split="Pane!.Split!"
+                                             ItemIndex="ItemIndex"
+                                             SessionParams="SessionParams"
+                                             ParentPaneId="@Pane.PaneId"
+                                             SelectedPaneId="@SelectedPaneId"
+                                             OnPaneSelected="OnPaneSelected"
+                                             OnResizeRequested="OnResizeRequested"
+                                             ItemRenderKeys="ItemRenderKeys"
+                                             ReadOnly="ReadOnly" />
+        </div>
+    </div>
+}
+else if (HasResolvedItem)
+{
+    <div class="@PaneCssClass"
+         data-pane-id="@PaneKey"
+         @onclick="OnSelectAsync"
+         @onclick:stopPropagation="true">
+        @if (ResolvedItem!.ShowHeader)
+        {
+            <div class="rgf-dashboard-designer-pane-header">
+                <div class="rgf-dashboard-designer-pane-title">
+                    <i class="@GetBootstrapIconClass()"></i>
+                    <span>@PaneMetadata.DisplayTitle</span>
+                </div>
+            </div>
+        }
+        <div class="rgf-dashboard-designer-pane-content rgf-dashboard-designer-pane-content-item">
+            <RgfDashboardRenderGuard PaneId="@Pane?.PaneId"
+                                     DashboardItemId="@Pane?.DashboardItemId"
+                                     FallbackContent="RenderDesignerEmptyState()"
+                                     LogMessage="Dashboard designer pane rendering failed.">
+                <ChildContent>
+                    <RgfDashboardItemComponent @key="GetItemComponentKey()" Item="ResolvedItem" SessionParams="SessionParams" />
+                </ChildContent>
+            </RgfDashboardRenderGuard>
+        </div>
+    </div>
+}
+else
+{
+    <div class="@PaneCssClass"
+         data-pane-id="@PaneKey"
+         @onclick="OnSelectAsync"
+         @onclick:stopPropagation="true">
+        <div class="rgf-dashboard-designer-pane-content">
+            @RenderDesignerEmptyState()
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired]
+    public RgfDashboardPane Pane { get; set; } = new();
+
+    [Parameter, EditorRequired]
+    public IReadOnlyDictionary<int, RgfDashboardItem> ItemIndex { get; set; } = new Dictionary<int, RgfDashboardItem>();
+
+    [Parameter]
+    public RgfSessionParams? SessionParams { get; set; }
+
+    [Parameter]
+    public string? SelectedPaneId { get; set; }
+
+    [Parameter]
+    public bool ReadOnly { get; set; }
+
+    [Parameter]
+    public EventCallback<string> OnPaneSelected { get; set; }
+
+    [Parameter]
+    public EventCallback<RgfDashboardGroupResizeRequest> OnResizeRequested { get; set; }
+
+    [Parameter]
+    public IReadOnlyDictionary<int, int> ItemRenderKeys { get; set; } = new Dictionary<int, int>();
+
+    [Inject]
+    private IRecroDictService RecroDict { get; set; } = null!;
+
+    [Inject]
+    private ILogger<DashboardDesignerPaneComponent> Logger { get; set; } = null!;
+
+    private RgfDashboardPaneMetadata PaneMetadata { get; set; } = new();
+    private string? _lastLoggedMissingItemReference;
+
+    private RgfDashboardItem? ResolvedItem => PaneMetadata.ResolvedItem;
+
+    private bool HasSplit => PaneMetadata.HasSplit;
+
+    private bool HasResolvedItem => ResolvedItem != null;
+
+    private bool HasMissingItemReference => PaneMetadata.HasMissingItemReference;
+
+    private bool IsSelected => !string.IsNullOrWhiteSpace(Pane?.PaneId) && string.Equals(Pane.PaneId, SelectedPaneId, StringComparison.Ordinal);
+
+    private string PaneKey => string.IsNullOrWhiteSpace(Pane?.PaneId) ? "splitter-designer-pane" : Pane.PaneId;
+
+    private string PaneCssClass
+        => string.Join(" ", new[] {
+            "rgf-dashboard-designer-pane",
+            IsSelected ? "rgf-dashboard-designer-pane-selected" : null,
+            ReadOnly ? "rgf-dashboard-designer-pane-readonly" : null
+        }.Where(value => !string.IsNullOrWhiteSpace(value)));
+
+    protected override void OnParametersSet()
+    {
+        PaneMetadata = RgfDashboardDefinitionHelper.ResolvePaneMetadata(Pane, ItemIndex);
+
+        if (!HasMissingItemReference)
+        {
+            _lastLoggedMissingItemReference = null;
+            return;
+        }
+
+        var signature = $"{Pane?.PaneId}:{Pane?.DashboardItemId}";
+        if (string.Equals(_lastLoggedMissingItemReference, signature, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        _lastLoggedMissingItemReference = signature;
+        LogMissingItemReference();
+    }
+
+    private Task OnSelectAsync() => string.IsNullOrWhiteSpace(Pane?.PaneId) ? Task.CompletedTask : OnPaneSelected.InvokeAsync(Pane.PaneId);
+
+    private string GetItemComponentKey()
+    {
+        if (ResolvedItem == null)
+        {
+            return "missing-item";
+        }
+
+        ItemRenderKeys.TryGetValue(ResolvedItem.DashboardItemId, out var renderKey);
+        return $"{ResolvedItem.DashboardItemId}:{renderKey}";
+    }
+
+    private string GetBootstrapIconClass()
+        => PaneMetadata.IconKey switch
+        {
+            RgfDashboardViewType.Tree => "bi bi-diagram-2",
+            RgfDashboardViewType.Chart => "bi bi-bar-chart",
+            RgfDashboardViewType.ChartData => "bi bi-graph-up-arrow",
+            _ => "bi bi-table"
+        };
+
+    private RenderFragment RenderDesignerEmptyState() =>
+        @<div class="rgf-dashboard-designer-pane-empty">
+            <div class="rgf-dashboard-designer-pane-empty-content">
+                <div class="rgf-dashboard-designer-pane-empty-title">
+                    @(IsSelected ?
+                        RecroDict.GetRgfUiDashboard("DesignerPaneReadyToSplit") :
+                        RecroDict.GetRgfUiDashboard("DesignerPaneSelectToEdit"))
+                </div>
+                <div class="rgf-dashboard-designer-pane-empty-text">
+                    @(IsSelected ?
+                        RecroDict.GetRgfUiDashboard("DesignerPaneSplitHintSelected") :
+                        RecroDict.GetRgfUiDashboard("DesignerPaneSplitHintUnselected"))
+                </div>
+            </div>
+        </div>;
+
+    private void LogMissingItemReference()
+        => Logger.LogWarning(
+            "Dashboard designer pane item reference could not be resolved. PaneId={PaneId}, DashboardItemId={DashboardItemId}.",
+            Pane?.PaneId,
+            Pane?.DashboardItemId);
+}

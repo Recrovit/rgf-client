@@ -1,0 +1,43 @@
+.rgf-dashboard-runtime-item {
+    display: flex;
+    flex: 1 1 auto;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.rgf-dashboard-runtime-item > * {
+    flex: 1 1 auto;
+    min-width: 0;
+    min-height: 0;
+}
+
+.rgf-dashboard-grid-host {
+    display: flex;
+    flex: 1 1 auto;
+    min-width: 0;
+    min-height: 0;
+    overflow: auto;
+}
+
+.rgf-dashboard-grid-host > * {
+    flex: 0 0 auto;
+    min-width: fit-content;
+    min-height: 100%;
+}
+
+.rgf-dashboard-chart-initializer {
+    display: none;
+    flex: 0 0 auto;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.rgf-dashboard-item-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.75rem;
+    color: var(--bs-secondary-color);
+}

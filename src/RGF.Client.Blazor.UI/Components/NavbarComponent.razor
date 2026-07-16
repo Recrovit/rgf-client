@@ -1,0 +1,455 @@
+@using Microsoft.AspNetCore.Components.Routing
+@using Microsoft.AspNetCore.Components.Rendering
+
+@if (!_initialized)
+{
+    <SpinnerComponent Status="Loading menu..." />
+}
+else if (_resolvedMenuItems != null)
+{
+    <nav class="@GetNavbarCssClass()">
+        <div class="rgf-navbar-shell">
+            <div class="rgf-navbar-mobile-header @GetMobileMenuVisibilityClass()">
+                @NavbarBrand
+
+                <button class="navbar-toggler"
+                        type="button"
+                        data-bs-toggle="offcanvas"
+                        data-bs-target="@($"#{_offcanvasId}")"
+                        aria-controls="@_offcanvasId"
+                        aria-label="Toggle navigation">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+            </div>
+
+            <div class="rgf-navbar-content @GetDesktopMenuVisibilityClass()">
+                <div class="rgf-navbar-section rgf-navbar-section-brand">
+                    @NavbarBrand
+                </div>
+                <div class="rgf-navbar-section rgf-navbar-section-menu">
+                    @RenderMenu(_desktopViewContext)
+                </div>
+                <div class="rgf-navbar-section rgf-navbar-section-actions">
+                    @RenderCustomContent(_desktopViewContext)
+                    @RenderBuiltInControls(_desktopViewContext)
+                </div>
+            </div>
+
+            <div @ref="_offcanvasReference"
+                 class="offcanvas offcanvas-start rgf-navbar-offcanvas"
+                 tabindex="-1"
+                 id="@_offcanvasId"
+                 aria-labelledby="@_offcanvasLabelId">
+                <div class="offcanvas-header">
+                    <h5 class="offcanvas-title" id="@_offcanvasLabelId">
+                        @NavbarBrand
+                        @if (string.IsNullOrWhiteSpace(BrandText))
+                        {
+                            <span>Navigation</span>
+                        }
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+                </div>
+                <div class="offcanvas-body rgf-navbar-offcanvas-body">
+                    @RenderMenu(_mobileViewContext)
+                    @RenderBuiltInControls(_mobileViewContext)
+                    @RenderCustomContent(_mobileViewContext)
+                </div>
+            </div>
+        </div>
+    </nav>
+}
+
+@implements IDisposable
+@inject IRecroSecService _recroSec
+@inject IRecroDictService _recroDict
+@inject IRgfMenuService _menuService
+@inject IJSRuntime _jsRuntime
+@inject NavigationManager NavigationManager
+
+@code
+{
+    [Parameter, EditorRequired]
+    public RgfMenuParameters MenuParameters { get; set; } = null!;
+
+    [Parameter]
+    public string? BrandText { get; set; }
+
+    [Parameter]
+    public string BrandUrl { get; set; } = "/";
+
+    [Parameter]
+    public string NavbarBreakpoint { get; set; } = "lg"; //sm, md, lg, xl, xxl
+
+    [Parameter]
+    public RenderFragment? NavbarRightContent { get; set; }
+
+    [Parameter]
+    public bool ShowThemeSelector { get; set; }
+
+    [Parameter]
+    public bool ShowLanguageSelector { get; set; }
+
+    private readonly HashSet<string> _expandedMobileItems = [];
+    private readonly string _offcanvasId = $"rgf-navbar-{Guid.NewGuid():N}";
+    private readonly string _offcanvasLabelId = $"rgf-navbar-label-{Guid.NewGuid():N}";
+    private const string NavbarCssScopeAttribute = "rgf-bs-navbar";
+
+    private ElementReference? _offcanvasReference;
+    private bool _initialized;
+    private int? _loadedMenuId;
+    private string? _loadedMenuLanguage;
+    private List<RgfMenu>? _loadedMenuItems;
+    private List<RgfMenu>? _resolvedMenuItems;
+
+    private RenderFragment? NavbarBrand => !string.IsNullOrWhiteSpace(BrandText) ? @<a class="navbar-brand fw-semibold rgf-navbar-brand" href="@BrandUrl">@BrandText</a> : null;
+
+    private RenderFragment? ThemeSelector() => ShowThemeSelector ? _themeSelector : null;
+    private RenderFragment _themeSelector => @<div class="rgf-navbar-built-in-control rgf-navbar-theme-selector"><ThemeSelector /></div>;
+    private NavbarViewContext _desktopViewContext => new(
+        NavbarRenderMode.Desktop,
+        "navbar-nav rgf-menu rgf-navbar-menu",
+        "rgf-navbar-built-in-controls rgf-navbar-built-in-controls-desktop",
+        "rgf-navbar-custom-content rgf-navbar-custom-content-desktop",
+        "ms-1",
+        "auto");
+    private NavbarViewContext _mobileViewContext => new(
+        NavbarRenderMode.Mobile,
+        $"navbar-nav rgf-menu rgf-navbar-mobile {GetMobileMenuVisibilityClass()}",
+        $"rgf-navbar-built-in-controls rgf-navbar-built-in-controls-mobile {GetMobileMenuVisibilityClass()}",
+        $"rgf-navbar-custom-content rgf-navbar-custom-content-mobile {GetMobileMenuVisibilityClass()}",
+        null,
+        null);
+
+    private enum NavbarRenderMode
+    {
+        Desktop,
+        Mobile
+    }
+
+    private sealed record NavbarViewContext(
+        NavbarRenderMode RenderMode,
+        string MenuClass,
+        string BuiltInControlsClass,
+        string CustomContentClass,
+        string? LanguageSelectorCssClass,
+        string? LanguageSelectorWidth);
+
+    protected override void OnInitialized()
+    {
+        NavigationManager.LocationChanged += OnLocationChanged;
+        base.OnInitialized();
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await base.OnParametersSetAsync();
+
+        _resolvedMenuItems = await ResolveMenuItemsAsync();
+        if (_resolvedMenuItems == null)
+        {
+            return;
+        }
+
+        await PrepareMenuItemsAsync(_resolvedMenuItems);
+        _expandedMobileItems.RemoveWhere(path => !PathExists(path, _resolvedMenuItems));
+    }
+
+    public void Dispose()
+    {
+        NavigationManager.LocationChanged -= OnLocationChanged;
+    }
+
+    private Task OnLanguageChanged(ChangeEventArgs args) =>
+        _recroSec.SetUserLanguageAsync(args.Value?.ToString());
+
+    private async Task PrepareMenuItemsAsync(IEnumerable<RgfMenu> items)
+    {
+        foreach (var item in items)
+        {
+            if (MenuParameters.OnMenuRender != null)
+            {
+                await MenuParameters.OnMenuRender.Invoke(item);
+            }
+
+            if (item.NestedMenu?.Count > 0)
+            {
+                await PrepareMenuItemsAsync(item.NestedMenu);
+            }
+        }
+    }
+
+    private async Task<List<RgfMenu>?> ResolveMenuItemsAsync()
+    {
+        if (MenuParameters.MenuItems != null)
+        {
+            _initialized = true;
+            return MenuParameters.MenuItems;
+        }
+
+        if (MenuParameters.MenuId == null)
+        {
+            _initialized = true;
+            _loadedMenuId = null;
+            _loadedMenuLanguage = null;
+            _loadedMenuItems = null;
+            return null;
+        }
+
+        string userLanguage = _recroSec.UserLanguage;
+        if (_loadedMenuItems != null
+            && _loadedMenuId == MenuParameters.MenuId
+            && string.Equals(_loadedMenuLanguage, userLanguage, StringComparison.Ordinal))
+        {
+            _initialized = true;
+            return _loadedMenuItems;
+        }
+
+        var res = await _menuService.GetMenuAsync(MenuParameters.MenuId.Value, userLanguage);
+        _initialized = true;
+        if (res.Success)
+        {
+            _loadedMenuId = MenuParameters.MenuId;
+            _loadedMenuLanguage = userLanguage;
+            _loadedMenuItems = res.Result;
+            return _loadedMenuItems;
+        }
+
+        return null;
+    }
+
+    private RenderFragment RenderMenu(NavbarViewContext context) => @<ul class="@context.MenuClass">
+        @foreach (var item in _resolvedMenuItems!.Select((menu, index) => (menu, index)))
+        {
+            @RenderNavbarItem(item.menu, item.index.ToString(), context.RenderMode)
+        }
+    </ul>;
+
+    private RenderFragment? RenderBuiltInControls(NavbarViewContext context) => ShowThemeSelector || ShowLanguageSelector
+        ? @<div class="@context.BuiltInControlsClass">
+            @ThemeSelector()
+
+            @if (ShowLanguageSelector)
+            {
+                <div class="rgf-navbar-built-in-control rgf-navbar-language-selector">
+                    <RgfComboBox TValue="string"
+                                 CssClass="@context.LanguageSelectorCssClass"
+                                 Width="@context.LanguageSelectorWidth"
+                                 ValueExpression="() => _recroSec.UserLanguage"
+                                 Value="_recroSec.UserLanguage"
+                                 DataSource="_recroDict.Languages.Select(e => new KeyValuePair<string, string>(e.Key, e.Value))"
+                                 OnValueChanging="(arg)=> _recroSec.SetUserLanguageAsync(arg.NewValue)" />
+                </div>
+            }
+        </div>
+    : null;
+
+    private RenderFragment? RenderCustomContent(NavbarViewContext context) => NavbarRightContent == null ? null :
+        @<div class="@context.CustomContentClass">@NavbarRightContent</div>;
+
+    private RenderFragment RenderNavbarItem(RgfMenu item, string path, NavbarRenderMode mode) => builder =>
+    {
+        int sequence = 0;
+        bool hasNested = item.MenuType == RgfMenuType.Menu && item.NestedMenu?.Count > 0;
+        bool isDesktop = mode == NavbarRenderMode.Desktop;
+        string itemClass = isDesktop && hasNested ? "nav-item dropdown" : "nav-item";
+        if (!string.IsNullOrWhiteSpace(item.CssClass))
+        {
+            itemClass = $"{itemClass} {item.CssClass}";
+        }
+
+        builder.OpenElement(sequence++, "li");
+        AddNavbarScope(builder, ref sequence);
+        builder.AddAttribute(sequence++, "class", itemClass);
+
+        if (item.Disabled || item.MenuType == RgfMenuType.Disabled)
+        {
+            builder.AddMarkupContent(sequence++, $"<span class=\"nav-link disabled {NavbarCssScopeAttribute}\">{BuildNavbarItemContent(item)}</span>");
+            builder.CloseElement();
+            return;
+        }
+
+        switch (item.MenuType)
+        {
+            case RgfMenuType.ActionLink:
+                if (isDesktop)
+                {
+                    builder.OpenComponent(sequence++, typeof(NavLink));
+                    builder.AddAttribute(sequence++, "class", "nav-link");
+                    builder.AddAttribute(sequence++, NavbarCssScopeAttribute, string.Empty);
+                    builder.AddAttribute(sequence++, "href", $"{RgfClientConfiguration.AppRootPath}{item.Command}");
+                    builder.AddAttribute(sequence++, nameof(NavLink.ChildContent), (RenderFragment)((b) => b.AddMarkupContent(0, BuildNavbarItemContent(item))));
+                    builder.CloseComponent();
+                }
+                else
+                {
+                    builder.OpenElement(sequence++, "a");
+                    AddNavbarScope(builder, ref sequence);
+                    builder.AddAttribute(sequence++, "class", "nav-link");
+                    builder.AddAttribute(sequence++, "href", $"{RgfClientConfiguration.AppRootPath}{item.Command}");
+                    builder.AddAttribute(sequence++, "onclick", EventCallback.Factory.Create(this, CloseNavbarAsync));
+                    builder.AddMarkupContent(sequence++, BuildNavbarItemContent(item));
+                    builder.CloseElement();
+                }
+                break;
+
+            case RgfMenuType.Divider:
+                if (isDesktop)
+                {
+                    builder.AddMarkupContent(sequence++, $"<div class=\"vr {GetDesktopDividerVisibilityClass()} h-100 mx-2\"></div>");
+                }
+                else
+                {
+                    builder.AddMarkupContent(sequence++, "<hr class=\"rgf-navbar-mobile-divider\" />");
+                }
+                break;
+
+            case RgfMenuType.Menu:
+                if (isDesktop)
+                {
+                    builder.OpenElement(sequence++, "button");
+                    AddNavbarScope(builder, ref sequence);
+                    builder.AddAttribute(sequence++, "type", "button");
+                    builder.AddAttribute(sequence++, "class", "nav-link dropdown-toggle btn btn-link");
+                    builder.AddAttribute(sequence++, "data-bs-toggle", "dropdown");
+                    builder.AddAttribute(sequence++, "aria-expanded", "false");
+                    builder.AddMarkupContent(sequence++, BuildNavbarItemContent(item));
+                    builder.CloseElement();
+
+                    builder.OpenComponent(sequence++, typeof(MenuComponent));
+                    builder.AddAttribute(sequence++, nameof(MenuComponent.MenuParameters), new RgfMenuParameters()
+                    {
+                        MenuItems = item.NestedMenu,
+                        OnMenuRender = MenuParameters.OnMenuRender,
+                        OnMenuItemSelect = MenuParameters.OnMenuItemSelect
+                    });
+                    builder.CloseComponent();
+                }
+                else
+                {
+                    string collapseId = $"{_offcanvasId}-section-{SanitizePath(path)}";
+                    builder.OpenElement(sequence++, "button");
+                    AddNavbarScope(builder, ref sequence);
+                    builder.AddAttribute(sequence++, "type", "button");
+                    builder.AddAttribute(sequence++, "class", "nav-link btn btn-link rgf-navbar-mobile-toggle");
+                    builder.AddAttribute(sequence++, "aria-expanded", IsMobileItemExpanded(path));
+                    builder.AddAttribute(sequence++, "aria-controls", collapseId);
+                    builder.AddAttribute(sequence++, "onclick", EventCallback.Factory.Create(this, () => ToggleMobileItem(path)));
+                    builder.AddMarkupContent(sequence++, $"{BuildNavbarItemContent(item)}<i class=\"bi {(IsMobileItemExpanded(path) ? "bi-chevron-up" : "bi-chevron-down")} small\"></i>");
+                    builder.CloseElement();
+
+                    if (hasNested)
+                    {
+                        builder.OpenElement(sequence++, "ul");
+                        AddNavbarScope(builder, ref sequence);
+                        builder.AddAttribute(sequence++, "id", collapseId);
+                        builder.AddAttribute(sequence++, "class", "navbar-nav rgf-menu rgf-navbar-mobile-submenu");
+                        builder.AddAttribute(sequence++, "hidden", !IsMobileItemExpanded(path));
+                        builder.AddAttribute(sequence++, "aria-hidden", (!IsMobileItemExpanded(path)).ToString().ToLowerInvariant());
+                        builder.AddAttribute(sequence++, "style", IsMobileItemExpanded(path) ? "display:flex;" : "display:none;");
+                        foreach (var nested in item.NestedMenu!.Select((menu, index) => (menu, index)))
+                        {
+                            builder.AddContent(sequence++, RenderNavbarItem(nested.menu, $"{path}-{nested.index}", NavbarRenderMode.Mobile));
+                        }
+                        builder.CloseElement();
+                    }
+                }
+                break;
+
+            case RgfMenuType.Custom:
+                builder.AddMarkupContent(sequence++, string.Format(item.Command, item.Title));
+                break;
+        }
+
+        builder.CloseElement();
+    };
+
+    private static string BuildNavbarItemContent(RgfMenu item)
+    {
+        string iconMarkup = item.Icon != null ? $"<i class=\"bi {item.Icon} me-2\"></i>" : string.Empty;
+        return $"{iconMarkup}<span>{item.Title}</span>";
+    }
+
+    private static void AddNavbarScope(RenderTreeBuilder builder, ref int sequence) =>
+        builder.AddAttribute(sequence++, NavbarCssScopeAttribute, string.Empty);
+
+    private string GetNavbarCssClass() => $"navbar rgf-navbar navbar-expand-{GetNavbarBreakpoint()}";
+
+    private string GetDesktopMenuVisibilityClass() => $"d-none d-{GetNavbarBreakpoint()}-flex";
+
+    private string GetMobileMenuVisibilityClass() => $"d-{GetNavbarBreakpoint()}-none";
+
+    private string GetDesktopDividerVisibilityClass() => $"d-none d-{GetNavbarBreakpoint()}-flex";
+
+    private string GetNavbarBreakpoint() => string.IsNullOrWhiteSpace(NavbarBreakpoint) ? "lg" : NavbarBreakpoint.Trim().ToLowerInvariant();
+
+    private bool IsMobileItemExpanded(string path) => _expandedMobileItems.Contains(path);
+
+    private void ToggleMobileItem(string path)
+    {
+        if (!_expandedMobileItems.Add(path))
+        {
+            _expandedMobileItems.Remove(path);
+        }
+    }
+
+    private async Task OnNavbarMenuItemSelectedAsync(RgfMenu item, bool isDesktop)
+    {
+        if (MenuParameters.OnMenuItemSelect != null)
+        {
+            await MenuParameters.OnMenuItemSelect.Invoke(item);
+        }
+
+        if (!isDesktop)
+        {
+            await CloseNavbarAsync();
+        }
+    }
+
+    private async Task CloseNavbarAsync()
+    {
+        _expandedMobileItems.Clear();
+
+        if (_offcanvasReference != null)
+        {
+            await _jsRuntime.InvokeVoidAsync(RGFClientBlazorUIConfiguration.JsBlazorUiNamespace + ".Menu.hideOffcanvas", _offcanvasReference);
+        }
+    }
+
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
+    {
+        _expandedMobileItems.Clear();
+        _ = InvokeAsync(async () =>
+        {
+            await CloseNavbarAsync();
+            StateHasChanged();
+        });
+    }
+
+    private static string SanitizePath(string path) => path.Replace('-', '_');
+
+    private static bool PathExists(string path, IReadOnlyList<RgfMenu> items)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return false;
+        }
+
+        var segments = path.Split('-', StringSplitOptions.RemoveEmptyEntries);
+        IReadOnlyList<RgfMenu> current = items;
+        RgfMenu? item = null;
+
+        foreach (string segment in segments)
+        {
+            if (!int.TryParse(segment, out int index) || index < 0 || index >= current.Count)
+            {
+                return false;
+            }
+
+            item = current[index];
+            current = item.NestedMenu ?? [];
+        }
+
+        return item?.MenuType == RgfMenuType.Menu;
+    }
+}

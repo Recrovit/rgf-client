@@ -3,6 +3,49 @@
     overflow-y: hidden;
 }
 
+.rgf-apexchart-container-embedded {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.rgf-apexchart-card-body-embedded {
+    display: flex;
+    flex: 1 1 auto;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.rgf-apexchart-tab-content-embedded {
+    display: flex;
+    flex: 1 1 auto;
+    width: 100%;
+    min-width: 0;
+    min-height: 0;
+}
+
+.rgf-apexchart-tab-pane-embedded {
+    min-width: 0;
+    min-height: 0;
+}
+
+.rgf-apexchart-tab-pane-embedded.active,
+.rgf-apexchart-content-embedded {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    width: 100%;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+}
+
 .pie ::deep div.apx-legend-position-right,
 .donut ::deep div.apx-legend-position-right {
     width: 33%;

@@ -1,0 +1,240 @@
+
+@ChildContent?.Invoke(Context)
+
+@inject IJSRuntime JsRuntime
+@inject ILogger<RgfDashboardGroupResizeComponent> Logger
+@implements IAsyncDisposable
+@code {
+    [Parameter, EditorRequired]
+    public RgfDashboardSplit Split { get; set; } = new();
+
+    [Parameter]
+    public string? ParentPaneId { get; set; }
+
+    [Parameter]
+    public ElementReference ContainerElement { get; set; }
+
+    [Parameter]
+    public bool ResizeEnabled { get; set; }
+
+    [Parameter]
+    public EventCallback<RgfDashboardGroupResizeCommit> OnResizeCommitted { get; set; }
+
+    [Parameter]
+    public RenderFragment<RgfDashboardGroupResizeContext>? ChildContent { get; set; }
+
+    private IReadOnlyList<RgfDashboardSplitPane> RenderablePanes { get; set; } = [];
+    private List<decimal> WorkingSizes { get; set; } = [];
+    private ResizeInteractionState? ActiveResize { get; set; }
+    private RgfDashboardGroupResizeContext Context { get; set; } = null!;
+
+    internal IReadOnlyList<RgfDashboardSplitPane> RenderablePanesSnapshot => RenderablePanes;
+    internal IReadOnlyList<decimal> WorkingSizesSnapshot => WorkingSizes;
+    internal bool HasRenderablePanesSnapshot => RenderablePanes.Count > 0;
+    internal bool IsVerticalSnapshot => Split.Direction == RgfDashboardSplitDirection.Rows;
+    internal bool IsDraggingSnapshot => ActiveResize != null;
+
+    protected override void OnInitialized()
+    {
+        Context = new RgfDashboardGroupResizeContext(this);
+    }
+
+    protected override void OnParametersSet()
+    {
+        RenderablePanes = (Split.Panes ?? [])
+            .Where(splitPane => splitPane?.Pane != null)
+            .Cast<RgfDashboardSplitPane>()
+            .ToArray();
+
+        if (ActiveResize == null)
+        {
+            WorkingSizes = RenderablePanes
+                .Select(splitPane => splitPane.Size > 0 ? splitPane.Size : 1m)
+                .ToList();
+        }
+    }
+
+    internal string GetSegmentStyle(RgfDashboardSplitPane splitPane, int index)
+    {
+        var size = index < WorkingSizes.Count && WorkingSizes[index] > 0
+            ? WorkingSizes[index]
+            : splitPane.Size > 0 ? splitPane.Size : 1m;
+
+        return FormattableString.Invariant(
+            $"flex:{size} 1 0;min-width:{GetMinWidth(splitPane)};min-height:{GetMinHeight(splitPane)};");
+    }
+
+    private string GetMinWidth(RgfDashboardSplitPane splitPane)
+        => !IsVerticalSnapshot && splitPane.MinSize is > 0
+            ? FormattableString.Invariant($"{splitPane.MinSize.Value}px")
+            : "0";
+
+    private string GetMinHeight(RgfDashboardSplitPane splitPane)
+        => IsVerticalSnapshot && splitPane.MinSize is > 0
+            ? FormattableString.Invariant($"{splitPane.MinSize.Value}px")
+            : "0";
+
+    internal async Task OnHandlePointerDownAsync(int handleIndex, PointerEventArgs args)
+    {
+        if (!ResizeEnabled || handleIndex < 0 || handleIndex >= RenderablePanes.Count - 1 || WorkingSizes.Count != RenderablePanes.Count)
+        {
+            Logger.LogDebug(
+                "Dashboard resize ignored on pointer down. ResizeEnabled={ResizeEnabled}, HandleIndex={HandleIndex}, PaneCount={PaneCount}, WorkingSizeCount={WorkingSizeCount}, ParentPaneId={ParentPaneId}.",
+                ResizeEnabled,
+                handleIndex,
+                RenderablePanes.Count,
+                WorkingSizes.Count,
+                ParentPaneId);
+            return;
+        }
+
+        var containerLength = await JsRuntime.InvokeAsync<double>(
+            RgfBlazorConfiguration.JsBlazorNamespace + ".getElementClientSize",
+            ContainerElement,
+            IsVerticalSnapshot ? "height" : "width");
+
+        if (containerLength <= 0)
+        {
+            Logger.LogWarning(
+                "Dashboard resize aborted because container length is not positive. ParentPaneId={ParentPaneId}, HandleIndex={HandleIndex}, Direction={Direction}, ContainerLength={ContainerLength}.",
+                ParentPaneId,
+                handleIndex,
+                Split.Direction,
+                containerLength);
+            return;
+        }
+
+        ActiveResize = new ResizeInteractionState(
+            handleIndex,
+            IsVerticalSnapshot ? args.ClientY : args.ClientX,
+            containerLength,
+            WorkingSizes.ToArray());
+    }
+
+    internal Task OnOverlayPointerMoveAsync(PointerEventArgs args)
+    {
+        if (ActiveResize == null)
+        {
+            return Task.CompletedTask;
+        }
+
+        var currentPosition = IsVerticalSnapshot ? args.ClientY : args.ClientX;
+        var deltaPixels = currentPosition - ActiveResize.LastPointerPosition;
+        if (Math.Abs(deltaPixels) < double.Epsilon)
+        {
+            return Task.CompletedTask;
+        }
+
+        var totalSize = WorkingSizes.Sum();
+        if (ActiveResize.ContainerLength <= 0 || totalSize <= 0)
+        {
+            Logger.LogWarning(
+                "Dashboard resize move aborted because container or total size is invalid. ParentPaneId={ParentPaneId}, ContainerLength={ContainerLength}, TotalSize={TotalSize}.",
+                ParentPaneId,
+                ActiveResize.ContainerLength,
+                totalSize);
+            return Task.CompletedTask;
+        }
+
+        var leadingIndex = ActiveResize.HandleIndex;
+        var trailingIndex = leadingIndex + 1;
+        var deltaUnits = (decimal)(deltaPixels * (double)totalSize / ActiveResize.ContainerLength);
+        var leadingSize = WorkingSizes[leadingIndex] + deltaUnits;
+        var trailingSize = WorkingSizes[trailingIndex] - deltaUnits;
+
+        var leadingMinimum = GetMinimumSizeUnits(RenderablePanes[leadingIndex].MinSize, totalSize, ActiveResize.ContainerLength);
+        var trailingMinimum = GetMinimumSizeUnits(RenderablePanes[trailingIndex].MinSize, totalSize, ActiveResize.ContainerLength);
+
+        if (leadingSize < leadingMinimum)
+        {
+            var deficit = leadingMinimum - leadingSize;
+            leadingSize = leadingMinimum;
+            trailingSize -= deficit;
+        }
+
+        if (trailingSize < trailingMinimum)
+        {
+            var deficit = trailingMinimum - trailingSize;
+            trailingSize = trailingMinimum;
+            leadingSize -= deficit;
+        }
+
+        if (leadingSize < leadingMinimum || trailingSize < trailingMinimum)
+        {
+            Logger.LogDebug(
+                "Dashboard resize move rejected by minimum size. ParentPaneId={ParentPaneId}, LeadingPaneId={LeadingPaneId}, TrailingPaneId={TrailingPaneId}.",
+                ParentPaneId,
+                RenderablePanes[leadingIndex].Pane.PaneId,
+                RenderablePanes[trailingIndex].Pane.PaneId);
+            ActiveResize = ActiveResize with { LastPointerPosition = currentPosition };
+            return Task.CompletedTask;
+        }
+
+        WorkingSizes[leadingIndex] = decimal.Round(leadingSize, 4);
+        WorkingSizes[trailingIndex] = decimal.Round(trailingSize, 4);
+        ActiveResize = ActiveResize with { LastPointerPosition = currentPosition };
+        StateHasChanged();
+
+        return Task.CompletedTask;
+    }
+
+    internal async Task OnOverlayPointerUpAsync(PointerEventArgs _)
+    {
+        if (ActiveResize == null)
+        {
+            return;
+        }
+
+        var resizeState = ActiveResize;
+        ActiveResize = null;
+
+        var leadingIndex = resizeState.HandleIndex;
+        var trailingIndex = leadingIndex + 1;
+        if (leadingIndex < 0 || trailingIndex >= RenderablePanes.Count)
+        {
+            StateHasChanged();
+            return;
+        }
+
+        if (AreSizesEqual(resizeState.InitialSizes[leadingIndex], WorkingSizes[leadingIndex])
+            && AreSizesEqual(resizeState.InitialSizes[trailingIndex], WorkingSizes[trailingIndex]))
+        {
+            StateHasChanged();
+            return;
+        }
+
+        await OnResizeCommitted.InvokeAsync(new RgfDashboardGroupResizeCommit
+        {
+            LeadingIndex = leadingIndex,
+            TrailingIndex = trailingIndex,
+            LeadingSize = WorkingSizes[leadingIndex],
+            TrailingSize = WorkingSizes[trailingIndex]
+        });
+        StateHasChanged();
+    }
+
+    private static decimal GetMinimumSizeUnits(decimal? minimumPixels, decimal totalSize, double containerLength)
+    {
+        if (minimumPixels is not > 0 || totalSize <= 0 || containerLength <= 0)
+        {
+            return 0m;
+        }
+
+        return decimal.Round((decimal)((double)minimumPixels.Value * (double)totalSize / containerLength), 4);
+    }
+
+    private static bool AreSizesEqual(decimal left, decimal right)
+        => decimal.Round(left, 4) == decimal.Round(right, 4);
+
+    public ValueTask DisposeAsync()
+    {
+        ActiveResize = null;
+        return ValueTask.CompletedTask;
+    }
+
+    private sealed record ResizeInteractionState(
+        int HandleIndex,
+        double LastPointerPosition,
+        double ContainerLength,
+        decimal[] InitialSizes);
+}

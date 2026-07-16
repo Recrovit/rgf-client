@@ -13,6 +13,7 @@ Its main responsibility is to provide a concrete, opinionated set of Blazor UI c
 In practice, this package is the layer that gives RecroGrid a complete default UI in Blazor applications:
 
 - it provides concrete implementations for the menu, dialog, entity, grid, filter, form, pager, tree, toast, toolbar, and chart UI
+- it provides the ready-made dashboard page and dashboard designer experience on top of the dashboard runtime layer
 - it wires those components into the extension points defined by [`Recrovit.RecroGridFramework.Client.Blazor`](https://www.nuget.org/packages/Recrovit.RecroGridFramework.Client.Blazor/)
 - it ships the supporting Bootstrap and RecroGrid-specific UI resources needed by the default UI layer
 - it adds a root component and helper base controls for building consistent RecroGrid user interfaces
@@ -33,6 +34,7 @@ The `Components` folder contains the concrete UI implementations that sit on top
 - `PagerComponent`
 - `TreeComponent`
 - `MenuComponent`
+- `NavbarComponent`
 - `DialogComponent`
 - `ToolbarComponent`
 - `ToastComponent`
@@ -40,6 +42,18 @@ The `Components` folder contains the concrete UI implementations that sit on top
 - `RgfRootComponent`
 
 These components provide the default visual and interaction model for working with RecroGrid entities in Blazor applications.
+
+### Dashboard UI
+
+The package also contains the ready-made dashboard UI experience built on top of the runtime dashboard renderer from [`Recrovit.RecroGridFramework.Client.Blazor`](https://www.nuget.org/packages/Recrovit.RecroGridFramework.Client.Blazor/).
+
+This dashboard UI layer includes:
+
+- `DashboardPageComponent` as the packaged dashboard page, loading flow, selection shell, and runtime/designer host
+- `DashboardDesignerComponent` as the dashboard editor used for creating, cloning, updating, and deleting dashboards
+- `DashboardDesignerPaneComponent` and `DashboardDesignerGroupComponent` as the layout editing UI for pane and split composition
+
+This package owns the ready-made dashboard page and designer experience. The lower-level dashboard runtime renderer remains a separate component layer in [`Recrovit.RecroGridFramework.Client.Blazor`](https://www.nuget.org/packages/Recrovit.RecroGridFramework.Client.Blazor/).
 
 ### Base input and layout controls
 
@@ -67,10 +81,13 @@ It is responsible for:
 - registering `MenuComponent` as the active menu component
 - registering `DialogComponent` as the active dialog component
 - registering `EntityComponent` as the default entity component
+- registering `DashboardPageComponent` as the active dashboard page component
 - initializing the ApexCharts-based chart implementation
 - loading the UI resource set required by the packaged components
 
 This makes the package the default UI composition layer for RecroGrid in Blazor applications.
+
+Within that registration model, the packaged dashboard page is the higher-level integration point. It hosts the runtime dashboard component for viewing and switches to the packaged designer UI when editing is enabled.
 
 ### Resource loading and theming
 
@@ -92,9 +109,11 @@ The packaged UI also includes higher-level application behavior, for example:
 - `RgfRootComponent` as a root wrapper for RecroGrid UI composition
 - `ToastComponent` for framework notifications and background progress feedback
 - `DialogComponent` for modal and inline dialog presentation
-- menu and toolbar components for framework-driven navigation and actions
+- menu, navbar, and toolbar components for framework-driven navigation and actions
 
 These pieces make the package useful not only as a control library, but as the default end-user UI layer of the framework.
+
+For dashboards specifically, this also means the package provides the end-user browsing and editing flow rather than only the underlying renderer. The packaged dashboard editor is responsive, but it intentionally blocks editing in mobile-sized viewports while the runtime dashboard display remains available through the lower-level dashboard component layer.
 
 ## How It Fits Into The RGF Stack
 
@@ -104,7 +123,7 @@ At a high level, the flow looks like this:
 2. [`Recrovit.RecroGridFramework.Client`](https://www.nuget.org/packages/Recrovit.RecroGridFramework.Client/) provides the client-side API access, services, and orchestration.
 3. [`Recrovit.RecroGridFramework.Client.Blazor`](https://www.nuget.org/packages/Recrovit.RecroGridFramework.Client.Blazor/) provides the Blazor integration points, base components, and runtime services.
 4. [`Recrovit.RecroGridFramework.Blazor.ApexCharts`](https://www.nuget.org/packages/Recrovit.RecroGridFramework.Blazor.ApexCharts/) provides the concrete chart implementation.
-5. [`Recrovit.RecroGridFramework.Client.Blazor.UI`](https://www.nuget.org/packages/Recrovit.RecroGridFramework.Client.Blazor.UI/) assembles those pieces into a complete default UI layer.
+5. [`Recrovit.RecroGridFramework.Client.Blazor.UI`](https://www.nuget.org/packages/Recrovit.RecroGridFramework.Client.Blazor.UI/) assembles those pieces into a complete default UI layer, including the packaged dashboard page and dashboard designer.
 
 This makes [`Recrovit.RecroGridFramework.Client.Blazor.UI`](https://www.nuget.org/packages/Recrovit.RecroGridFramework.Client.Blazor.UI/) the highest-level packaged UI layer in the current RecroGrid client stack.
 
@@ -114,8 +133,13 @@ This makes [`Recrovit.RecroGridFramework.Client.Blazor.UI`](https://www.nuget.or
 
 - Blazor applications that want a ready-made RecroGrid UI instead of composing every component manually
 - applications that want the default menu, dialog, toast, form, grid, and toolbar implementations
+- applications that want a built-in dashboard browsing and editing experience without building a custom dashboard shell
 - applications that want the RecroGrid Bootstrap-based visual layer and bundled resource setup
 - applications that build on the RecroGrid Blazor stack but prefer starting from the packaged UI components
+
+## Dashboard Capability
+
+In the packaged UI stack, dashboard navigation is exposed through the built-in dashboard page component registered for the dashboard route. That page combines catalog loading, dashboard selection, runtime display, and the packaged designer workflow, while still delegating actual dashboard rendering to the lower-level runtime component layer.
 
 ## Related Packages
 

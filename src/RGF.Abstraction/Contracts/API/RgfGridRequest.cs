@@ -1,6 +1,4 @@
 ﻿using Recrovit.RecroGridFramework.Abstraction.Models;
-using System;
-using System.Collections.Generic;
 using System.Text.Json.Serialization;
 
 namespace Recrovit.RecroGridFramework.Abstraction.Contracts.API;
@@ -26,6 +24,9 @@ public class RgfGridRequest : RgfSessionParams
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public bool? Skeleton { get; set; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool SkipInitialData { get; set; }
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public RgfListParam ListParam { get; set; }

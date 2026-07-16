@@ -139,6 +139,11 @@ public class ApiService : IRgfApiService
             {
                 body = response;
             }
+            else if (typeof(ResultType) == typeof(RgfEmptyResult))
+            {
+                var content = await response.Content.ReadAsStringAsync(request.CancellationToken);
+                body = string.IsNullOrWhiteSpace(content) ? new RgfEmptyResult() : JsonSerializer.Deserialize<RgfEmptyResult>(content);
+            }
             else
             {
                 using Stream contentStream = await response.Content.ReadAsStreamAsync();
@@ -240,6 +245,8 @@ public static class IRgfServiceExtension
     public static Task<IRgfApiResponse<List<RecroSecResult>>> GetPermissionsAsync(this IRgfApiService service, IEnumerable<RecroSecQuery> param) => service.PostAsync<List<RecroSecResult>, IEnumerable<RecroSecQuery>>($"/rgf/api/recrosec/Permissions", param);
 
     public static Task<IRgfApiResponse<RgfUserState>> GetUserStateAsync(this IRgfApiService service, Dictionary<string, string>? query = null) => service.GetAsync<RgfUserState>($"/rgf/api/recrosec/UserState", query);
+
+    public static Task<IRgfApiResponse<RgfEmptyResult>> SaveUserStateSettingsAsync(this IRgfApiService service, Dictionary<string, string?> settings) => service.PostAsync<RgfEmptyResult, Dictionary<string, string?>>($"/rgf/api/recrosec/UserStateSettings", settings);
 
     public static Task<IRgfApiResponse<RgfResult<Dictionary<string, string>>>> VersionCompatibilityAsync(this IRgfApiService service) => service.GetAsync<RgfResult<Dictionary<string, string>>>($"/rgf/api/version-compatibility");
 }

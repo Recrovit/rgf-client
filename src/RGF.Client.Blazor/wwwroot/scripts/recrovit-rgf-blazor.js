@@ -1,9 +1,9 @@
 ﻿/*!
-* recrovit-rgf-blazor.js v1.0.1
+* recrovit-rgf-blazor.js v1.1.0
 */
 
-window.Recrovit = window.Recrovit || { };
-window.Recrovit.RGF = window.Recrovit.RGF || { };
+window.Recrovit = window.Recrovit || {};
+window.Recrovit.RGF = window.Recrovit.RGF || {};
 window.Recrovit.RGF.Blazor = window.Recrovit.RGF.Blazor || {};
 var Blazor = window.Recrovit.RGF.Blazor;
 
@@ -66,7 +66,18 @@ Blazor.Client = {
         //console.log(funct, args);
         this.createFn(funct)(this.prepareGridColArg(args));
     },
-    downloadFileFromStream: async function(fileName, contentStreamReference) {
+    getElementClientSize: function (element, dimension) {
+        if (!element) {
+            return 0;
+        }
+
+        if (dimension === 'height') {
+            return element.clientHeight || 0;
+        }
+
+        return element.clientWidth || 0;
+    },
+    downloadFileFromStream: async function (fileName, contentStreamReference) {
         const arrayBuffer = await contentStreamReference.arrayBuffer();
         const blob = new Blob([arrayBuffer]);
         const url = URL.createObjectURL(blob);

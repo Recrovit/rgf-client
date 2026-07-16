@@ -122,7 +122,6 @@ public partial class RgfToolbarComponent : ComponentBase, IDisposable
         var param = new RgfMenuParameters()
         {
             MenuItems = menu,
-            Navbar = false,
             Icon = icon,
             OnMenuItemSelect = OnSettingsMenu,
             OnMenuRender = _menuRenderer!.OnMenuRender,
@@ -302,7 +301,7 @@ public partial class RgfToolbarComponent : ComponentBase, IDisposable
         else
         {
             var title = _recroDict.GetRgfUiString("Delete");
-            var confirmationMessage = string.Format(_recroDict.GetRgfUiString("DelConfirmBulk"), Manager.SelectedItems.Value.Count);
+            var confirmationMessage = _recroDict.GetRgfUiString("DelConfirmBulk", Manager.SelectedItems.Value.Count);
             _dynamicDialog.PromptActionConfirmation(title, confirmationMessage, ApprovalType.All | ApprovalType.Cancel, async (approval) =>
             {
                 if (approval == ApprovalType.All)
