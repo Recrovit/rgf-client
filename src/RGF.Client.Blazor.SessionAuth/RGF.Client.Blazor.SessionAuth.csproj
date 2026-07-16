@@ -8,7 +8,7 @@
   <PropertyGroup>
     <!--<Version>10.x.x</Version>-->
     <Description>RecroGrid Framework Blazor session-auth integration for route-aware client and SSR scenarios.</Description>
-    <PackageTags>recrogrid dotnet blazor sessionauth</PackageTags>
+    <PackageTags>recrogrid sessionauth blazor oidc</PackageTags>
   </PropertyGroup>
 
   <ItemGroup>
