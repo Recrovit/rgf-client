@@ -88,7 +88,7 @@ public partial class RgfChartComponent : ComponentBase, IDisposable
 
         AllowedProperties = Manager.EntityDesc.Properties
             .Where(p => p.Readable && !p.IsDynamic &&
-                p.Options?.GetStringValue("RGO_AutoExternal") == null &&
+                //p.Options?.GetStringValue("RGO_AutoExternal") == null &&
                 p.Options?.GetBoolValue("RGO_AggregationExclude") != true &&
                 (validFormTypes.Contains(p.FormType) || p.Options?.GetBoolValue("RGO_AggregationRequired") == true))
             .OrderBy(e => e.ColTitle)
@@ -300,6 +300,7 @@ public partial class RgfChartComponent : ComponentBase, IDisposable
     {
         messageStore.Clear();
         var aggregationSettings = rgfChartSettings.AggregationSettings;
+        var allowedPropertyIds = AllowedProperties.Select(property => property.Id).ToHashSet();
         if (aggregationSettings.Columns.Count == 0)
         {
             ChartSettings.AggregationSettings.Columns = new List<RgfAggregationColumn> { new() { Id = 0, Aggregate = "Count" } };
@@ -322,6 +323,10 @@ public partial class RgfChartComponent : ComponentBase, IDisposable
             {
                 messageStore.Add(() => col.Id, "");
             }
+            else if (!allowedPropertyIds.Contains(col.Id))
+            {
+                messageStore.Add(() => aggregationSettings.Columns[i], "");
+            }
         }
         if (rgfChartSettings.SeriesType != RgfChartSeriesType.Bar && rgfChartSettings.SeriesType != RgfChartSeriesType.Line)
         {
@@ -337,7 +342,7 @@ public partial class RgfChartComponent : ComponentBase, IDisposable
         for (int i = aggregationSettings.SubGroup.Count - 1; i >= 0; i--)
         {
             var group = aggregationSettings.SubGroup[i];
-            if (group.Id == 0 || aggregationSettings.SubGroup.IndexOf(group) < i || aggregationSettings.Groups.IndexOf(group) != -1)
+            if (group.Id == 0 || !allowedPropertyIds.Contains(group.Id) || aggregationSettings.SubGroup.IndexOf(group) < i || aggregationSettings.Groups.IndexOf(group) != -1)
             {
                 messageStore.Add(() => aggregationSettings.SubGroup[i], "");
             }
@@ -345,7 +350,7 @@ public partial class RgfChartComponent : ComponentBase, IDisposable
         for (int i = aggregationSettings.Groups.Count - 1; i >= 0; i--)
         {
             var group = aggregationSettings.Groups[i];
-            if (group.Id == 0 || aggregationSettings.Groups.IndexOf(group) < i)
+            if (group.Id == 0 || !allowedPropertyIds.Contains(group.Id) || aggregationSettings.Groups.IndexOf(group) < i)
             {
                 messageStore.Add(() => aggregationSettings.Groups[i], "");
             }
