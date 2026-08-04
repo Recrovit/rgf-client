@@ -1,6 +1,7 @@
 @using Microsoft.AspNetCore.Authorization
 @using Microsoft.AspNetCore.Components.Authorization
 @using Recrovit.RecroGridFramework.Client.Blazor.SessionAuth.Authentication.Session
+@implements IDisposable
 
 <RgfRouteAuthenticationTracker PageType="RouteData.PageType" />
 
@@ -38,6 +39,16 @@ else
     private RouteData? _pendingProtectedRoute;
     private long _evaluationVersion;
     private int _loginRedirectStarted;
+    private int _sessionStateChangedSubscribed;
+    private int _reevaluateCurrentProtectedRoute;
+
+    protected override void OnInitialized()
+    {
+        if (Interlocked.Exchange(ref _sessionStateChangedSubscribed, 1) == 0)
+        {
+            SessionMonitor.SessionStateChanged += OnSessionStateChanged;
+        }
+    }
 
     protected override async Task OnParametersSetAsync()
     {
@@ -48,12 +59,14 @@ else
             return;
         }
 
-        if (_authorizationCompleted && _isAuthorized && ReferenceEquals(_completedProtectedRoute, RouteData))
+        var requiresReevaluation = Interlocked.Exchange(ref _reevaluateCurrentProtectedRoute, 0) == 1;
+
+        if (!requiresReevaluation && _authorizationCompleted && _isAuthorized && ReferenceEquals(_completedProtectedRoute, RouteData))
         {
             return;
         }
 
-        if (!_authorizationCompleted && ReferenceEquals(_pendingProtectedRoute, RouteData))
+        if (!requiresReevaluation && !_authorizationCompleted && ReferenceEquals(_pendingProtectedRoute, RouteData))
         {
             return;
         }
@@ -63,16 +76,18 @@ else
         _pendingProtectedRoute = RouteData;
 
         var routeData = RouteData;
+        var routeUri = NavigationManager.Uri;
+        var hadValidSessionBeforeEvaluation = SessionMonitor.HasValidSession;
         var evaluationVersion = Interlocked.Increment(ref _evaluationVersion);
 
         await SessionMonitor.EnsureValidatedAsync(CancellationToken.None);
-        if (!IsCurrentEvaluation(evaluationVersion, routeData))
+        if (!IsCurrentEvaluation(evaluationVersion, routeData, routeUri))
         {
             return;
         }
 
         var authenticationState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
-        if (!IsCurrentEvaluation(evaluationVersion, routeData))
+        if (!IsCurrentEvaluation(evaluationVersion, routeData, routeUri))
         {
             return;
         }
@@ -84,7 +99,7 @@ else
         var isAuthorized = policy is null
             || (await AuthorizationService.AuthorizeAsync(authenticationState.User, resource: null, policy)).Succeeded;
 
-        if (!IsCurrentEvaluation(evaluationVersion, routeData))
+        if (!IsCurrentEvaluation(evaluationVersion, routeData, routeUri))
         {
             return;
         }
@@ -94,15 +109,16 @@ else
         _completedProtectedRoute = isAuthorized ? routeData : null;
         _isAuthorized = isAuthorized;
 
-        if (!isAuthorized)
+        if (!isAuthorized && hadValidSessionBeforeEvaluation)
         {
             NavigateToLoginOnce();
         }
     }
 
-    private bool IsCurrentEvaluation(long evaluationVersion, RouteData routeData)
+    private bool IsCurrentEvaluation(long evaluationVersion, RouteData routeData, string routeUri)
         => evaluationVersion == Interlocked.Read(ref _evaluationVersion)
-            && ReferenceEquals(_pendingProtectedRoute, routeData);
+            && ReferenceEquals(_pendingProtectedRoute, routeData)
+            && string.Equals(NavigationManager.Uri, routeUri, StringComparison.Ordinal);
 
     private void ResetProtectedRouteState()
     {
@@ -112,10 +128,16 @@ else
         _completedProtectedRoute = null;
         _pendingProtectedRoute = null;
         _loginRedirectStarted = 0;
+        _reevaluateCurrentProtectedRoute = 0;
     }
 
     private void NavigateToLoginOnce()
     {
+        if (IsCurrentLocationLogin())
+        {
+            return;
+        }
+
         if (Interlocked.Exchange(ref _loginRedirectStarted, 1) != 0)
         {
             return;
@@ -124,5 +146,32 @@ else
         var currentUri = new Uri(NavigationManager.Uri, UriKind.Absolute);
         var returnUrl = $"{currentUri.PathAndQuery}{currentUri.Fragment}";
         NavigationManager.NavigateTo($"{AuthenticationEndpoints.LoginPath}?returnUrl={Uri.EscapeDataString(returnUrl)}", forceLoad: true);
+    }
+
+    private void OnSessionStateChanged()
+    {
+        if (!_requiresAuthentication || !_authorizationCompleted || !_isAuthorized || IsCurrentLocationLogin())
+        {
+            return;
+        }
+
+        Interlocked.Exchange(ref _reevaluateCurrentProtectedRoute, 1);
+        _completedProtectedRoute = null;
+
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    private bool IsCurrentLocationLogin()
+    {
+        var currentUri = new Uri(NavigationManager.Uri, UriKind.Absolute);
+        return string.Equals(currentUri.AbsolutePath, AuthenticationEndpoints.LoginPath, StringComparison.Ordinal);
+    }
+
+    public void Dispose()
+    {
+        if (Interlocked.Exchange(ref _sessionStateChangedSubscribed, 0) == 1)
+        {
+            SessionMonitor.SessionStateChanged -= OnSessionStateChanged;
+        }
     }
 }
