@@ -17,7 +17,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Blazor-ApexCharts" Version="6.1.0" />
+    <PackageReference Include="Blazor-ApexCharts" Version="7.0.0" />
   </ItemGroup>
 
   <ItemGroup>
