@@ -15,7 +15,7 @@ Official Website: [RecroGrid Framework](https://RecroGridFramework.com)
 
 RGF stands for [RecroGrid Framework](https://RecroGridFramework.com).
 
-Its purpose is to package the "host half" of the SessionAuth server-proxy architecture into one reusable setup layer.
+Its purpose is to package the server-side integration required by the SessionAuth server-proxy architecture into one reusable setup layer.
 
 Although this package is part of the RGF ecosystem, it is not limited to RGF-only scenarios. It builds on the reusable OpenID Connect host and token-management infrastructure from [`Recrovit.AspNetCore.Authentication.OpenIdConnect`](https://www.nuget.org/packages/Recrovit.AspNetCore.Authentication.OpenIdConnect/), so the same host-side sign-in, session, downstream token acquisition, and proxy pattern can also be used for non-RGF APIs.
 
@@ -26,7 +26,7 @@ In practice, this package combines:
 - opinionated proxy and host wiring for the typical RGF application shape
 - the Razor Components setup typically needed by an interactive Blazor Web App host
 
-Because of this, the package is the recommended app-level entry point when the browser should stay on the host origin, and the ASP.NET Core host should handle authentication, acquire downstream access tokens, and proxy the API calls on the user's behalf.
+Because of this, the package is the recommended app-level entry point when the browser should stay on the host origin and the ASP.NET Core host should handle authentication and downstream API proxying on the user's behalf.
 
 The downstream API can be an RGF API or any other API registered under `Recrovit:OpenIdConnect:DownstreamApis`, regardless of whether that API is hosted together with the app or on a separate server.
 
@@ -117,12 +117,7 @@ These calls automatically add the following ASP.NET Core/Blazor infrastructure, 
 
 That means you should not separately repeat `AddRazorComponents()`, `AddAuthentication()`, `AddAuthorization()`, `AddAntiforgery()` and similar framework registrations unless you are intentionally customizing the underlying setup.
 
-`MapRgfBlazorServerProxyOpenIdConnectEndpoints(...)` also applies the standard middleware sequence used by the underlying OIDC host package:
-
-- forwarded headers
-- status-code page re-execution
-- authentication, authorization, and antiforgery middleware
-- proxy transports plus `/authentication/...` and RGF proxy endpoint mapping
+`MapRgfBlazorServerProxyOpenIdConnectEndpoints(...)` maps the host authentication endpoints, the generic downstream proxy endpoints provided by the underlying OIDC package, and the RGF-specific proxy routes used by existing RGF applications.
 
 ### 2. Configure the shared app root for route-aware host rendering
 
@@ -168,13 +163,16 @@ This setup lets the host render server-routed pages through `RecrovitRoutes` whi
 }
 ```
 
-### 3. Register the downstream API in the server-side app
+### 3. Configure the OIDC host and downstream API in the server-side app
 
 The host package proxies to a named downstream API called `RgfApi`.
 
 For additional OpenID Connect host and downstream API configuration options, see [`Recrovit.AspNetCore.Authentication.OpenIdConnect`](https://www.nuget.org/packages/Recrovit.AspNetCore.Authentication.OpenIdConnect/).
 
-In the server-side app configuration, register that downstream API under `Recrovit:OpenIdConnect:DownstreamApis:RgfApi` and point it to the real downstream API.
+In the server-side app configuration:
+
+- configure the host-facing OIDC behavior under `Recrovit:OpenIdConnect:Host`
+- register the shared downstream API under `Recrovit:OpenIdConnect:DownstreamApis:RgfApi`
 
 Minimal example:
 
@@ -188,7 +186,7 @@ Minimal example:
           "Authority": "https://idp.example.com",
           "ClientId": "client-id",
           "ClientSecret": "client-secret",
-          "Scopes": [ "openid", "profile", "offline_access" ]
+          "Scopes": [ "openid", "profile", "offline_access" ],
           "CallbackPath": "/signin-oidc",
           "SignedOutRedirectPath": "/"
         }
@@ -199,7 +197,7 @@ Minimal example:
           "Scopes": [ "api.scope" ]
         }
       }
-    }
+    },
     "RecroGridFramework": {
       "API": {
         "ProxyBaseAddress": "https://app-host.example.com"
@@ -209,11 +207,20 @@ Minimal example:
 }
 ```
 
-Why this registration matters:
+What this configuration controls:
 
-- the proxy routes in this package look up the downstream API by the name `RgfApi`
-- the host uses that entry to resolve the downstream base URL
-- the OIDC host infrastructure uses that entry to request and refresh access tokens for the downstream API
+- the `Host` section controls the authentication endpoint base path, cookie behavior, session validation rules, remote-failure redirect target, and downstream proxy request protection policy
+- the `RgfApi` downstream entry tells the host which API to proxy on behalf of the signed-in user
+
+Provider-specific downstream API overrides are optional. When present, the active provider can replace or augment the shared `Recrovit:OpenIdConnect:DownstreamApis` entries without changing the package registration API.
+
+### 3/a. Production and security requirements
+
+Important requirements:
+
+- In production, configure an explicit shared Data Protection key repository. The simplest package-native option is `Recrovit:OpenIdConnect:Infrastructure:DataProtectionKeysPath`, but an explicit host-level Data Protection configuration is also valid.
+- If your deployment sits behind a reverse proxy, load balancer, or cross-origin frontend boundary, validate the `Recrovit:OpenIdConnect:Host` and `Recrovit:OpenIdConnect:Infrastructure` sections carefully.
+- If your application uses cookie-authenticated downstream proxy calls, review the `DownstreamProxyRequestProtection` settings so browser-origin and antiforgery behavior match your deployment.
 
 ### 4. Configure the interactive client with SessionAuth
 
@@ -228,7 +235,7 @@ That client-side registration is responsible for:
 - principal snapshot synchronization through `/authentication/principal`
 - redirecting protected client routes to `/authentication/login?returnUrl=...` when reauthentication is required
 
-This host package supplies the matching server-side infrastructure that those client-side behaviors depend on.
+This host package supplies the matching server-side infrastructure that those client-side behaviors depend on. Remote-failure handling and session-timeout handling are part of the underlying host infrastructure, so host applications do not need separate workaround middleware for those flows.
 
 ## Built-In Authentication Endpoints Used By SessionAuth
 
@@ -244,6 +251,8 @@ SessionAuth depends specifically on:
 - `login` for reauthentication redirects
 - `session` for determining whether the current host session is still valid
 - `principal` for rebuilding the interactive client-side `ClaimsPrincipal` from the host session
+
+When `Recrovit:OpenIdConnect:Host:SessionValidationDownstreamApiName` is set, the `session` endpoint checks that the current host session is still usable for the configured downstream API.
 
 ## Related Packages
 

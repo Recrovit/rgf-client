@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Builder;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Recrovit.AspNetCore.Authentication.OpenIdConnect.Configuration;
@@ -52,6 +52,11 @@ public static class RgfBlazorServerProxyOpenIdConnectHostExtensions
     /// <summary>
     /// Maps the standard middleware and endpoints required by the RGF SSR server-proxy OpenID Connect host.
     /// </summary>
+    /// <remarks>
+    /// This keeps the RGF-specific proxy routes on their established paths while also mapping the reusable
+    /// Recrovit OpenID Connect authentication endpoints and the generic downstream proxy endpoints provided by the
+    /// underlying host package.
+    /// </remarks>
     public static WebApplication MapRgfBlazorServerProxyOpenIdConnectEndpoints(this WebApplication app, string notFoundPath = "/not-found")
     {
         app.UseRecrovitOpenIdConnectForwardedHeaders();
