@@ -8,7 +8,8 @@ public enum RgfChartSeriesType
     Bar = 1,
     Line = 2,
     Pie = 3,
-    Donut = 4
+    Donut = 4,
+    Card = 5
 }
 
 public class RgfChartSetting : ICloneable
@@ -21,6 +22,7 @@ public class RgfChartSetting : ICloneable
         {
             ChartSettingsId = chartSetting.ChartSettingsId;
             SettingsName = chartSetting.SettingsName;
+            Remark = chartSetting.Remark;
             RoleId = chartSetting.RoleId;
             IsReadonly = chartSetting.IsReadonly;
             if (chartSetting.ParentGridSettings != null)

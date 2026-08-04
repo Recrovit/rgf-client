@@ -13,6 +13,7 @@ public class RgfSessionParams
             SessionId = param.SessionId;
             GridId = param.GridId;
             Language = param.Language;
+            ClientConnectionId = param.ClientConnectionId;
         }
     }
 

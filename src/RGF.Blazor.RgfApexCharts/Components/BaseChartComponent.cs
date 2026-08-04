@@ -153,7 +153,7 @@ public abstract class BaseChartComponent : ComponentBase, IAsyncDisposable
         ChangedLegend(chartSetting.Legend);
         ApexChartSettings.Width = chartSetting.Width;
         ApexChartSettings.Height = chartSetting.Height;
-        ApexChartSettings.Title = "";
+        ApexChartSettings.Card = null;
         ApexChartSettings.Series.Clear();
     }
 
@@ -284,7 +284,7 @@ public abstract class BaseChartComponent : ComponentBase, IAsyncDisposable
             return false;
         }
         await Manager.ToastManager.RaiseEventAsync(toast.RecreateAsSuccess(RecroDict.GetRgfUiString("Processed"), delay: 2000), this);
-        ApexChartSettings.Title = "";
+        ApexChartSettings.Card = null;
         ApexChartSettings.Series.Clear();
         if (ApexChartRef != null)
         {
@@ -318,13 +318,21 @@ public abstract class BaseChartComponent : ComponentBase, IAsyncDisposable
                 await Manager.ToastManager.RaiseEventAsync(toast, this);
                 StateHasChanged();
                 await Task.Delay(50);
-                await ApexChartRef.RenderChartAsync(_chartSettings.SettingsName, $"{Manager.EntityDesc.Title} : ", _chartSettings.AggregationSettings, RgfChartRef.DataColumns, RgfChartRef.ChartData);
+                if (!await RenderCurrentVisualizationAsync(toast))
+                {
+                    RgfChartRef.ChartStatus = RgfProcessingStatus.Invalid;
+                    return;
+                }
             }
             else
             {
                 toast = RgfToastEventArgs.CreateActionEvent(RecroDict.GetRgfUiString("Request"), Manager.EntityDesc.MenuTitle, RecroDict.GetRgfUiString("Redraw"), delay: 0);
                 await Manager.ToastManager.RaiseEventAsync(toast, this);
-                await ApexChartRef.UpdateChart();
+                if (!await RenderCurrentVisualizationAsync(toast, redrawOnly: true))
+                {
+                    RgfChartRef.ChartStatus = RgfProcessingStatus.Invalid;
+                    return;
+                }
             }
             await Manager.ToastManager.RaiseEventAsync(toast.RecreateAsSuccess(RecroDict.GetRgfUiString("Processed"), delay: 2000), this);
             RgfChartRef.ChartStatus = RgfProcessingStatus.Valid;
@@ -347,6 +355,8 @@ public abstract class BaseChartComponent : ComponentBase, IAsyncDisposable
     protected Task ChangeChartType(RgfChartSeriesType seriesType)
     {
         _chartSettings.SeriesType = seriesType;
+        ApexChartSettings.ChartType = seriesType;
+        ApexChartSettings.Card = null;
         switch (seriesType)
         {
             case RgfChartSeriesType.Bar:
@@ -364,8 +374,39 @@ public abstract class BaseChartComponent : ComponentBase, IAsyncDisposable
             case RgfChartSeriesType.Donut:
                 ApexChartSettings.SeriesType = SeriesType.Donut;
                 break;
+
+            case RgfChartSeriesType.Card:
+                break;
         }
         return TryUpdateChart();
+    }
+
+    private async Task<bool> RenderCurrentVisualizationAsync(RgfToastEventArgs toast, bool redrawOnly = false)
+    {
+        if (_chartSettings.SeriesType == RgfChartSeriesType.Card)
+        {
+            var cardModel = RgfChartRef.CreateCardModel();
+            if (cardModel == null)
+            {
+                await Manager.ToastManager.RaiseEventAsync(toast.Remove(), this);
+                await Manager.ToastManager.RaiseEventAsync(new RgfToastEventArgs(RecroDict.GetRgfUiString("Warning"), "Card view requires exactly one aggregated result.", RgfToastType.Warning), this);
+                return false;
+            }
+
+            await ApexChartRef.RenderCardAsync(cardModel);
+            return true;
+        }
+
+        if (redrawOnly)
+        {
+            await ApexChartRef.UpdateChart();
+        }
+        else
+        {
+            await ApexChartRef.RenderChartAsync(_chartSettings.AggregationSettings, RgfChartRef.DataColumns, RgfChartRef.ChartData);
+        }
+
+        return true;
     }
 
     protected Task ChangedStacked(bool value)

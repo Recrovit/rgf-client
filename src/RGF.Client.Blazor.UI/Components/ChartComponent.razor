@@ -131,7 +131,8 @@
                                         <div class="col-sm-2 checkbox-lg">
                                             <RgfCheckBox Label="@RgfCharComp.GetRecroDictChart("Legend")"
                                                          Value="RgfCharComp.ChartSettings.Legend" ValueExpression="() => RgfCharComp.ChartSettings.Legend"
-                                                         ValueChanged="ChangedLegend" />
+                                                         ValueChanged="ChangedLegend"
+                                                         Disabled="@(RgfCharComp.ChartSettings.SeriesType == RgfChartSeriesType.Card)" />
                                         </div>
                                         <div class="col-sm-2 checkbox-lg">
                                             <RgfCheckBox Label="@RgfCharComp.GetRecroDictChart("ShowDataLabels")"
@@ -218,8 +219,8 @@
                             }
                         </div>
                         <div id="@($"{_tabsId}-tab-{RecroChartTab.Chart}-pane")" class="@(Embedded
-                            ? $"rgf-apexchart-content rgf-apexchart-content-embedded tab-pane fade show{(ActiveTabIndex == RecroChartTab.Chart ? " active " : " ")}{ApexChartSettings.SeriesType.ToString().ToLower()}"
-                            : $"rgf-apexchart-content tab-pane fade show{(ActiveTabIndex == RecroChartTab.Chart ? " active " : " ")}{ApexChartSettings.SeriesType.ToString().ToLower()}")" role="tabpanel" tabindex="0">
+                            ? $"rgf-apexchart-content rgf-apexchart-content-embedded tab-pane fade show{(ActiveTabIndex == RecroChartTab.Chart ? " active " : " ")}{ApexChartSettings.ChartType.ToString().ToLowerInvariant()}"
+                            : $"rgf-apexchart-content tab-pane fade show{(ActiveTabIndex == RecroChartTab.Chart ? " active " : " ")}{ApexChartSettings.ChartType.ToString().ToLowerInvariant()}")" role="tabpanel" tabindex="0">
                             <ApexChartComponent @ref=ApexChartRef ChartSettings="@ApexChartSettings" />
                         </div>
                     </div>

@@ -138,7 +138,8 @@
                                 </div>
                                 <div class="p-1">
                                     <label class="col-form-label text-nowrap">@RgfCharComp.GetRecroDictChart("Legend")</label>
-                                    <InputCheckbox Value="RgfCharComp.ChartSettings.Legend" ValueExpression="() => RgfCharComp.ChartSettings.Legend" ValueChanged="ChangedLegend" />
+                                    <InputCheckbox Value="RgfCharComp.ChartSettings.Legend" ValueExpression="() => RgfCharComp.ChartSettings.Legend" ValueChanged="ChangedLegend"
+                                                   disabled="@(RgfCharComp.ChartSettings.SeriesType == RgfChartSeriesType.Card)" />
                                 </div>
                                 <div class="p-1">
                                     <label class="col-form-label text-nowrap">@RgfCharComp.GetRecroDictChart("ShowDataLabels")</label>
@@ -203,7 +204,7 @@
                     }
                 </div>
 
-                <div class="rgf-apexchart-content tabcontent@(ActiveTabIndex == RecroChartTab.Chart ? " active" : "")">
+                <div class="rgf-apexchart-content @(ApexChartSettings.ChartType.ToString().ToLowerInvariant()) tabcontent@(ActiveTabIndex == RecroChartTab.Chart ? " active" : "")">
                     <ApexChartComponent @ref=ApexChartRef ChartSettings="@ApexChartSettings" />
                 </div>
             </div>

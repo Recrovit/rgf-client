@@ -12,6 +12,7 @@ using Recrovit.RecroGridFramework.Client.Events;
 using Recrovit.RecroGridFramework.Client.Handlers;
 using System.Collections.Concurrent;
 using System.Data;
+using System.Globalization;
 
 namespace Recrovit.RecroGridFramework.Client.Blazor.Components;
 
@@ -328,7 +329,18 @@ public partial class RgfChartComponent : ComponentBase, IDisposable
                 messageStore.Add(() => aggregationSettings.Columns[i], "");
             }
         }
-        if (rgfChartSettings.SeriesType != RgfChartSeriesType.Bar && rgfChartSettings.SeriesType != RgfChartSeriesType.Line)
+        if (rgfChartSettings.SeriesType == RgfChartSeriesType.Card)
+        {
+            if (aggregationSettings.Columns.Count > 1)
+            {
+                messageStore.Add(() => aggregationSettings.Columns[1], "");
+            }
+            if (aggregationSettings.SubGroup.Count > 0)
+            {
+                messageStore.Add(() => aggregationSettings.SubGroup[0], "");
+            }
+        }
+        else if (rgfChartSettings.SeriesType != RgfChartSeriesType.Bar && rgfChartSettings.SeriesType != RgfChartSeriesType.Line)
         {
             if (aggregationSettings.Columns.Count > 1)
             {
@@ -469,5 +481,78 @@ public partial class RgfChartComponent : ComponentBase, IDisposable
             }
         }
         return false;
+    }
+
+    public RgfChartCardModel? CreateCardModel()
+    {
+        if (ChartSettings.SeriesType != RgfChartSeriesType.Card
+            || DataStatus != RgfProcessingStatus.Valid
+            || ChartData.Count != 1)
+        {
+            return null;
+        }
+
+        RgfDynamicDictionary? aggregateColumn = null;
+        foreach (var column in DataColumns)
+        {
+            if (string.IsNullOrWhiteSpace(column.Get<string?>("Aggregate")))
+            {
+                continue;
+            }
+
+            if (aggregateColumn != null)
+            {
+                return null;
+            }
+
+            aggregateColumn = column;
+        }
+
+        if (aggregateColumn == null)
+        {
+            return null;
+        }
+
+        var row = ChartData[0];
+        var alias = aggregateColumn.Get<string>("Alias");
+        if (string.IsNullOrWhiteSpace(alias))
+        {
+            return null;
+        }
+
+        var data = row.GetItemData(alias);
+        if (data == null)
+        {
+            return null;
+        }
+
+        var value = FormatCardValue(data);
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        var aggregate = aggregateColumn.Get<string?>("Aggregate");
+        var title = aggregateColumn.Get<string>("Name");
+        return new RgfChartCardModel
+        {
+            Title = title,
+            Value = value,
+            Remark = string.IsNullOrWhiteSpace(ChartSettings.Remark) ? null : ChartSettings.Remark.Trim()
+        };
+    }
+
+    private static string FormatCardValue(RgfDynamicData data)
+    {
+        var decimalValue = data.DecimalValue
+            ?? data.TryGetDecimal(CultureInfo.CurrentCulture)
+            ?? data.TryGetDecimal(CultureInfo.InvariantCulture);
+
+        if (decimalValue != null)
+        {
+            return decimalValue.Value.ToString("#,0.################", CultureInfo.CurrentCulture);
+        }
+
+        return data.ToString() ?? string.Empty;
     }
 }

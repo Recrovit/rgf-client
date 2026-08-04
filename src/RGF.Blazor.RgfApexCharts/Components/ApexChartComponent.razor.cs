@@ -1,8 +1,9 @@
-﻿using ApexCharts;
+using ApexCharts;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.Logging;
 using Recrovit.RecroGridFramework.Abstraction.Models;
 using Recrovit.RecroGridFramework.Client.Blazor.Components;
+using Recrovit.RecroGridFramework.Client.Blazor.Parameters;
 using System.Data;
 using System.Globalization;
 
@@ -25,16 +26,17 @@ public partial class ApexChartComponent : ComponentBase
         _logger.LogDebug("UpdateChart");
         StateHasChanged();
         await Task.Delay(50);
-        //await _chartRef.UpdateOptionsAsync(true, true, true);
-        //await _chartRef.UpdateSeriesAsync(true);
+        if (ChartSettings.ChartType == RgfChartSeriesType.Card)
+        {
+            return;
+        }
         await _chartRef.RenderAsync();
     }
 
-    public async Task RenderChartAsync(string title, string chartName, RgfAggregationSettings aggregationSettings, List<RgfDynamicDictionary> dataColumns, IEnumerable<RgfDynamicDictionary> chartData)
+    public async Task RenderChartAsync(RgfAggregationSettings aggregationSettings, List<RgfDynamicDictionary> dataColumns, IEnumerable<RgfDynamicDictionary> chartData)
     {
-        var columns = new List<string>();
         ChartSettings.Series.Clear();
-        ChartSettings.Title = string.IsNullOrEmpty(title) ? chartName : title;
+        ChartSettings.Card = null;
 
         xAlias = [];
         foreach (var group in aggregationSettings.Groups)
@@ -67,7 +69,7 @@ public partial class ApexChartComponent : ComponentBase
             }
         }
         sgData = chartData.GroupBy(arr => string.Join(" / ", sgAlias.Select(alias => arr.GetMember(alias)?.ToString() ?? alias))).Select(e => e.Key).OrderBy(e => e).ToList();
-        var cultureInfo = new System.Globalization.CultureInfo("en");
+        var cultureInfo = new CultureInfo("en");
 
         for (int i = 0; i < dataColumns.Count; i++)
         {
@@ -79,17 +81,6 @@ public partial class ApexChartComponent : ComponentBase
                 continue;
             }
             var dataAlias = acolumn.Get<string>("Alias");
-            if (string.IsNullOrEmpty(title))
-            {
-                if (i > 0)
-                {
-                    ChartSettings.Title += ", ";
-                }
-                if (!string.IsNullOrEmpty(name))
-                {
-                    ChartSettings.Title += name;
-                }
-            }
             if (aggregate != "Count")
             {
                 name = $"{aggregate}({name})";
@@ -109,6 +100,13 @@ public partial class ApexChartComponent : ComponentBase
                 }
             }
         }
+        await UpdateChart();
+    }
+
+    public async Task RenderCardAsync(RgfChartCardModel card)
+    {
+        ChartSettings.Series.Clear();
+        ChartSettings.Card = card;
         await UpdateChart();
     }
 

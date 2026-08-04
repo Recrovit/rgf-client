@@ -25,6 +25,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Update="Components\ApexChartComponent.razor.css" CssScope="rgf-apexchart-view" />
     <None Update="Components\ChartComponent.razor.css" CssScope="rgf-apexcharts" />
   </ItemGroup>
 
