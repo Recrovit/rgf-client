@@ -1,7 +1,4 @@
 ﻿using Recrovit.RecroGridFramework.Abstraction.Extensions;
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Runtime.Serialization;
 using System.Text.Json.Serialization;
 
@@ -269,7 +266,7 @@ public static class IRgfPropertyExtension
     public static int? GetAutoExternalId(this IRgfProperty property)
     {
         var ext = property.Options?.GetStringValue("RGO_AutoExternal");
-        if (ext != null && int.TryParse(ext.ToString().Split('/').Last(), out int externalId))
+        if (ext != null && int.TryParse(ext.Split('/').Last(), out int externalId))
         {
             return externalId;
         }

@@ -1,7 +1,4 @@
 ﻿using Recrovit.RecroGridFramework.Abstraction.Extensions;
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Text.Json.Serialization;
 
 namespace Recrovit.RecroGridFramework.Abstraction.Models;
@@ -63,7 +60,7 @@ public class RgfExternalColumnSettings
     public int PropertyId { get; set; }
 
     [JsonIgnore]
-    public string FullPath => $"{ExternalPath}/{ExternalId}";
+    public string FullPath => string.IsNullOrEmpty(ExternalPath) ? null : $"{ExternalPath}/{ExternalId}";
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string Aggregate { get; set; }
@@ -105,6 +102,52 @@ public class RgfGridColumnSettings : RgfColumnSettings
                 settings.ColWidthOrNull = prop.ColWidth == 0 ? null : prop.ColWidth;
                 settings.CssClass = settings.GetCssClass();
             }
+        }
+    }
+
+    public static void InitializeExternalSettings(RgfGridColumnSettings settings, RgfGridColumnSettings parent = null, string fullPath = null)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+
+        settings.ExternalSettings = new RgfExternalColumnSettings()
+        {
+            PropertyId = settings.Property.Id,
+            ColPos = settings.Property.ColPos
+        };
+
+        if (!string.IsNullOrEmpty(fullPath))
+        {
+            var pos = fullPath.LastIndexOf('/');
+            if (pos <= 0 || pos == fullPath.Length - 1 || !int.TryParse(fullPath[(pos + 1)..], out var externalId))
+            {
+                throw new ArgumentException("Invalid external full path.", nameof(fullPath));
+            }
+
+            settings.ExternalSettings.ExternalId = externalId;
+            settings.ExternalSettings.ExternalPath = fullPath[..pos];
+            return;
+        }
+
+        settings.ExternalSettings.ExternalId = settings.Property.Id;
+        if (parent != null)
+        {
+            if (parent.ExternalSettings is null)
+            {
+                throw new ArgumentException("Parent external settings must be initialized.", nameof(parent));
+            }
+
+            settings.PathTitle = $"{parent.PathTitle ?? parent.Property.ColTitle} > {settings.Property.ColTitle}";
+            settings.ExternalSettings.ExternalPath = parent.ExternalSettings.ExternalPath;
+            if (!string.IsNullOrEmpty(settings.Property.BaseEntityPropertyName))
+            {
+                settings.ExternalSettings.ExternalPath = string.IsNullOrEmpty(settings.ExternalSettings.ExternalPath)
+                    ? settings.Property.BaseEntityPropertyName
+                    : $"{settings.ExternalSettings.ExternalPath}.{settings.Property.BaseEntityPropertyName}";
+            }
+        }
+        else
+        {
+            settings.ExternalSettings.ExternalPath = settings.Property.BaseEntityPropertyName;
         }
     }
 
@@ -159,19 +202,19 @@ public class RgfGridColumnSettings : RgfColumnSettings
         {
             return "rgf-f-recrogrid";
         }
-        if (Property.Ex.IndexOf('E') != -1)
+        if (Property.Ex?.Contains('E') == true)
         {
             return "rgf-f-entity";
         }
-        if (Property.Ex.IndexOf('D') != -1)
+        if (Property.Ex?.Contains('D') == true)
         {
             return "rgf-f-dynamic";
         }
-        if (Property.Ex.IndexOf('N') != -1)
+        if (Property.Ex?.Contains('N') == true)
         {
             return "rgf-esql";
         }
-        if (Property.Ex.IndexOf('B') != -1)
+        if (Property.Ex?.Contains('B') == true)
         {
             return "rgf-ebase";
         }

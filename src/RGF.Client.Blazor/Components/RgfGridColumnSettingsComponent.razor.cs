@@ -60,7 +60,7 @@ public partial class RgfGridColumnSettingsComponent : ComponentBase, IDisposable
             Columns = RgfGridColumnSettings.InitColumnSettings(_entityDesc).ToArray();
             foreach (var col in Columns)
             {
-                InitializeExternalSettings(col, null);
+                RgfGridColumnSettings.InitializeExternalSettings(col);
             }
         }
         else
@@ -105,35 +105,13 @@ public partial class RgfGridColumnSettingsComponent : ComponentBase, IDisposable
 
         if (result?.Success == true)
         {
-            var path = settings.ExternalSettings?.ExternalPath?.Split('/').ToList() ?? [];
             settings.BaseEntity = result.Result;
             settings.RelatedEntityColumnSettings = RgfGridColumnSettings.InitColumnSettings(settings.BaseEntity, true).ToArray();
             foreach (var col in settings.RelatedEntityColumnSettings)
             {
-                InitializeExternalSettings(col, settings);
+                RgfGridColumnSettings.InitializeExternalSettings(col, settings);
             }
             RgfGridColumnSettings.UpdateColumnSettingsFromProperties(Columns, _entityDesc);
-        }
-    }
-
-    private void InitializeExternalSettings(RgfGridColumnSettings settings, RgfGridColumnSettings? parent)
-    {
-        settings.ExternalSettings = new RgfExternalColumnSettings()
-        {
-            ExternalId = settings.Property.Id
-        };
-        if (parent != null)
-        {
-            settings.PathTitle = $"{parent.PathTitle ?? parent.Property.ColTitle} > {settings.Property.ColTitle}";
-            settings.ExternalSettings.ExternalPath = $"{parent.ExternalSettings.ExternalPath}";
-            if (!string.IsNullOrEmpty(settings.Property.BaseEntityPropertyName))
-            {
-                settings.ExternalSettings.ExternalPath += $".{settings.Property.BaseEntityPropertyName}";
-            }
-        }
-        else
-        {
-            settings.ExternalSettings.ExternalPath = settings.Property.BaseEntityPropertyName;
         }
     }
 
