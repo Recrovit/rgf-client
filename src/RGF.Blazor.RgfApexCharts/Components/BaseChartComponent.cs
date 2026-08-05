@@ -8,6 +8,7 @@ using Recrovit.RecroGridFramework.Client.Blazor.Components;
 using Recrovit.RecroGridFramework.Client.Blazor.Parameters;
 using Recrovit.RecroGridFramework.Client.Events;
 using Recrovit.RecroGridFramework.Client.Handlers;
+using Recrovit.RecroGridFramework.Blazor.RgfApexCharts.Formatting;
 
 namespace Recrovit.RecroGridFramework.Blazor.RgfApexCharts.Components;
 
@@ -68,11 +69,18 @@ public abstract class BaseChartComponent : ComponentBase, IAsyncDisposable
                 DataLabels = new DataLabels
                 {
                     Enabled = true,
-                    Formatter = "function (value) { return Array.isArray(value) ? value.join('/') : value?.toLocaleString(); }"
+                },
+                Xaxis = new XAxis
+                {
+                    Type = XAxisType.Category
                 },
                 Yaxis = new List<YAxis>()
                 {
-                    new YAxis { Labels = new YAxisLabels { Formatter = "function (value) { return Array.isArray(value) ? value.join('/') : value?.toLocaleString(); }" } }
+                    new YAxis { Labels = new YAxisLabels() }
+                },
+                Tooltip = new Tooltip
+                {
+                    Y = new TooltipY()
                 }
             }
         };
@@ -83,6 +91,9 @@ public abstract class BaseChartComponent : ComponentBase, IAsyncDisposable
 
     [Inject]
     protected IRecroDictService RecroDict { get; init; } = null!;
+
+    [Inject]
+    protected IRecroSecService _recroSec { get; init; } = null!;
 
     protected RgfChartComponent RgfChartRef { get; set; } = null!;
 
@@ -109,6 +120,7 @@ public abstract class BaseChartComponent : ComponentBase, IAsyncDisposable
 
     protected override void OnInitialized()
     {
+        ApplyValueFormatters();
         EntityParameters.ChartParameters.EventDispatcher.Subscribe(RgfChartEventKind.ShowChart, (arg) => OnInitSizeAsync(true), true, this);
         EntityParameters.ChartParameters.EventDispatcher.Subscribe(RgfChartEventKind.Initialized, OnChartInitializedAsync, this);
     }
@@ -151,6 +163,7 @@ public abstract class BaseChartComponent : ComponentBase, IAsyncDisposable
         ChangeChartType(chartSetting.SeriesType);
         ChangedShowDataLabels(chartSetting.ShowDataLabels);
         ChangedLegend(chartSetting.Legend);
+        ApplyValueFormatters();
         ApexChartSettings.Width = chartSetting.Width;
         ApexChartSettings.Height = chartSetting.Height;
         ApexChartSettings.Card = null;
@@ -461,11 +474,32 @@ public abstract class BaseChartComponent : ComponentBase, IAsyncDisposable
     protected Task ChangedLegend(bool value)
     {
         _chartSettings.Legend = value;
-        ApexChartSettings.Options.Legend = !value ? default : new Legend
-        {
-            Formatter = @"function(seriesName, opts) { return [seriesName, ' - ', opts.w.globals.series[opts.seriesIndex].toLocaleString()] }"
-        };
+        ApexChartSettings.Options.Legend = !value ? default : new Legend();
+        ApplyValueFormatters();
         return TryUpdateChart();
+    }
+
+    private void ApplyValueFormatters()
+    {
+        var cultureInfo = _recroSec.UserCultureInfo();
+        var valueFormatter = ApexChartJsValueFormatter.CreateValueFormatter(cultureInfo);
+
+        ApexChartSettings.Options.DataLabels.Formatter = valueFormatter;
+
+        foreach (var yAxis in ApexChartSettings.Options.Yaxis)
+        {
+            yAxis.Labels ??= new YAxisLabels();
+            yAxis.Labels.Formatter = valueFormatter;
+        }
+
+        ApexChartSettings.Options.Tooltip ??= new Tooltip();
+        ApexChartSettings.Options.Tooltip.Y ??= new TooltipY();
+        ApexChartSettings.Options.Tooltip.Y.Formatter = ApexChartJsValueFormatter.CreateTooltipYFormatter(cultureInfo);
+
+        if (ApexChartSettings.Options.Legend != null)
+        {
+            ApexChartSettings.Options.Legend.Formatter = ApexChartJsValueFormatter.CreateLegendFormatter(cultureInfo);
+        }
     }
 
     protected Task ChangeTheme(Mode? value)

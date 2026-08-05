@@ -3,6 +3,7 @@ using Microsoft.JSInterop;
 using Recrovit.RecroGridFramework.Abstraction.Contracts.Services;
 using Recrovit.RecroGridFramework.Abstraction.Extensions;
 using Recrovit.RecroGridFramework.Abstraction.Models;
+using Recrovit.RecroGridFramework.Client.Blazor.Formatting;
 using System.Globalization;
 
 namespace Recrovit.RecroGridFramework.Client.Blazor.Components;
@@ -36,29 +37,9 @@ public partial class RgfGridColumnComponent : ComponentBase
         {
             Data = await _jsRuntime.InvokeAsync<string>(RgfBlazorConfiguration.JsBlazorNamespace + ".invokeGridColFuncAsync", value.ToString(), CreateJSArgs(EntityDesc, RowData, PropDesc, Data));
         }
-        else if (objData is DateTime && PropDesc.ListType == PropertyListType.Date)
+        else if (RgfDisplayValueFormatter.TryFormatDisplayValue(objData, PropDesc, culture, out var formattedDisplayValue))
         {
-            if (PropDesc.FormType == PropertyFormType.DateTime)
-            {
-                Data = string.Format("{0} {1}",
-                    ((DateTime)objData).ToString("d", culture).Replace(" ", ""),
-                    ((DateTime)objData).ToString("T", culture).Replace(" ", ""));
-            }
-            else
-            {
-                Data = ((DateTime)objData).ToString("d", culture).Replace(" ", "");
-            }
-        }
-        else if (PropDesc.ListType == PropertyListType.Numeric && !PropDesc.IsKey &&
-                !string.IsNullOrEmpty(Data) && objData is not string &&
-                PropDesc.Options?.GetBoolValue("RGO_NoFormat") != true)
-        {
-            try
-            {
-                var number = Convert.ToDecimal(objData);
-                Data = number.ToString("#,0.##", culture);
-            }
-            catch { }
+            Data = formattedDisplayValue;
         }
     }
 

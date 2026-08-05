@@ -24,8 +24,7 @@ public sealed class ChartComponentTests
     [Fact]
     public void ApexChartComponent_RendersCardRemark_WhenCardModeIsActive()
     {
-        using var testContext = new BunitContext();
-        testContext.Services.AddLogging();
+        using var testContext = CreateTestContext();
 
         var cut = testContext.Render<ApexChartComponent>(parameters => parameters
             .Add(component => component.ChartSettings, new ApexChartSettings

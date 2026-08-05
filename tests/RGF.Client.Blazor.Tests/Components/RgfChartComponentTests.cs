@@ -122,7 +122,7 @@ public sealed class RgfChartComponentTests
     [Fact]
     public void CreateCardModel_ReturnsFormattedCard_ForSingleAggregateResult()
     {
-        using var testContext = CreateTestContext();
+        using var testContext = CreateTestContext(userLanguage: "hun");
         var entityParameters = CreateEntityParameters(new RgfEntity
         {
             EntityId = 1,
@@ -274,7 +274,7 @@ public sealed class RgfChartComponentTests
         Assert.Equal("kedvezmények után", cut.Instance.ChartSettings.Remark);
     }
 
-    private static BunitContext CreateTestContext()
+    private static BunitContext CreateTestContext(string userLanguage = "eng")
     {
         RgfBlazorTestState.Reset();
         RgfBlazorConfiguration.RegisterComponent<FakeDialogComponent>(RgfBlazorConfiguration.ComponentType.Dialog);
@@ -283,7 +283,7 @@ public sealed class RgfChartComponentTests
         var testContext = new BunitContext();
         testContext.Services.AddLogging();
         testContext.Services.AddSingleton<IRecroDictService, FakeRecroDictService>();
-        testContext.Services.AddSingleton<IRecroSecService, FakeRecroSecService>();
+        testContext.Services.AddSingleton<IRecroSecService>(new FakeRecroSecService(userLanguage));
         return testContext;
     }
 
@@ -482,7 +482,7 @@ public sealed class RgfChartComponentTests
         public string GetRgfUiString(string resourceKey, params object[] args) => resourceKey;
     }
 
-    private sealed class FakeRecroSecService : IRecroSecService
+    private sealed class FakeRecroSecService(string userLanguage) : IRecroSecService
     {
         public EventDispatcher<EventArgs> AuthenticationStateChanged { get; } = new();
         public EventDispatcher<DataEventArgs<RgfUserState>> UserStateChangedEvent { get; } = new();
@@ -494,7 +494,7 @@ public sealed class RgfChartComponentTests
         public RgfUserState UserState { get; } = new();
         public IReadOnlyDictionary<string, string> Roles { get; } = new Dictionary<string, string>();
         public Task<string?> GetAccessTokenAsync() => Task.FromResult<string?>(null);
-        public string UserLanguage => "eng";
+        public string UserLanguage => userLanguage;
         public Task<string?> SetUserLanguageAsync(string? language) => Task.FromResult(language);
         public EventDispatcher<DataEventArgs<string>> LanguageChangedEvent { get; } = new();
         public Task<bool> UpdateUserStateSettingsAsync(IDictionary<string, string?> settings) => Task.FromResult(false);

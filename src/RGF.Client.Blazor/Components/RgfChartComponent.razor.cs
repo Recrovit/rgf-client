@@ -7,6 +7,7 @@ using Recrovit.RecroGridFramework.Abstraction.Contracts.Services;
 using Recrovit.RecroGridFramework.Abstraction.Extensions;
 using Recrovit.RecroGridFramework.Abstraction.Infrastructure.Security;
 using Recrovit.RecroGridFramework.Abstraction.Models;
+using Recrovit.RecroGridFramework.Client.Blazor.Formatting;
 using Recrovit.RecroGridFramework.Client.Blazor.Parameters;
 using Recrovit.RecroGridFramework.Client.Events;
 using Recrovit.RecroGridFramework.Client.Handlers;
@@ -214,6 +215,7 @@ public partial class RgfChartComponent : ComponentBase, IDisposable
             foreach (var item in aggregationSettings.Columns)
             {
                 string alias;
+                IRgfProperty? sourceProperty = null;
                 if (item.Aggregate == "Count")
                 {
                     alias = "Count";
@@ -225,6 +227,7 @@ public partial class RgfChartComponent : ComponentBase, IDisposable
                     {
                         continue;
                     }
+                    sourceProperty = oprop;
                     alias = $"{oprop.Alias}_{item.Aggregate.Replace('-', '_')}";
                 }
                 var prop = chartManager.EntityDesc.Properties.FirstOrDefault(e => e.Alias.Equals(alias, StringComparison.OrdinalIgnoreCase));
@@ -243,6 +246,7 @@ public partial class RgfChartComponent : ComponentBase, IDisposable
                 dataCol.SetMember("Index", idx);
                 var name = item.Aggregate == "Count" ? _recroDict.GetRgfUiString("ItemCount") : prop.ColTitle;
                 dataCol.SetMember("Name", name);
+                dataCol.SetMember("Property", sourceProperty);
                 DataColumns.Add(dataCol);
             }
 
@@ -270,6 +274,9 @@ public partial class RgfChartComponent : ComponentBase, IDisposable
                 dataCol.SetMember("PropertyId", group.Id);
                 dataCol.SetMember("Index", idx);
                 dataCol.SetMember("Name", prop.ColTitle);
+                dataCol.SetMember("Property", oprop);
+                dataCol.SetMember("FormType", oprop.FormType);
+                dataCol.SetMember("ListType", oprop.ListType);
                 DataColumns.Add(dataCol);
                 order.Add(prop.Alias);
             }
@@ -277,13 +284,18 @@ public partial class RgfChartComponent : ComponentBase, IDisposable
             IOrderedEnumerable<RgfDynamicDictionary>? ordered = null;
             foreach (var item in order)
             {
+                var property = DataColumns
+                    .Where(column => string.Equals(column.Get<string>("Alias"), item, StringComparison.Ordinal))
+                    .Select(column => column.GetMember("Property") as IRgfProperty)
+                    .FirstOrDefault();
+
                 if (ordered == null)
                 {
-                    ordered = dataList.OrderBy(e => e.GetMember(item)?.ToString());
+                    ordered = dataList.OrderBy(e => GetChartOrderValue(e.GetMember(item), property));
                 }
                 else
                 {
-                    ordered = ordered.ThenBy(e => e.GetMember(item)?.ToString());
+                    ordered = ordered.ThenBy(e => GetChartOrderValue(e.GetMember(item), property));
                 }
             }
             ChartData = ordered?.ToList() ?? dataList;
@@ -529,8 +541,14 @@ public partial class RgfChartComponent : ComponentBase, IDisposable
             return null;
         }
 
-        var value = FormatCardValue(data);
-        if (string.IsNullOrWhiteSpace(value))
+        CultureInfo culture = _recroSec.UserCultureInfo();
+        var property = aggregateColumn.GetMember("Property") as IRgfProperty;
+        string? formattedValue;
+        if (!RgfDisplayValueFormatter.TryFormatDisplayValue(data.Value, property, culture, out formattedValue))
+        {
+            formattedValue = data.ToString();
+        }
+        if (string.IsNullOrWhiteSpace(formattedValue))
         {
             return null;
         }
@@ -540,22 +558,18 @@ public partial class RgfChartComponent : ComponentBase, IDisposable
         return new RgfChartCardModel
         {
             Title = title,
-            Value = value,
+            Value = formattedValue,
             Remark = string.IsNullOrWhiteSpace(ChartSettings.Remark) ? null : ChartSettings.Remark.Trim()
         };
     }
 
-    private static string FormatCardValue(RgfDynamicData data)
+    private static object? GetChartOrderValue(object? value, IRgfProperty? property)
     {
-        var decimalValue = data.DecimalValue
-            ?? data.TryGetDecimal(CultureInfo.CurrentCulture)
-            ?? data.TryGetDecimal(CultureInfo.InvariantCulture);
-
-        if (decimalValue != null)
+        if (RgfDisplayValueFormatter.TryGetNormalizedDateTimeValue(value, property, out var normalizedDateTime))
         {
-            return decimalValue.Value.ToString("#,0.################", CultureInfo.CurrentCulture);
+            return normalizedDateTime;
         }
 
-        return data.ToString() ?? string.Empty;
+        return value?.ToString();
     }
 }
