@@ -432,7 +432,10 @@ public partial class RgfChartComponent : ComponentBase, IDisposable
                 var filterHandler = await Manager.GetFilterHandlerAsync();
                 filterHandler.ApplyFilterState(conditions, parentGridSettings.SQLTimeout);
                 _pendingParentRefresh = !Embedded;
-                await Manager.ToastManager.RaiseEventAsync(new RgfToastEventArgs(Manager.EntityDesc.MenuTitle, RgfToastEventArgs.ActionTemplate(_recroDict.GetRgfUiString("Settings"), ChartSettings.SettingsName), delay: 2000), this);
+                if (!EntityParameters.ChartParameters.SuppressAutomaticChartToast)
+                {
+                    await Manager.ToastManager.RaiseEventAsync(new RgfToastEventArgs(Manager.EntityDesc.MenuTitle, RgfToastEventArgs.ActionTemplate(_recroDict.GetRgfUiString("Settings"), ChartSettings.SettingsName), delay: 2000), this);
+                }
                 return true;
             }
         }

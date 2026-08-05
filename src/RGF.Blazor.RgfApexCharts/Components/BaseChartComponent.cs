@@ -219,7 +219,7 @@ public abstract class BaseChartComponent : ComponentBase, IAsyncDisposable
 
         if (redraw && RgfChartRef.DataStatus == RgfProcessingStatus.Valid)
         {
-            await UpdateChart();
+            await UpdateChart(EntityParameters.ChartParameters.SuppressAutomaticChartToast);
         }
     }
 
@@ -247,9 +247,10 @@ public abstract class BaseChartComponent : ComponentBase, IAsyncDisposable
         StateHasChanged();
         await Task.Delay(50);
         await OnInitSizeAsync();
-        if (RgfChartRef.DataStatus == RgfProcessingStatus.Valid || await GetData())
+        var suppressAutomaticToast = EntityParameters.ChartParameters.SuppressAutomaticChartToast;
+        if (RgfChartRef.DataStatus == RgfProcessingStatus.Valid || await GetData(suppressAutomaticToast))
         {
-            await UpdateChart();
+            await UpdateChart(suppressAutomaticToast);
             return true;
         }
         return false;
@@ -263,27 +264,38 @@ public abstract class BaseChartComponent : ComponentBase, IAsyncDisposable
         }
         SettingsAccordionActive = false;
         ActiveTabIndex = RecroChartTab.Grid;
-        return await GetData();
+        return await GetData(EntityParameters.ChartParameters.SuppressAutomaticChartToast);
     }
 
-    protected async Task<bool> GetData()
+    protected async Task<bool> GetData(bool suppressToast = false)
     {
         if (RgfChartRef.DataStatus == RgfProcessingStatus.Valid)
         {
             return false;
         }
-        var toast = RgfToastEventArgs.CreateActionEvent(RecroDict.GetRgfUiString("Request"), Manager.EntityDesc.MenuTitle, RgfChartRef.GetRecroDictChart("DataSet"), delay: 0);
-        await Manager.ToastManager.RaiseEventAsync(toast, this);
+        var toast = suppressToast
+            ? null
+            : RgfToastEventArgs.CreateActionEvent(RecroDict.GetRgfUiString("Request"), Manager.EntityDesc.MenuTitle, RgfChartRef.GetRecroDictChart("DataSet"), delay: 0);
+        if (toast != null)
+        {
+            await Manager.ToastManager.RaiseEventAsync(toast, this);
+        }
 
         var success = await RgfChartRef.CreateChartDataAsyc();
         if (!success)
         {
             // Switch to this tab because the error message appears here
             ActiveTabIndex = RecroChartTab.Grid;
-            await Manager.ToastManager.RaiseEventAsync(toast.Remove(), this);
+            if (toast != null)
+            {
+                await Manager.ToastManager.RaiseEventAsync(toast.Remove(), this);
+            }
             return false;
         }
-        await Manager.ToastManager.RaiseEventAsync(toast.RecreateAsSuccess(RecroDict.GetRgfUiString("Processed"), delay: 2000), this);
+        if (toast != null)
+        {
+            await Manager.ToastManager.RaiseEventAsync(toast.RecreateAsSuccess(RecroDict.GetRgfUiString("Processed"), delay: 2000), this);
+        }
         ApexChartSettings.Card = null;
         ApexChartSettings.Series.Clear();
         if (ApexChartRef != null)
@@ -294,7 +306,7 @@ public abstract class BaseChartComponent : ComponentBase, IAsyncDisposable
         return true;
     }
 
-    protected virtual async Task UpdateChart()
+    protected virtual async Task UpdateChart(bool suppressToast = false)
     {
         var currentStatus = RgfChartRef.ChartStatus;
         if (ApexChartRef == null || currentStatus == RgfProcessingStatus.InProgress)
@@ -311,13 +323,18 @@ public abstract class BaseChartComponent : ComponentBase, IAsyncDisposable
         RgfChartRef.ChartStatus = RgfProcessingStatus.InProgress;// Prevents the chart from being redrawn when the data is updated
         try
         {
-            RgfToastEventArgs toast;
+            RgfToastEventArgs? toast;
             if (currentStatus == RgfProcessingStatus.Invalid)
             {
-                toast = RgfToastEventArgs.CreateActionEvent(RecroDict.GetRgfUiString("Request"), Manager.EntityDesc.MenuTitle, "Render", delay: 0);
-                await Manager.ToastManager.RaiseEventAsync(toast, this);
-                StateHasChanged();
-                await Task.Delay(50);
+                toast = suppressToast
+                    ? null
+                    : RgfToastEventArgs.CreateActionEvent(RecroDict.GetRgfUiString("Request"), Manager.EntityDesc.MenuTitle, "Render", delay: 0);
+                if (toast != null)
+                {
+                    await Manager.ToastManager.RaiseEventAsync(toast, this);
+                    StateHasChanged();
+                    await Task.Delay(50);
+                }
                 if (!await RenderCurrentVisualizationAsync(toast))
                 {
                     RgfChartRef.ChartStatus = RgfProcessingStatus.Invalid;
@@ -326,15 +343,23 @@ public abstract class BaseChartComponent : ComponentBase, IAsyncDisposable
             }
             else
             {
-                toast = RgfToastEventArgs.CreateActionEvent(RecroDict.GetRgfUiString("Request"), Manager.EntityDesc.MenuTitle, RecroDict.GetRgfUiString("Redraw"), delay: 0);
-                await Manager.ToastManager.RaiseEventAsync(toast, this);
+                toast = suppressToast
+                    ? null
+                    : RgfToastEventArgs.CreateActionEvent(RecroDict.GetRgfUiString("Request"), Manager.EntityDesc.MenuTitle, RecroDict.GetRgfUiString("Redraw"), delay: 0);
+                if (toast != null)
+                {
+                    await Manager.ToastManager.RaiseEventAsync(toast, this);
+                }
                 if (!await RenderCurrentVisualizationAsync(toast, redrawOnly: true))
                 {
                     RgfChartRef.ChartStatus = RgfProcessingStatus.Invalid;
                     return;
                 }
             }
-            await Manager.ToastManager.RaiseEventAsync(toast.RecreateAsSuccess(RecroDict.GetRgfUiString("Processed"), delay: 2000), this);
+            if (toast != null)
+            {
+                await Manager.ToastManager.RaiseEventAsync(toast.RecreateAsSuccess(RecroDict.GetRgfUiString("Processed"), delay: 2000), this);
+            }
             RgfChartRef.ChartStatus = RgfProcessingStatus.Valid;
         }
         catch
@@ -381,14 +406,17 @@ public abstract class BaseChartComponent : ComponentBase, IAsyncDisposable
         return TryUpdateChart();
     }
 
-    private async Task<bool> RenderCurrentVisualizationAsync(RgfToastEventArgs toast, bool redrawOnly = false)
+    private async Task<bool> RenderCurrentVisualizationAsync(RgfToastEventArgs? toast, bool redrawOnly = false)
     {
         if (_chartSettings.SeriesType == RgfChartSeriesType.Card)
         {
             var cardModel = RgfChartRef.CreateCardModel();
             if (cardModel == null)
             {
-                await Manager.ToastManager.RaiseEventAsync(toast.Remove(), this);
+                if (toast != null)
+                {
+                    await Manager.ToastManager.RaiseEventAsync(toast.Remove(), this);
+                }
                 await Manager.ToastManager.RaiseEventAsync(new RgfToastEventArgs(RecroDict.GetRgfUiString("Warning"), "Card view requires exactly one aggregated result.", RgfToastType.Warning), this);
                 return false;
             }

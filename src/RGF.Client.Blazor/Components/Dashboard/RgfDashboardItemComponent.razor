@@ -122,6 +122,7 @@
         else if (_currentViewType is RgfDashboardViewType.Chart or RgfDashboardViewType.ChartData)
         {
             _entityParameters.SkipInitialDataLoad = true;
+            _entityParameters.ChartParameters.SuppressAutomaticChartToast = true;
         }
 
         _entityParameters.EventDispatcher.Subscribe(RgfEntityEventKind.Initialized, OnEntityInitializedAsync, true, this);
