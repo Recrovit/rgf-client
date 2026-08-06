@@ -79,23 +79,7 @@ public partial class RgfChartComponent : ComponentBase, IDisposable
 
         _recroDictChart = await _recroDict.GetDictionaryAsync("RGF.UI.Chart", _recroSec.UserLanguage);
 
-        var validFormTypes = new[] {
-            PropertyFormType.TextBox,
-            PropertyFormType.TextBoxMultiLine,
-            PropertyFormType.CheckBox,
-            PropertyFormType.DropDown,
-            PropertyFormType.Date,
-            PropertyFormType.DateTime,
-            PropertyFormType.StaticText
-        };
-
-        AllowedProperties = Manager.EntityDesc.Properties
-            .Where(p => p.Readable && !p.IsDynamic &&
-                //p.Options?.GetStringValue("RGO_AutoExternal") == null &&
-                p.Options?.GetBoolValue("RGO_AggregationExclude") != true &&
-                (validFormTypes.Contains(p.FormType) || p.Options?.GetBoolValue("RGO_AggregationRequired") == true))
-            .OrderBy(e => e.ColTitle)
-            .ToArray();
+        RebuildAllowedProperties();
 
         ChartSettings.AggregationSettings.Columns = new List<RgfAggregationColumn> { new() { Id = 0, Aggregate = "Count" } };
 
@@ -146,15 +130,20 @@ public partial class RgfChartComponent : ComponentBase, IDisposable
 
     protected void HandleValidationRequested(object? sender, ValidationRequestedEventArgs e) => Validation(MessageStore, ChartSettings);
 
-    private void OnShowChart(IRgfEventArgs args)
+    private async Task OnShowChart(IRgfEventArgs args)
     {
-        SetDataStatus(RgfProcessingStatus.Invalid);
-        _showComponent = true;
         args.Handled = true;
         args.PreventDefault = true;
+
+        RebuildAllowedProperties();
+        _ = EditContext.Validate();
+
+        SetDataStatus(RgfProcessingStatus.Invalid);
+        _showComponent = true;
+
         StateHasChanged();
         var eventArgs = new RgfChartEventArgs(RgfChartEventKind.ShowChart);
-        _ = EntityParameters.ChartParameters.EventDispatcher.DispatchEventAsync(eventArgs.EventKind, new RgfEventArgs<RgfChartEventArgs>(this, eventArgs));
+        await EntityParameters.ChartParameters.EventDispatcher.DispatchEventAsync(eventArgs.EventKind, new RgfEventArgs<RgfChartEventArgs>(this, eventArgs));
     }
 
     private Task OnDialogCloseAsync(IRgfEventArgs<RgfDialogEventArgs> args) => CloseDialogAsync();
@@ -178,6 +167,27 @@ public partial class RgfChartComponent : ComponentBase, IDisposable
 
         _pendingParentRefresh = false;
         return true;
+    }
+
+    private void RebuildAllowedProperties()
+    {
+        var validFormTypes = new[]
+        {
+            PropertyFormType.TextBox,
+            PropertyFormType.TextBoxMultiLine,
+            PropertyFormType.CheckBox,
+            PropertyFormType.DropDown,
+            PropertyFormType.Date,
+            PropertyFormType.DateTime,
+            PropertyFormType.StaticText
+        };
+
+        AllowedProperties = Manager.EntityDesc.Properties
+            .Where(p => p.Readable && !p.IsDynamic &&
+                p.Options?.GetBoolValue("RGO_AggregationExclude") != true &&
+                (validFormTypes.Contains(p.FormType) || p.Options?.GetBoolValue("RGO_AggregationRequired") == true))
+            .OrderBy(e => e.ColTitle)
+            .ToArray();
     }
 
     public virtual async Task<bool> CreateChartDataAsyc()

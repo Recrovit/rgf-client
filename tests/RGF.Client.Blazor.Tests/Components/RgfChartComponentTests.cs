@@ -57,6 +57,53 @@ public sealed class RgfChartComponentTests
     }
 
     [Fact]
+    public async Task OnShowChart_RefreshesAllowedProperties_OnEveryOpen()
+    {
+        using var testContext = CreateTestContext();
+        var manager = new FakeRgManager(new RgfSessionParams(), new RgfEntity
+        {
+            EntityId = 1,
+            EntityName = "Orders",
+            EntityVersion = "1",
+            MenuTitle = "Orders",
+            Title = "Orders",
+            Permissions = new RgfPermissions(true),
+            Properties =
+            [
+                CreateProperty(1, "Name", "Name", PropertyFormType.TextBox, PropertyListType.String),
+                CreateProperty(2, "Amount", "Amount", PropertyFormType.TextBox, PropertyListType.Numeric)
+            ]
+        });
+        var entityParameters = CreateEntityParameters(manager.EntityDesc, (_, _) => manager);
+
+        var cut = RenderChartComponent(testContext, entityParameters);
+
+        Assert.DoesNotContain(cut.Instance.AllowedProperties, property => property.Id == 3);
+
+        manager.EntityDesc = new RgfEntity
+        {
+            EntityId = 1,
+            EntityName = "Orders",
+            EntityVersion = "1",
+            MenuTitle = "Orders",
+            Title = "Orders",
+            Permissions = new RgfPermissions(true),
+            Properties =
+            [
+                CreateProperty(1, "Name", "Name", PropertyFormType.TextBox, PropertyListType.String),
+                CreateProperty(2, "Amount", "Amount", PropertyFormType.TextBox, PropertyListType.Numeric),
+                CreateProperty(3, "CustomerRevenue", "Customer Revenue", PropertyFormType.TextBox, PropertyListType.Numeric, autoExternalPath: "Customer/201")
+            ]
+        };
+
+        await cut.InvokeAsync(() => entityParameters.ToolbarParameters.EventDispatcher.DispatchEventAsync(
+            RgfToolbarEventKind.RecroChart,
+            new RgfEventArgs<RgfToolbarEventArgs>(cut.Instance, new RgfToolbarEventArgs(RgfToolbarEventKind.RecroChart))));
+
+        Assert.Contains(cut.Instance.AllowedProperties, property => property.Id == 3);
+    }
+
+    [Fact]
     public void Validation_MarksMissingPropertyIdsAsInvalid()
     {
         using var testContext = CreateTestContext();
@@ -87,6 +134,51 @@ public sealed class RgfChartComponentTests
         Assert.NotEmpty(cut.Instance.EditContext.GetValidationMessages(() => cut.Instance.ChartSettings.AggregationSettings.Columns[0]));
         Assert.NotEmpty(cut.Instance.EditContext.GetValidationMessages(() => cut.Instance.ChartSettings.AggregationSettings.Groups[0]));
         Assert.NotEmpty(cut.Instance.EditContext.GetValidationMessages(() => cut.Instance.ChartSettings.AggregationSettings.SubGroup[0]));
+    }
+
+    [Fact]
+    public async Task OnShowChart_RevalidatesExistingChartSettings_AfterMetadataRefresh()
+    {
+        using var testContext = CreateTestContext();
+        var manager = new FakeRgManager(new RgfSessionParams(), new RgfEntity
+        {
+            EntityId = 1,
+            EntityName = "Orders",
+            EntityVersion = "1",
+            MenuTitle = "Orders",
+            Title = "Orders",
+            Permissions = new RgfPermissions(true),
+            Properties =
+            [
+                CreateProperty(1, "Name", "Name", PropertyFormType.TextBox, PropertyListType.String),
+                CreateProperty(2, "Amount", "Amount", PropertyFormType.TextBox, PropertyListType.Numeric)
+            ]
+        });
+        var entityParameters = CreateEntityParameters(manager.EntityDesc, (_, _) => manager);
+        var cut = RenderChartComponent(testContext, entityParameters);
+        cut.Instance.ChartSettings.AggregationSettings.Columns.Clear();
+        cut.Instance.ChartSettings.AggregationSettings.Columns.Add(new RgfAggregationColumn { Id = 2, Aggregate = "Sum" });
+
+        manager.EntityDesc = new RgfEntity
+        {
+            EntityId = 1,
+            EntityName = "Orders",
+            EntityVersion = "1",
+            MenuTitle = "Orders",
+            Title = "Orders",
+            Permissions = new RgfPermissions(true),
+            Properties =
+            [
+                CreateProperty(1, "Name", "Name", PropertyFormType.TextBox, PropertyListType.String)
+            ]
+        };
+
+        await cut.InvokeAsync(() => entityParameters.ToolbarParameters.EventDispatcher.DispatchEventAsync(
+            RgfToolbarEventKind.RecroChart,
+            new RgfEventArgs<RgfToolbarEventArgs>(cut.Instance, new RgfToolbarEventArgs(RgfToolbarEventKind.RecroChart))));
+
+        Assert.DoesNotContain(cut.Instance.AllowedProperties, property => property.Id == 2);
+        Assert.NotEmpty(cut.Instance.EditContext.GetValidationMessages(() => cut.Instance.ChartSettings.AggregationSettings.Columns[0]));
     }
 
     [Fact]
@@ -419,7 +511,7 @@ public sealed class RgfChartComponentTests
 
         public IRgListHandler ListHandler => throw new NotSupportedException();
 
-        public RgfEntity EntityDesc { get; } = entityDesc;
+        public RgfEntity EntityDesc { get; set; } = entityDesc;
 
         public ObservableProperty<Dictionary<int, RgfEntityKey>> SelectedItems { get; } = new(new(), nameof(SelectedItems));
 

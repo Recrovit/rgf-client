@@ -129,7 +129,7 @@
                                     {
                                         <div class="d-grid gap-2">
                                             <RgfComboBox TValue="string"
-                                                         DataSource="_selector.EntityOptions.Select(e => new KeyValuePair<string, string>(e.EntityName, string.IsNullOrEmpty(e.Title) ? e.EntityName : e.Title))"
+                                                         DataSource="_selector.EntityOptions.Select(e => new KeyValuePair<string, string>(e.EntityName, string.IsNullOrEmpty(e.Title) ? e.EntityName : e.Title)).OrderBy(e => e.Value)"
                                                          Value="@_selector.SelectedEntityName"
                                                          ValueExpression="@(() => _selector.SelectedEntityName)"
                                                          ValueChanged="OnEntityChangedAsync"
@@ -142,7 +142,7 @@
                                                          ValueChanged="OnViewTypeChangedAsync"
                                                          Disabled="@(_state.IsReadonly || _selector.IsEntityOptionsLoading || _selector.AllowedViewTypes.Count == 0)" />
                                             <RgfComboBox TValue="int?"
-                                                         DataSource="_selector.SavedViews"
+                                                         DataSource="@_selector.SavedViews.OrderBy(e => e.Value)"
                                                          Value="_selector.SelectedSettingsId"
                                                          ValueExpression="@(() => _selector.SelectedSettingsId)"
                                                          ValueChanged="OnSettingsChangedAsync"
