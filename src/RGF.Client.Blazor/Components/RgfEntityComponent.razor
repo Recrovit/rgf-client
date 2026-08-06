@@ -45,9 +45,20 @@
         }
     </RgfComponentWrapper>
 }
-else if (LoadingIndicator != null && !EntityParameters.DeferredInitialization)
+else if (!EntityParameters.DeferredInitialization)
 {
-    @LoadingIndicator
+    if (LoadingIndicator != null)
+    {
+        @LoadingIndicator
+    }
+    else if (RgfBlazorConfiguration.TryGetComponentType(RgfBlazorConfiguration.ComponentType.LoadingIndicator, out var componentType))
+    {
+        <DynamicComponent Type="componentType" Parameters="@(new Dictionary<string, object> { ["LoadingIndicatorParameters"] = LoadingIndicatorParameters ?? new RgfLoadingIndicatorParameters { Text = _recroDict.GetRgfUiString("Loading") } })" />
+    }
+    else
+    {
+        <p><em>Loading...</em></p>
+    }
 }
 
 <RgfDynamicDialog @ref="_dynamicDialog" />
@@ -79,5 +90,8 @@ else if (LoadingIndicator != null && !EntityParameters.DeferredInitialization)
     public RenderFragment<RgfEntityParameters>? ChartTemplate { get; set; }
 
     [Parameter]
-    public RenderFragment LoadingIndicator { get; set; } = @<p><em>Loading...</em></p>;
+    public RenderFragment? LoadingIndicator { get; set; }
+
+    [Parameter]
+    public RgfLoadingIndicatorParameters? LoadingIndicatorParameters { get; set; }
 }

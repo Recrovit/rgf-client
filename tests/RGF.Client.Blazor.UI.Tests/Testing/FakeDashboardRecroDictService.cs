@@ -24,7 +24,6 @@ internal sealed class FakeDashboardRecroDictService : IRecroDictService
         "LayoutSection",
         "LoadingDashboard",
         "LoadingDashboards",
-        "LoadingItem",
         "MissingSavedViewWarning",
         "NewDashboard",
         "NoDashboardItem",

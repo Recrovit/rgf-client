@@ -1,6 +1,6 @@
 @using Recrovit.RecroGridFramework.Abstraction.Contracts.API
 @using Recrovit.RecroGridFramework.Abstraction.Contracts.Services
-@using Recrovit.RecroGridFramework.Client.Services.Dashboard
+@using Recrovit.RecroGridFramework.Client.Blazor.Parameters
 
 <div id="@_resizeHostId" class="rgf-dashboard-runtime-item">
     @if (_hasTechnicalError)
@@ -13,7 +13,7 @@
             <div class="rgf-dashboard-chart-initializer" aria-hidden="true">
                 @_entityComponent
             </div>
-            @if (_managerInitialized)
+            @if (_managerInitialized && _chartComponent != null)
             {
                 if (Item.ViewReference.ViewType == RgfDashboardViewType.ChartData)
                 {
@@ -34,9 +34,21 @@
             </div>
         }
     }
-    else
+
+    @if (_isPanelLoading)
     {
-        <div class="rgf-dashboard-item-loading">@RecroDict.GetRgfUiDashboard("LoadingItem")</div>
+        <div class="rgf-dashboard-item-loading">
+            @if (RgfBlazorConfiguration.TryGetComponentType(RgfBlazorConfiguration.ComponentType.LoadingIndicator, out var componentType))
+            {
+                <DynamicComponent Type="@componentType" Parameters="@(new Dictionary<string, object> { ["LoadingIndicatorParameters"] = new RgfLoadingIndicatorParameters() { Text = RecroDict.GetRgfUiString("Loading") } })" />
+            }
+            else
+            {
+                <p>
+                    <em>@RecroDict.GetRgfUiString("Loading")</em>
+                </p>
+            }
+        </div>
     }
 </div>
 
@@ -61,6 +73,7 @@
     private RenderFragment? _entityComponent;
     private RenderFragment? _chartComponent;
     private bool _managerInitialized;
+    private bool _isPanelLoading;
     private bool _hasTechnicalError;
     private int _currentDashboardItemId;
     private string? _currentEntityName;
@@ -102,6 +115,7 @@
         }
 
         ResetRuntimeState();
+        _isPanelLoading = true;
         _currentDashboardItemId = Item.DashboardItemId;
         _currentEntityName = entityName;
         _currentViewType = Item.ViewReference.ViewType;
@@ -128,6 +142,10 @@
         _entityParameters.EventDispatcher.Subscribe(RgfEntityEventKind.Initialized, OnEntityInitializedAsync, true, this);
         _entityComponent = RgfEntityComponent.Create(_entityParameters, Logger);
         _chartComponent = CreateChartComponent();
+        if (_hasTechnicalError)
+        {
+            _isPanelLoading = false;
+        }
         _lastLayoutCommitVersion = LayoutCommitVersion;
     }
 
@@ -135,9 +153,11 @@
     {
         try
         {
-            if (_entityParameters?.Manager == null)
+            _entityParameters!.Manager ??= args.Args.Manager;
+            if (_entityParameters.Manager == null)
             {
                 _hasTechnicalError = true;
+                _isPanelLoading = false;
                 Logger.LogWarning(
                     "Dashboard item manager was not initialized. DashboardItemId={DashboardItemId}, EntityName={EntityName}.",
                     Item.DashboardItemId,
@@ -146,10 +166,12 @@
             }
 
             _managerInitialized = true;
+            _isPanelLoading = false;
         }
         catch (Exception ex)
         {
             _hasTechnicalError = true;
+            _isPanelLoading = false;
             Logger.LogError(
                 ex,
                 "Dashboard item initialization failed. DashboardItemId={DashboardItemId}, EntityName={EntityName}.",
@@ -157,7 +179,7 @@
                 Item.ViewReference.EntityName);
         }
 
-        StateHasChanged();
+        await InvokeAsync(StateHasChanged);
     }
 
     private RenderFragment? CreateChartComponent()
@@ -216,6 +238,7 @@
         _entityComponent = null;
         _chartComponent = null;
         _managerInitialized = false;
+        _isPanelLoading = false;
         _lastLayoutCommitVersion = LayoutCommitVersion;
         _hasTechnicalError = false;
     }

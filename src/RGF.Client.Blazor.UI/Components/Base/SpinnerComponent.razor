@@ -1,17 +1,20 @@
 ﻿<div class="@ContainerClass" style="z-index:5000">
-    <div class="@SpinnerClass" style="@Style" role="status">
-        @if (string.IsNullOrEmpty(Status))
+    <div class="@SpinnerClass" style="@EffectiveStyle" role="status">
+        @if (string.IsNullOrEmpty(EffectiveStatus))
         {
-            <span class="visually-hidden">@Text</span>
+            <span class="visually-hidden">@EffectiveText</span>
         }
     </div>
-    @if (!string.IsNullOrEmpty(Status))
+    @if (!string.IsNullOrEmpty(EffectiveStatus))
     {
-        <div>@Status</div>
+        <div>@EffectiveStatus</div>
     }
 </div>
 
 @code {
+    [Parameter]
+    public RgfLoadingIndicatorParameters? LoadingIndicatorParameters { get; set; }
+
     [Parameter]
     public string ContainerClass { get; set; } = "spinner-container";
 
@@ -26,4 +29,10 @@
 
     [Parameter]
     public string? Status { get; set; }
+
+    private string EffectiveText => LoadingIndicatorParameters?.Text ?? Text;
+
+    private string? EffectiveStatus => LoadingIndicatorParameters?.Status ?? Status;
+
+    private string? EffectiveStyle => LoadingIndicatorParameters?.Style ?? Style;
 }

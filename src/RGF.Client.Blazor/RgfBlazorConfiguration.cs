@@ -52,6 +52,7 @@ public class RgfBlazorConfiguration
         Dialog = 2,
         Chart = 3,
         DashboardPage = 4,
+        LoadingIndicator = 5,
     }
 
     public const string JsBlazorNamespace = "Recrovit.RGF.Blazor.Client";

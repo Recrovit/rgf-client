@@ -4,6 +4,7 @@ using Microsoft.JSInterop;
 using Recrovit.RecroGridFramework.Abstraction.Contracts.Services;
 using Recrovit.RecroGridFramework.Blazor.RgfApexCharts;
 using Recrovit.RecroGridFramework.Client.Blazor.UI.Components;
+using Recrovit.RecroGridFramework.Client.Blazor.UI.Components.Base;
 using Recrovit.RecroGridFramework.Client.Blazor.UI.Components.Dashboard;
 using Recrovit.RecroGridFramework.Client.Services;
 using System.Reflection;
@@ -85,6 +86,7 @@ public class RGFClientBlazorUIConfiguration
         RgfBlazorConfiguration.UnregisterComponent(RgfBlazorConfiguration.ComponentType.Menu);
         RgfBlazorConfiguration.UnregisterComponent(RgfBlazorConfiguration.ComponentType.Dialog);
         RgfBlazorConfiguration.UnregisterComponent(RgfBlazorConfiguration.ComponentType.DashboardPage);
+        RgfBlazorConfiguration.UnregisterComponent(RgfBlazorConfiguration.ComponentType.LoadingIndicator);
 
         await RgfApexChartsConfiguration.UnloadResourcesAsync(jsRuntime);
     }
@@ -124,6 +126,7 @@ public static class RGFClientBlazorUIConfigurationExtension
         RgfBlazorConfiguration.RegisterComponent<MenuComponent>(RgfBlazorConfiguration.ComponentType.Menu);
         RgfBlazorConfiguration.RegisterComponent<DialogComponent>(RgfBlazorConfiguration.ComponentType.Dialog);
         RgfBlazorConfiguration.RegisterComponent<DashboardPageComponent>(RgfBlazorConfiguration.ComponentType.DashboardPage);
+        RgfBlazorConfiguration.RegisterComponent<SpinnerComponent>(RgfBlazorConfiguration.ComponentType.LoadingIndicator);
         RgfBlazorConfiguration.RegisterEntityComponent<EntityComponent>(string.Empty);
 
         if (loadResources)
