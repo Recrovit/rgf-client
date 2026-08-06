@@ -97,6 +97,45 @@ public sealed class ChartComponentTests
         Assert.Equal(-2, chartRef.ChartSettings.AggregationSettings.Columns[0].Sort);
     }
 
+    [Fact]
+    public async Task ChartComponent_AggregationSelectors_AllowDatesOnlyForMinAndMax()
+    {
+        using var testContext = CreateTestContext();
+        var entityParameters = CreateEntityParameters();
+
+        var cut = testContext.Render<UiChartComponent>(parameters => parameters
+            .Add(component => component.EntityParameters, entityParameters));
+
+        var chartRef = (RgfChartComponent)typeof(BaseChartComponent)
+            .GetProperty("RgfChartRef", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .GetValue(cut.Instance)!;
+
+        Assert.Single(chartRef.ChartSettings.AggregationSettings.Columns);
+        Assert.Equal("Count", chartRef.ChartSettings.AggregationSettings.Columns[0].Aggregate);
+        Assert.DoesNotContain(2, chartRef.GetAllowedAggregationColumns("Sum").Keys);
+
+        await cut.InvokeAsync(() =>
+        {
+            var column = chartRef.ChartSettings.AggregationSettings.Columns[0];
+            column.Aggregate = "Min";
+            column.Id = 2;
+        });
+        cut.Render();
+
+        Assert.Contains(2, chartRef.GetAllowedAggregationColumns("Min").Keys);
+        Assert.Contains(2, chartRef.GetAllowedAggregationColumns("Max").Keys);
+
+        await cut.InvokeAsync(() =>
+        {
+            var column = chartRef.ChartSettings.AggregationSettings.Columns[0];
+            column.Aggregate = "Sum";
+            column.Id = 1;
+        });
+        cut.Render();
+
+        Assert.DoesNotContain(2, chartRef.GetAllowedAggregationColumns("Sum").Keys);
+    }
+
     private static BunitContext CreateTestContext()
     {
         RgfClientBlazorUiTestState.Reset();
@@ -123,7 +162,8 @@ public sealed class ChartComponentTests
             Permissions = new RgfPermissions(true),
             Properties =
             [
-                CreateProperty(1, "Amount", "Amount", PropertyFormType.TextBox, PropertyListType.Numeric)
+                CreateProperty(1, "Amount", "Amount", PropertyFormType.TextBox, PropertyListType.Numeric),
+                CreateProperty(2, "CreatedAt", "Created At", PropertyFormType.DateTime, PropertyListType.Date)
             ]
         };
 

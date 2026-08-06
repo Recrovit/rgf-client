@@ -345,7 +345,7 @@ public partial class RgfChartComponent : ComponentBase, IDisposable
             {
                 messageStore.Add(() => col.Id, "");
             }
-            else if (!allowedPropertyIds.Contains(col.Id))
+            else if (!allowedPropertyIds.Contains(col.Id) || !GetAllowedAggregationColumns(col.Aggregate).ContainsKey(col.Id))
             {
                 messageStore.Add(() => aggregationSettings.Columns[i], "");
             }
@@ -633,6 +633,24 @@ public partial class RgfChartComponent : ComponentBase, IDisposable
 
         return value is IComparable comparable ? comparable : value?.ToString();
     }
+
+    public Dictionary<int, string> GetAllowedAggregationColumns(string? aggregate)
+        => GetAllowedAggregationProperties(aggregate)
+            .OrderBy(e => e.ColTitle)
+            .ToDictionary(p => p.Id, p => p.ColTitle);
+
+    private IEnumerable<RgfProperty> GetAllowedAggregationProperties(string? aggregate)
+    {
+        if (string.Equals(aggregate, "Min", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(aggregate, "Max", StringComparison.OrdinalIgnoreCase))
+        {
+            return AllowedProperties.Where(property => IsNumericAggregationProperty(property) || RgfDisplayValueFormatter.IsDateDisplayProperty(property));
+        }
+
+        return AllowedProperties.Where(IsNumericAggregationProperty);
+    }
+
+    private static bool IsNumericAggregationProperty(RgfProperty property) => property.ListType == PropertyListType.Numeric || property.ClientDataType.IsNumeric();
 
     private void ResetEditContext()
     {

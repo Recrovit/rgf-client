@@ -52,7 +52,7 @@
                                                 @if (col.Aggregate != "Count")
                                                 {
                                                     <RgfComboBox TValue="int"
-                                                                 DataSource="RgfCharComp.ChartColumnsNumeric"
+                                                                 DataSource="RgfCharComp.GetAllowedAggregationColumns(col.Aggregate)"
                                                                  @bind-Value="col.Id"
                                                                  OnValueChanging="() => RgfCharComp.SetDataStatus(RgfProcessingStatus.Invalid)" />
                                                 }

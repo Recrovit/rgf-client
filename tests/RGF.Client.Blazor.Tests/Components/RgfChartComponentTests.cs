@@ -26,7 +26,7 @@ public sealed class RgfChartComponentTests
     private const string CardRequiresSingleAggregateMessage = "Card charts require exactly one aggregate and do not support additional grouping.";
 
     [Fact]
-    public void AllowedProperties_IncludeAutoExternal_AndNumericSelectorStillFiltersToNumericFields()
+    public void AllowedProperties_IncludeAutoExternal_AndAggregateSelectorsRespectNumericAndDateRules()
     {
         using var testContext = CreateTestContext();
         var entityParameters = CreateEntityParameters(new RgfEntity
@@ -42,6 +42,7 @@ public sealed class RgfChartComponentTests
                 CreateProperty(1, "Name", "Name", PropertyFormType.TextBox, PropertyListType.String),
                 CreateProperty(2, "CustomerName", "Customer Name", PropertyFormType.TextBox, PropertyListType.String, autoExternalPath: "Customer/200"),
                 CreateProperty(3, "CustomerRevenue", "Customer Revenue", PropertyFormType.TextBox, PropertyListType.Numeric, autoExternalPath: "Customer/201"),
+                CreateProperty(5, "CreatedAt", "Created At", PropertyFormType.DateTime, PropertyListType.Date),
                 CreateProperty(4, "HiddenByAggregationExclude", "Hidden", PropertyFormType.TextBox, PropertyListType.Numeric, options: new Dictionary<string, object> { ["RGO_AggregationExclude"] = true })
             ]
         });
@@ -50,10 +51,23 @@ public sealed class RgfChartComponentTests
 
         Assert.Contains(cut.Instance.AllowedProperties, property => property.Id == 2);
         Assert.Contains(cut.Instance.AllowedProperties, property => property.Id == 3);
+        Assert.Contains(cut.Instance.AllowedProperties, property => property.Id == 5);
         Assert.DoesNotContain(cut.Instance.AllowedProperties, property => property.Id == 4);
         Assert.Contains(cut.Instance.ChartColumnsNumeric, option => option.Key == 3 && option.Value == "Customer Revenue");
         Assert.DoesNotContain(cut.Instance.ChartColumnsNumeric, option => option.Key == 2);
+        Assert.DoesNotContain(cut.Instance.ChartColumnsNumeric, option => option.Key == 5);
         Assert.DoesNotContain(cut.Instance.ChartColumnsNumeric, option => option.Key == 4);
+
+        var sumColumns = cut.Instance.GetAllowedAggregationColumns("Sum");
+        var minColumns = cut.Instance.GetAllowedAggregationColumns("Min");
+        var maxColumns = cut.Instance.GetAllowedAggregationColumns("Max");
+
+        Assert.Contains(3, sumColumns.Keys);
+        Assert.DoesNotContain(5, sumColumns.Keys);
+        Assert.Contains(3, minColumns.Keys);
+        Assert.Contains(5, minColumns.Keys);
+        Assert.Contains(3, maxColumns.Keys);
+        Assert.Contains(5, maxColumns.Keys);
     }
 
     [Fact]
@@ -134,6 +148,42 @@ public sealed class RgfChartComponentTests
         Assert.NotEmpty(cut.Instance.EditContext.GetValidationMessages(() => cut.Instance.ChartSettings.AggregationSettings.Columns[0]));
         Assert.NotEmpty(cut.Instance.EditContext.GetValidationMessages(() => cut.Instance.ChartSettings.AggregationSettings.Groups[0]));
         Assert.NotEmpty(cut.Instance.EditContext.GetValidationMessages(() => cut.Instance.ChartSettings.AggregationSettings.SubGroup[0]));
+    }
+
+    [Fact]
+    public void Validation_AcceptsDateForMin_ButRejectsDateForSum()
+    {
+        using var testContext = CreateTestContext();
+        var entityParameters = CreateEntityParameters(new RgfEntity
+        {
+            EntityId = 1,
+            EntityName = "Orders",
+            EntityVersion = "1",
+            MenuTitle = "Orders",
+            Title = "Orders",
+            Permissions = new RgfPermissions(true),
+            Properties =
+            [
+                CreateProperty(1, "Amount", "Amount", PropertyFormType.TextBox, PropertyListType.Numeric),
+                CreateProperty(2, "CreatedAt", "Created At", PropertyFormType.DateTime, PropertyListType.Date)
+            ]
+        });
+
+        var cut = RenderChartComponent(testContext, entityParameters);
+        cut.Instance.ChartSettings.AggregationSettings.Columns.Clear();
+        cut.Instance.ChartSettings.AggregationSettings.Columns.Add(new RgfAggregationColumn { Id = 2, Aggregate = "Min" });
+
+        var minValid = cut.Instance.EditContext.Validate();
+
+        Assert.True(minValid);
+        Assert.Empty(cut.Instance.EditContext.GetValidationMessages(() => cut.Instance.ChartSettings.AggregationSettings.Columns[0]));
+
+        cut.Instance.ChartSettings.AggregationSettings.Columns[0].Aggregate = "Sum";
+
+        var sumValid = cut.Instance.EditContext.Validate();
+
+        Assert.False(sumValid);
+        Assert.NotEmpty(cut.Instance.EditContext.GetValidationMessages(() => cut.Instance.ChartSettings.AggregationSettings.Columns[0]));
     }
 
     [Fact]
