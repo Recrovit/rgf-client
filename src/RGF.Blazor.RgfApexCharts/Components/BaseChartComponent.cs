@@ -509,7 +509,7 @@ public abstract class BaseChartComponent : ComponentBase, IAsyncDisposable
         return TryUpdateChart();
     }
 
-    protected virtual Task ChangePalette(string palette)
+    protected virtual Task ChangePalette(string? palette)
     {
         if (!string.IsNullOrEmpty(palette) && Enum.TryParse(palette, out PaletteType acPalette))
         {

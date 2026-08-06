@@ -14,6 +14,7 @@ using Recrovit.RecroGridFramework.Client.Handlers;
 using Recrovit.RecroGridFramework.Client.Models;
 using System.Collections.Concurrent;
 using System.Globalization;
+using System.Linq;
 using System.Reflection;
 using System.Security.Claims;
 
@@ -22,6 +23,8 @@ namespace Recrovit.RecroGridFramework.Client.Blazor.Tests.Components;
 [Collection("RGF.Client.Blazor.StaticState")]
 public sealed class RgfChartComponentTests
 {
+    private const string CardRequiresSingleAggregateMessage = "Card charts require exactly one aggregate and do not support additional grouping.";
+
     [Fact]
     public void AllowedProperties_IncludeAutoExternal_AndNumericSelectorStillFiltersToNumericFields()
     {
@@ -83,39 +86,6 @@ public sealed class RgfChartComponentTests
         Assert.False(isValid);
         Assert.NotEmpty(cut.Instance.EditContext.GetValidationMessages(() => cut.Instance.ChartSettings.AggregationSettings.Columns[0]));
         Assert.NotEmpty(cut.Instance.EditContext.GetValidationMessages(() => cut.Instance.ChartSettings.AggregationSettings.Groups[0]));
-        Assert.NotEmpty(cut.Instance.EditContext.GetValidationMessages(() => cut.Instance.ChartSettings.AggregationSettings.SubGroup[0]));
-    }
-
-    [Fact]
-    public void Validation_RejectsCardConfiguration_WithMultipleAggregates_AndSubGroups()
-    {
-        using var testContext = CreateTestContext();
-        var entityParameters = CreateEntityParameters(new RgfEntity
-        {
-            EntityId = 1,
-            EntityName = "Orders",
-            EntityVersion = "1",
-            MenuTitle = "Orders",
-            Title = "Orders",
-            Permissions = new RgfPermissions(true),
-            Properties =
-            [
-                CreateProperty(1, "Amount", "Amount", PropertyFormType.TextBox, PropertyListType.Numeric),
-                CreateProperty(2, "Category", "Category", PropertyFormType.TextBox, PropertyListType.String)
-            ]
-        });
-
-        var cut = RenderChartComponent(testContext, entityParameters);
-        cut.Instance.ChartSettings.SeriesType = RgfChartSeriesType.Card;
-        cut.Instance.ChartSettings.AggregationSettings.Columns.Clear();
-        cut.Instance.ChartSettings.AggregationSettings.Columns.Add(new RgfAggregationColumn { Id = 1, Aggregate = "Sum" });
-        cut.Instance.ChartSettings.AggregationSettings.Columns.Add(new RgfAggregationColumn { Id = 1, Aggregate = "Avg" });
-        cut.Instance.ChartSettings.AggregationSettings.SubGroup.Add(new RgfIdAliasPair(2, "Category"));
-
-        var isValid = cut.Instance.EditContext.Validate();
-
-        Assert.False(isValid);
-        Assert.NotEmpty(cut.Instance.EditContext.GetValidationMessages(() => cut.Instance.ChartSettings.AggregationSettings.Columns[1]));
         Assert.NotEmpty(cut.Instance.EditContext.GetValidationMessages(() => cut.Instance.ChartSettings.AggregationSettings.SubGroup[0]));
     }
 
@@ -274,6 +244,73 @@ public sealed class RgfChartComponentTests
         Assert.Equal("kedvezmények után", cut.Instance.ChartSettings.Remark);
     }
 
+    [Fact]
+    public void DeepCopy_PreservesAggregationSortAndLimitSettings()
+    {
+        var source = new RgfChartSettings
+        {
+            AggregationSettings = new RgfAggregationSettings
+            {
+                Columns =
+                [
+                    new RgfAggregationColumn { Id = 1, Aggregate = "Sum", Sort = -2 },
+                    new RgfAggregationColumn { Id = 0, Aggregate = "Count", Sort = 1 }
+                ],
+                Take = 5
+            }
+        };
+
+        var copy = RgfChartSettings.DeepCopy(source);
+
+        Assert.NotSame(source, copy);
+        Assert.NotNull(copy);
+        Assert.Equal(2, copy!.AggregationSettings.Columns.Count);
+        Assert.Equal(-2, copy.AggregationSettings.Columns[0].Sort);
+        Assert.Equal(1, copy.AggregationSettings.Columns[1].Sort);
+        Assert.Equal(5, copy.AggregationSettings.Take);
+    }
+
+    [Fact]
+    public async Task AggregationSortAndTake_DoNotReorderExistingClientChartData()
+    {
+        using var testContext = CreateTestContext();
+        var entityParameters = CreateEntityParameters(new RgfEntity
+        {
+            EntityId = 1,
+            EntityName = "Orders",
+            EntityVersion = "1",
+            MenuTitle = "Orders",
+            Title = "Orders",
+            Permissions = new RgfPermissions(true),
+            Properties =
+            [
+                CreateProperty(1, "Amount", "Amount", PropertyFormType.TextBox, PropertyListType.Numeric)
+            ]
+        });
+
+        var cut = RenderChartComponent(testContext, entityParameters);
+        cut.Instance.ChartSettings.AggregationSettings.Columns.Clear();
+        var aggregateColumn = new RgfAggregationColumn { Id = 1, Aggregate = "Sum" };
+        cut.Instance.ChartSettings.AggregationSettings.Columns.Add(aggregateColumn);
+        cut.Instance.ChartSettings.AggregationSettings.Take = 2;
+        cut.Instance.ChartData =
+        [
+            CreateChartData(("Category", "B")),
+            CreateChartData(("Category", "A")),
+            CreateChartData(("Category", "C"))
+        ];
+
+        await cut.InvokeAsync(() =>
+        {
+            cut.Instance.SetColumnSortPriority(aggregateColumn, 1);
+            cut.Instance.SetColumnSortDescending(aggregateColumn, true);
+        });
+
+        Assert.Equal(-1, aggregateColumn.Sort);
+        Assert.Equal(2, cut.Instance.ChartSettings.AggregationSettings.Take);
+        Assert.Equal(["B", "A", "C"], cut.Instance.ChartData.Select(row => row.Get<string>("Category")).ToArray());
+    }
+
     private static BunitContext CreateTestContext(string userLanguage = "eng")
     {
         RgfBlazorTestState.Reset();
@@ -333,12 +370,16 @@ public sealed class RgfChartComponentTests
         };
     }
 
-    private static RgfDynamicDictionary CreateColumn(string alias, string name, string aggregate)
+    private static RgfDynamicDictionary CreateColumn(string alias, string name, string aggregate = null!, IRgfProperty? property = null)
     {
         var column = new RgfDynamicDictionary();
         column.SetMember("Alias", alias);
         column.SetMember("Name", name);
         column.SetMember("Aggregate", aggregate);
+        if (property != null)
+        {
+            column.SetMember("Property", property);
+        }
         return column;
     }
 
@@ -346,6 +387,16 @@ public sealed class RgfChartComponentTests
     {
         var row = new RgfDynamicDictionary();
         row.SetMember(alias, value);
+        return row;
+    }
+
+    private static RgfDynamicDictionary CreateChartData(params (string Alias, object Value)[] members)
+    {
+        var row = new RgfDynamicDictionary();
+        foreach (var member in members)
+        {
+            row.SetMember(member.Alias, member.Value);
+        }
         return row;
     }
 

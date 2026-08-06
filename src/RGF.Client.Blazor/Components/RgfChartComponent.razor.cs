@@ -28,11 +28,12 @@ public partial class RgfChartComponent : ComponentBase, IDisposable
     [Inject]
     private IRecroSecService _recroSec { get; set; } = null!;
 
-    public EditContext EditContext { get; private set; } = new(new RgfAggregationSettings());
+    public EditContext EditContext { get; private set; } = new(new RgfChartSettings());
 
     public ValidationMessageStore MessageStore { get; private set; } = null!;
 
     private ConcurrentDictionary<string, string> _recroDictChart = [];
+    private readonly Dictionary<RgfAggregationColumn, RgfAggregationSortState> _aggregationSortStates = [];
 
     public string GetRecroDictChart(string resourceKey, string? defaultValue = null) => _recroDict.GetItem(_recroDictChart, resourceKey, defaultValue);
 
@@ -98,9 +99,7 @@ public partial class RgfChartComponent : ComponentBase, IDisposable
 
         ChartSettings.AggregationSettings.Columns = new List<RgfAggregationColumn> { new() { Id = 0, Aggregate = "Count" } };
 
-        EditContext = new(ChartSettings.AggregationSettings);
-        EditContext.OnValidationRequested += HandleValidationRequested;
-        MessageStore = new(EditContext);
+        ResetEditContext();
 
         EntityParameters.ToolbarParameters.MenuEventDispatcher.Subscribe(Menu.RecroChart, OnShowChart);
         EntityParameters.ToolbarParameters.EventDispatcher.Subscribe(RgfToolbarEventKind.RecroChart, OnShowChart);
@@ -343,24 +342,16 @@ public partial class RgfChartComponent : ComponentBase, IDisposable
         }
         if (rgfChartSettings.SeriesType == RgfChartSeriesType.Card)
         {
-            if (aggregationSettings.Columns.Count > 1)
+            if (aggregationSettings.Columns.Count > 1 || aggregationSettings.SubGroup.Count > 0)
             {
-                messageStore.Add(() => aggregationSettings.Columns[1], "");
-            }
-            if (aggregationSettings.SubGroup.Count > 0)
-            {
-                messageStore.Add(() => aggregationSettings.SubGroup[0], "");
+                messageStore.Add(() => ChartSettings.SeriesType, GetRecroDictChart("CardRequiresSingleAggregate"));
             }
         }
         else if (rgfChartSettings.SeriesType != RgfChartSeriesType.Bar && rgfChartSettings.SeriesType != RgfChartSeriesType.Line)
         {
-            if (aggregationSettings.Columns.Count > 1)
+            if (aggregationSettings.Columns.Count > 1 || aggregationSettings.SubGroup.Count > 0)
             {
-                messageStore.Add(() => aggregationSettings.Columns[1], "");
-            }
-            if (aggregationSettings.SubGroup.Count > 0)
-            {
-                messageStore.Add(() => aggregationSettings.SubGroup[0], "");
+                messageStore.Add(() => ChartSettings.SeriesType, GetRecroDictChart("SingleSeriesChartSingleAggregateOnly"));
             }
         }
         for (int i = aggregationSettings.SubGroup.Count - 1; i >= 0; i--)
@@ -378,6 +369,18 @@ public partial class RgfChartComponent : ComponentBase, IDisposable
             {
                 messageStore.Add(() => aggregationSettings.Groups[i], "");
             }
+        }
+
+        if (aggregationSettings.Take <= 0)
+        {
+            aggregationSettings.Take = null;
+        }
+
+        int s = 1;
+        foreach (var column in aggregationSettings.Columns.Where(column => column.Sort != 0).OrderBy(column => Math.Abs(column.Sort)).ToArray())
+        {
+            column.Sort = column.Sort > 0 ? s : -s;
+            s++;
         }
     }
 
@@ -424,8 +427,54 @@ public partial class RgfChartComponent : ComponentBase, IDisposable
         ChartSettings.AggregationSettings.SubGroup.RemoveAt(idx);
     }
 
+    public void SetColumnSortPriority(RgfAggregationColumn column, int? priority)
+    {
+        SetDataStatus(RgfProcessingStatus.Invalid);
+
+        var state = GetColumnSortState(column);
+        if (priority == null || priority <= 0)
+        {
+            column.Sort = 0;
+            state.Priority = null;
+            return;
+        }
+
+        state.Priority = priority.Value;
+        column.Sort = state.Descending ? -priority.Value : priority.Value;
+    }
+
+    public void SetColumnSortDescending(RgfAggregationColumn column, bool descending)
+    {
+        SetDataStatus(RgfProcessingStatus.Invalid);
+
+        var state = GetColumnSortState(column);
+        state.Descending = descending;
+        if (column.Sort == 0)
+        {
+            return;
+        }
+
+        int priority = Math.Abs(column.Sort);
+        column.Sort = descending ? -priority : priority;
+    }
+
+    public RgfAggregationSortState GetColumnSortState(RgfAggregationColumn column)
+    {
+        if (!_aggregationSortStates.TryGetValue(column, out var state))
+        {
+            state = new RgfAggregationSortState();
+            _aggregationSortStates[column] = state;
+        }
+
+        int priority = Math.Abs(column.Sort);
+        state.Priority = priority == 0 ? null : priority;
+        state.Descending = column.Sort < 0;
+        return state;
+    }
+
     public void Dispose()
     {
+        EditContext.OnValidationRequested -= HandleValidationRequested;
         EntityParameters?.UnsubscribeFromAll(this);
     }
 
@@ -438,7 +487,8 @@ public partial class RgfChartComponent : ComponentBase, IDisposable
             var gs = ChartSettingList.FirstOrDefault(e => e.ChartSettingsId == chartSettingsId);
             if (gs?.ChartSettingsId > 0)
             {
-                ChartSettings = RgfChartSettings.DeepCopy(gs);
+                ChartSettings = RgfChartSettings.DeepCopy(gs)!;
+                ResetEditContext();
                 var parentGridSettings = ChartSettings.ParentGridSettings ?? new RgfGridSettings();
                 var conditions = parentGridSettings.Conditions ?? [];
                 var filterHandler = await Manager.GetFilterHandlerAsync();
@@ -452,10 +502,11 @@ public partial class RgfChartComponent : ComponentBase, IDisposable
             }
         }
 
-        ChartSettings = RgfChartSettings.DeepCopy(ChartSettings);
+        ChartSettings = RgfChartSettings.DeepCopy(ChartSettings)!;
         ChartSettings.SettingsName = name;
         ChartSettings.ChartSettingsId = null;
         ChartSettings.IsReadonly = false;
+        ResetEditContext();
         return false;
     }
 
@@ -470,7 +521,7 @@ public partial class RgfChartComponent : ComponentBase, IDisposable
                 ChartSettings.ChartSettingsId = res.ChartSettingsId;
             }
             ChartSettingList.RemoveAll(e => e.ChartSettingsId == ChartSettings.ChartSettingsId);
-            ChartSettingList.Insert(0, RgfChartSettings.DeepCopy(ChartSettings));
+            ChartSettingList.Insert(0, RgfChartSettings.DeepCopy(ChartSettings)!);
             return true;
         }
         return false;
@@ -570,6 +621,22 @@ public partial class RgfChartComponent : ComponentBase, IDisposable
             return normalizedDateTime;
         }
 
-        return value?.ToString();
+        return value is IComparable comparable ? comparable : value?.ToString();
+    }
+
+    private void ResetEditContext()
+    {
+        _aggregationSortStates.Clear();
+        EditContext.OnValidationRequested -= HandleValidationRequested;
+        EditContext = new(ChartSettings);
+        EditContext.OnValidationRequested += HandleValidationRequested;
+        MessageStore = new(EditContext);
+    }
+
+    public sealed class RgfAggregationSortState
+    {
+        public int? Priority { get; set; }
+
+        public bool Descending { get; set; }
     }
 }

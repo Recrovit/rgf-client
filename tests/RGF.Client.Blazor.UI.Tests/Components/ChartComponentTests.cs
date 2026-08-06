@@ -15,12 +15,16 @@ using Recrovit.RecroGridFramework.Client.Handlers;
 using Recrovit.RecroGridFramework.Client.Models;
 using System.Reflection;
 using System.Security.Claims;
+using Microsoft.AspNetCore.Components.Rendering;
+using UiChartComponent = Recrovit.RecroGridFramework.Client.Blazor.UI.Components.ChartComponent;
 
 namespace Recrovit.RecroGridFramework.Client.Blazor.UI.Tests.Components;
 
 [Collection(RgfBlazorUiStaticStateCollection.Name)]
 public sealed class ChartComponentTests
 {
+    private const string CardRequiresSingleAggregateMessage = "Card charts require exactly one aggregate and do not support additional grouping.";
+
     [Fact]
     public void ApexChartComponent_RendersCardRemark_WhenCardModeIsActive()
     {
@@ -50,16 +54,16 @@ public sealed class ChartComponentTests
     }
 
     [Fact]
-    public void ChartComponent_TracksCardType_WhenCardTypeIsSelected()
+    public async Task ChartComponent_TracksCardType_WhenCardTypeIsSelected()
     {
         using var testContext = CreateTestContext();
         var entityParameters = CreateEntityParameters();
 
-        var cut = testContext.Render<ChartComponent>(parameters => parameters
+        var cut = testContext.Render<UiChartComponent>(parameters => parameters
             .Add(component => component.EntityParameters, entityParameters));
 
         var changeChartType = typeof(BaseChartComponent).GetMethod("ChangeChartType", BindingFlags.Instance | BindingFlags.NonPublic)!;
-        ((Task)changeChartType.Invoke(cut.Instance, [RgfChartSeriesType.Card])!).GetAwaiter().GetResult();
+        await (Task)changeChartType.Invoke(cut.Instance, [RgfChartSeriesType.Card])!;
         cut.Render();
 
         var apexChartSettings = (ApexChartSettings)typeof(BaseChartComponent)
@@ -67,6 +71,30 @@ public sealed class ChartComponentTests
             .GetValue(cut.Instance)!;
 
         Assert.Equal(RgfChartSeriesType.Card, apexChartSettings.ChartType);
+    }
+
+    [Fact]
+    public async Task ChartComponent_AggregationSortControls_WriteColumnSortState()
+    {
+        using var testContext = CreateTestContext();
+        var entityParameters = CreateEntityParameters();
+
+        var cut = testContext.Render<UiChartComponent>(parameters => parameters
+            .Add(component => component.EntityParameters, entityParameters));
+
+        var chartRef = (RgfChartComponent)typeof(BaseChartComponent)
+            .GetProperty("RgfChartRef", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .GetValue(cut.Instance)!;
+
+        await cut.InvokeAsync(() =>
+        {
+            var column = chartRef.ChartSettings.AggregationSettings.Columns[0];
+            column.Aggregate = "Count";
+            chartRef.SetColumnSortPriority(column, 2);
+            chartRef.SetColumnSortDescending(column, true);
+        });
+
+        Assert.Equal(-2, chartRef.ChartSettings.AggregationSettings.Columns[0].Sort);
     }
 
     private static BunitContext CreateTestContext()
@@ -206,9 +234,26 @@ public sealed class ChartComponentTests
 
     private sealed class FakeDialogComponent : ComponentBase
     {
+        [Parameter]
+        public RgfDialogParameters DialogParameters { get; set; } = null!;
+
+        protected override void BuildRenderTree(RenderTreeBuilder builder)
+        {
+            var sequence = 0;
+            builder.OpenElement(sequence++, "div");
+            builder.AddAttribute(sequence++, "class", "fake-dialog");
+            builder.AddContent(sequence++, DialogParameters.Content);
+            if (DialogParameters.FooterTemplate != null)
+            {
+                builder.AddContent(sequence++, DialogParameters.FooterTemplate);
+            }
+            builder.CloseElement();
+        }
     }
 
     private sealed class FakeEntityHostComponent : ComponentBase
     {
+        [Parameter]
+        public RgfEntityParameters EntityParameters { get; set; } = null!;
     }
 }

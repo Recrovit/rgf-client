@@ -1,4 +1,5 @@
-﻿using System;
+﻿#nullable enable
+
 using System.Text.Json.Serialization;
 
 namespace Recrovit.RecroGridFramework.Abstraction.Models;
@@ -16,7 +17,7 @@ public class RgfChartSetting : ICloneable
 {
     public RgfChartSetting() { }
 
-    internal RgfChartSetting(RgfChartSetting chartSetting)
+    internal RgfChartSetting(RgfChartSetting? chartSetting)
     {
         if (chartSetting != null)
         {
@@ -35,30 +36,29 @@ public class RgfChartSetting : ICloneable
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public int? ChartSettingsId { get; set; }
 
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public string SettingsName { get; set; }
+    public string SettingsName { get; set; } = string.Empty;
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public string Remark { get; set; }
+    public string? Remark { get; set; }
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public string RoleId { get; set; }
+    public string? RoleId { get; set; }
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public bool? IsReadonly { get; set; }
 
-    public RgfGridSettings ParentGridSettings { get; set; }
+    public RgfGridSettings? ParentGridSettings { get; set; }
 
-    public virtual object Clone() => DeepCopy(this);
+    public virtual object Clone() => DeepCopy(this)!;
 
-    public static RgfChartSetting DeepCopy(RgfChartSetting source) => source == null ? null : new RgfChartSetting(source);
+    public static RgfChartSetting? DeepCopy(RgfChartSetting? source) => source == null ? null : new RgfChartSetting(source);
 }
 
 public class RgfChartSettings : RgfChartSetting
 {
     public RgfChartSettings() { }
 
-    internal RgfChartSettings(RgfChartSettings chartSettings) : base(chartSettings)
+    internal RgfChartSettings(RgfChartSettings? chartSettings) : base(chartSettings)
     {
         if (chartSettings != null)
         {
@@ -93,11 +93,11 @@ public class RgfChartSettings : RgfChartSetting
 
     public bool Horizontal { get; set; }
 
-    public string Theme { get; set; }
+    public string? Theme { get; set; }
 
-    public string Palette { get; set; }
+    public string? Palette { get; set; }
 
-    public override object Clone() => DeepCopy(this);
+    public override object Clone() => DeepCopy(this)!;
 
-    public static RgfChartSettings DeepCopy(RgfChartSettings source) => source == null ? null : new RgfChartSettings(source);
+    public static RgfChartSettings? DeepCopy(RgfChartSettings? source) => source == null ? null : new RgfChartSettings(source);
 }
