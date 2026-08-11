@@ -37,7 +37,6 @@ public class RgfColumnSettings : RgfIdAliasPair
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public int? ColWidthOrNull { get; set; }
 
-    [JsonPropertyName("Sort")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public int? Sort { get; set; }
 

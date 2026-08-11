@@ -1,9 +1,5 @@
 ﻿using Recrovit.RecroGridFramework.Abstraction.Contracts.Services;
 using Recrovit.RecroGridFramework.Abstraction.Extensions;
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Xml.Serialization;
@@ -171,17 +167,18 @@ public class RgfFilter
     }
 
     [Serializable]
-    public class Condition
+    public class Condition : RgfIdAliasPair
     {
         public LogicalOperator LogicalOperator { get; set; }
 
-        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
-        public int PropertyId { get; set; }
+        [Obsolete("Use Id instead.", true)]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWriting)]
+        public int PropertyId { get => Id; set => Id = value; }
 
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
         public QueryOperator QueryOperator { get; set; }
 
-        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public List<Condition> Conditions { get; set; }
 
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]

@@ -66,13 +66,13 @@
                                     <div><strong>X @RgfCharComp.GetRecroDictChart("Axis").ToLower()</strong></div>
                                     <div><small>@RgfCharComp.GetRecroDictChart("GroupValues")</small></div>
                                 </div>
-                                @for (int i = 0; i < RgfCharComp.ChartSettings.AggregationSettings.Groups.Count; i++)
+                                @for (int i = 0; i < RgfCharComp.ChartSettings.AggregationSettings.GroupsOrEmpty.Count; i++)
                                 {
                                     var idx = i;
                                     <div class="p-1">
-                                        <ValidationMessage For="@(() => RgfCharComp.ChartSettings.AggregationSettings.Groups[idx])" />
-                                        <InputSelect TValue="int" Value="RgfCharComp.ChartSettings.AggregationSettings.Groups[idx].Id" ValueExpression="() => RgfCharComp.ChartSettings.AggregationSettings.Groups[idx].Id"
-                                                     ValueChanged="(v) => { RgfCharComp.ChartSettings.AggregationSettings.Groups[idx].Id = v; RgfCharComp.SetDataStatus(RgfProcessingStatus.Invalid); }">
+                                        <ValidationMessage For="@(() => RgfCharComp.ChartSettings.AggregationSettings.GroupsOrEmpty[idx])" />
+                                        <InputSelect TValue="int" Value="RgfCharComp.ChartSettings.AggregationSettings.GroupsOrEmpty[idx].Id" ValueExpression="() => RgfCharComp.ChartSettings.AggregationSettings.GroupsOrEmpty[idx].Id"
+                                                     ValueChanged="(v) => { RgfCharComp.ChartSettings.AggregationSettings.GroupsOrEmpty[idx].Id = v; RgfCharComp.SetDataStatus(RgfProcessingStatus.Invalid); }">
                                             <option value="0"></option>
                                             @foreach (var option in RgfCharComp.AllowedProperties.OrderBy(e => e.ColTitle).ToDictionary(p => p.Id, p => p.ColTitle))
                                             {
@@ -93,13 +93,13 @@
                                     <div><strong>@RgfCharComp.GetRecroDictChart("AdditionalGrouping")</strong></div>
                                     <div><small>@RgfCharComp.GetRecroDictChart("SeriesGrouping")</small></div>
                                 </div>
-                                @for (int i = 0; i < RgfCharComp.ChartSettings.AggregationSettings.SubGroup.Count; i++)
+                                @for (int i = 0; i < RgfCharComp.ChartSettings.AggregationSettings.SubGroupsOrEmpty.Count; i++)
                                 {
                                     var idx = i;
                                     <div class="p-1">
-                                        <ValidationMessage For="@(() => RgfCharComp.ChartSettings.AggregationSettings.SubGroup[idx])" />
-                                        <InputSelect TValue="int" Value="RgfCharComp.ChartSettings.AggregationSettings.SubGroup[idx].Id" ValueExpression="() => RgfCharComp.ChartSettings.AggregationSettings.SubGroup[idx].Id"
-                                                     ValueChanged="(v) => { RgfCharComp.ChartSettings.AggregationSettings.SubGroup[idx].Id = v; RgfCharComp.SetDataStatus(RgfProcessingStatus.Invalid); }">
+                                        <ValidationMessage For="@(() => RgfCharComp.ChartSettings.AggregationSettings.SubGroupsOrEmpty[idx])" />
+                                        <InputSelect TValue="int" Value="RgfCharComp.ChartSettings.AggregationSettings.SubGroupsOrEmpty[idx].Id" ValueExpression="() => RgfCharComp.ChartSettings.AggregationSettings.SubGroupsOrEmpty[idx].Id"
+                                                     ValueChanged="(v) => { RgfCharComp.ChartSettings.AggregationSettings.SubGroupsOrEmpty[idx].Id = v; RgfCharComp.SetDataStatus(RgfProcessingStatus.Invalid); }">
                                             <option value="0"></option>
                                             @foreach (var option in RgfCharComp.AllowedProperties.OrderBy(e => e.ColTitle).ToDictionary(p => p.Id, p => p.ColTitle))
                                             {

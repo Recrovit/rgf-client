@@ -7,7 +7,7 @@ public sealed class RgfDashboardDesignerState
 {
     private string? _baselineSnapshot;
 
-    public RgfDashboardDefinition Dashboard { get; private set; } = RgfDashboardDefinitionHelper.CreateLocalDashboard();
+    public RgfDashboardDefinition Dashboard { get; private set; } = new();
 
     public string? SelectedPaneId { get; private set; }
 
@@ -180,12 +180,8 @@ public sealed class RgfDashboardDesignerState
             }
 
             var resolvedViewReference = viewReference.DeepCopy() ?? new();
-            resolvedViewReference.EntityName = string.IsNullOrWhiteSpace(resolvedViewReference.EntityName)
-                ? string.Empty
-                : resolvedViewReference.EntityName.Trim();
-            resolvedViewReference.SettingsName = string.IsNullOrWhiteSpace(resolvedViewReference.SettingsName)
-                ? null
-                : resolvedViewReference.SettingsName.Trim();
+            resolvedViewReference.EntityName = resolvedViewReference.EntityName?.Trim() ?? string.Empty;
+            resolvedViewReference.SettingsName = resolvedViewReference.SettingsName?.Trim() ?? string.Empty;
 
             var layout = EnsureLayout(clone);
             if (pane.DashboardItemId is int existingItemId)
@@ -333,7 +329,7 @@ public sealed class RgfDashboardDesignerState
 
     private RgfDashboardCommandResult ApplyMutation(Func<RgfDashboardDefinition, MutationOutcome> mutate)
     {
-        var clone = Dashboard.DeepCopy() ?? RgfDashboardDefinitionHelper.CreateLocalDashboard();
+        var clone = Dashboard.DeepCopy() ?? new();
         var outcome = mutate(clone);
         if (!outcome.Succeeded)
         {

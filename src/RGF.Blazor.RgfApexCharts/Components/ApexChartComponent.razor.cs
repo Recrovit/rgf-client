@@ -44,10 +44,10 @@ public partial class ApexChartComponent : ComponentBase
 
         var cultureInfo = _recroSec.UserCultureInfo();
 
-        _xAxisFields = ResolveAxisFields(aggregationSettings.Groups, dataColumns);
+        _xAxisFields = ResolveAxisFields(aggregationSettings.GroupsOrEmpty, dataColumns);
         _xData = DistinctAxisValues(chartData, _xAxisFields, cultureInfo);
 
-        _sgAxisFields = ResolveAxisFields(aggregationSettings.SubGroup, dataColumns);
+        _sgAxisFields = ResolveAxisFields(aggregationSettings.SubGroupsOrEmpty, dataColumns);
         _sgData = DistinctAxisValues(chartData, _sgAxisFields, cultureInfo);
 
         ChartSettings.Options.Xaxis.Type = XAxisType.Category;
@@ -68,7 +68,7 @@ public partial class ApexChartComponent : ComponentBase
                 name = $"{aggregate}({name})";
             }
 
-            if (aggregationSettings.SubGroup.Count == 0)
+            if (aggregationSettings.SubGroupsOrEmpty.Count == 0)
             {
                 var data = chartData.ToDictionary(e => CreateAxisValue(e, _xAxisFields, cultureInfo).Key, v => v);
                 AddSerie(data, name, dataAlias, cultureInfo);

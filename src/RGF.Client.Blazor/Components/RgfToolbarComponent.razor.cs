@@ -137,7 +137,7 @@ public partial class RgfToolbarComponent : ComponentBase, IDisposable
         return SettingsMenu;
     }
 
-    public RenderFragment? CreateCustomMenu(object? icon = null) 
+    public RenderFragment? CreateCustomMenu(object? icon = null)
     {
         _menuRenderer ??= new MenuRenderer(EntityParameters);
         CustomMenu = _menuRenderer.CreateCustomMenu(OnMenuCommand, icon);
@@ -276,7 +276,7 @@ public partial class RgfToolbarComponent : ComponentBase, IDisposable
     {
         if (GridSetting.GridSettingsId != null && GridSetting.GridSettingsId != 0)
         {
-            var toast = RgfToastEventArgs.CreateActionEvent(_recroDict.GetRgfUiString("Request"), Manager.EntityDesc.MenuTitle, _recroDict.GetRgfUiString("Delete"), GridSetting.SettingsName);
+            var toast = RgfToastEventArgs.CreateActionEvent(_recroDict.GetRgfUiString("Request"), Manager.EntityDesc.MenuTitle, _recroDict.GetRgfUiString("Delete"), GridSetting.SettingsName ?? "");
             await Manager.ToastManager.RaiseEventAsync(toast, this);
             bool res = await Manager.DeleteGridSettingsAsync((int)GridSetting.GridSettingsId);
             if (res)

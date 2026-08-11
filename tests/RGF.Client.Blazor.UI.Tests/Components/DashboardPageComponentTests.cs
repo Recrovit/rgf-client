@@ -365,7 +365,9 @@ public sealed class DashboardPageComponentTests : IDisposable
                         ViewReference = new()
                         {
                             EntityName = "Orders",
-                            ViewType = RgfDashboardViewType.Grid
+                            ViewType = RgfDashboardViewType.Grid,
+                            SettingsId = 42,
+                            SettingsName = "Orders default"
                         }
                     }
                 ]

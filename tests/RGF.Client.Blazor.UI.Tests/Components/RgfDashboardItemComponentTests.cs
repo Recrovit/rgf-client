@@ -106,7 +106,7 @@ public sealed class RgfDashboardItemComponentTests : IDisposable
         => testContext.Render<DashboardItemHostComponent>(parameters => parameters
             .Add(component => component.InitialItem, item));
 
-    private static RgfDashboardItem CreateItem(RgfDashboardViewType viewType, int? settingsId)
+    private static RgfDashboardItem CreateItem(RgfDashboardViewType viewType, int settingsId)
         => new()
         {
             DashboardItemId = 1,

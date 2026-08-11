@@ -89,14 +89,14 @@
                                             <div class="fw-bold">X @RgfCharComp.GetRecroDictChart("Axis").ToLower()</div>
                                             <div class="small">@RgfCharComp.GetRecroDictChart("GroupValues")</div>
                                         </div>
-                                        @for (int i = 0; i < RgfCharComp.ChartSettings.AggregationSettings.Groups.Count; i++)
+                                        @for (int i = 0; i < RgfCharComp.ChartSettings.AggregationSettings.GroupsOrEmpty.Count; i++)
                                         {
                                             var idx = i;
                                             <div class="p-1 col-auto">
-                                                <ValidationMessage For="@(() => RgfCharComp.ChartSettings.AggregationSettings.Groups[idx])" />
+                                                <ValidationMessage For="@(() => RgfCharComp.ChartSettings.AggregationSettings.GroupsOrEmpty[idx])" />
                                                 <RgfComboBox TValue="int"
                                                              DataSource="RgfCharComp.AllowedProperties.OrderBy(e => e.ColTitle).ToDictionary(p => p.Id, p => p.ColTitle)"
-                                                             @bind-Value="RgfCharComp.ChartSettings.AggregationSettings.Groups[idx].Id"
+                                                             @bind-Value="RgfCharComp.ChartSettings.AggregationSettings.GroupsOrEmpty[idx].Id"
                                                              OnValueChanging="() => RgfCharComp.SetDataStatus(RgfProcessingStatus.Invalid)" />
                                             </div>
                                             <div class="p-1 col-auto">
@@ -112,14 +112,14 @@
                                             <div class="fw-bold">@RgfCharComp.GetRecroDictChart("AdditionalGrouping")</div>
                                             <div class="small">@RgfCharComp.GetRecroDictChart("SeriesGrouping")</div>
                                         </div>
-                                        @for (int i = 0; i < RgfCharComp.ChartSettings.AggregationSettings.SubGroup.Count; i++)
+                                        @for (int i = 0; i < RgfCharComp.ChartSettings.AggregationSettings.SubGroupsOrEmpty.Count; i++)
                                         {
                                             var idx = i;
                                             <div class="p-1 col-auto">
-                                                <ValidationMessage For="@(() => RgfCharComp.ChartSettings.AggregationSettings.SubGroup[idx])" />
+                                                <ValidationMessage For="@(() => RgfCharComp.ChartSettings.AggregationSettings.SubGroupsOrEmpty[idx])" />
                                                 <RgfComboBox TValue="int"
                                                              DataSource="RgfCharComp.AllowedProperties.OrderBy(e => e.ColTitle).ToDictionary(p => p.Id, p => p.ColTitle)"
-                                                             @bind-Value="RgfCharComp.ChartSettings.AggregationSettings.SubGroup[idx].Id"
+                                                             @bind-Value="RgfCharComp.ChartSettings.AggregationSettings.SubGroupsOrEmpty[idx].Id"
                                                              OnValueChanging="() => RgfCharComp.SetDataStatus(RgfProcessingStatus.Invalid)" />
                                             </div>
                                             <div class="p-1 col-auto">

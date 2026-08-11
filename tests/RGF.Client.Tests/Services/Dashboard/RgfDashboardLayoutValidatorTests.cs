@@ -30,6 +30,17 @@ public sealed class RgfDashboardLayoutValidatorTests
     }
 
     [Fact]
+    public void Validate_DesignerMode_RejectsMissingSettingsName()
+    {
+        var dashboard = CreateDashboardWithItem(1, "Orders", settingsName: "   ");
+
+        var result = RgfDashboardLayoutValidator.Validate(dashboard, RgfDashboardValidationMode.Designer);
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Issues, issue => issue.Code == "item-settings-name-missing" && issue.DashboardItemId == 1);
+    }
+
+    [Fact]
     public void Validate_DesignerMode_RejectsDuplicateDashboardItemIds()
     {
         var dashboard = new RgfDashboardDefinition
@@ -117,7 +128,7 @@ public sealed class RgfDashboardLayoutValidatorTests
         Assert.DoesNotContain(result.Issues, issue => issue.Code == "item-id-duplicate");
     }
 
-    private static RgfDashboardDefinition CreateDashboardWithItem(int dashboardItemId, string entityName)
+    private static RgfDashboardDefinition CreateDashboardWithItem(int dashboardItemId, string entityName, string settingsName = "Orders default")
         => new()
         {
             Layout = new()
@@ -132,16 +143,17 @@ public sealed class RgfDashboardLayoutValidatorTests
                     new()
                     {
                         DashboardItemId = dashboardItemId,
-                        ViewReference = CreateViewReference(entityName)
+                        ViewReference = CreateViewReference(entityName, settingsName)
                     }
                 ]
             }
         };
 
-    private static RgfDashboardViewReference CreateViewReference(string entityName)
+    private static RgfDashboardViewReference CreateViewReference(string entityName, string settingsName = "Orders default")
         => new()
         {
             EntityName = entityName,
-            ViewType = RgfDashboardViewType.Grid
+            ViewType = RgfDashboardViewType.Grid,
+            SettingsName = settingsName
         };
 }

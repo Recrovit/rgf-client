@@ -13,20 +13,39 @@ public class RgfAggregationSettings : ICloneable
         if (source != null)
         {
             Columns = source.Columns.Select(c => new RgfAggregationColumn(c)).ToList();
-            Groups = source.Groups.Select(g => new RgfIdAliasPair(g)).ToList();
-            SubGroup = source.SubGroup.Select(s => new RgfIdAliasPair(s)).ToList();
+            Groups = source.Groups?.Select(g => new RgfIdAliasPair(g)).ToList();
+            SubGroups = source.SubGroups?.Select(s => new RgfIdAliasPair(s)).ToList();
             Take = source.Take;
         }
     }
 
-    public List<RgfAggregationColumn> Columns { get; set; } = new();
+    public List<RgfAggregationColumn> Columns { get; set; } = [];
 
-    public List<RgfIdAliasPair> Groups { get; set; } = new();
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<RgfIdAliasPair>? Groups { get; set; }
 
-    public List<RgfIdAliasPair> SubGroup { get; set; } = new();
+    [Obsolete("Use SubGroups property instead.", true)]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWriting)]
+    public List<RgfIdAliasPair>? SubGroup { get => SubGroups; set => SubGroups = value; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<RgfIdAliasPair>? SubGroups { get; set; }
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public int? Take { get; set; }
+
+    [JsonIgnore]
+    public List<RgfIdAliasPair> GroupsOrEmpty => Groups ??= [];
+
+    [JsonIgnore]
+    public List<RgfIdAliasPair> SubGroupsOrEmpty => SubGroups ??= [];
+
+    public void Normalize()
+    {
+        if (GroupsOrEmpty.Count ==  0) Groups = null;
+        if (SubGroupsOrEmpty.Count == 0) SubGroups = null;  
+        if (Take != null && Take <= 0) Take = null;
+    }
 
     public virtual object Clone() => DeepCopy(this)!;
 
@@ -54,6 +73,7 @@ public class RgfAggregationColumn : RgfIdAliasPair
     /// Aggregator-based API sort priority where <c>0</c> means unsorted, positive values mean ascending order,
     /// and negative values mean descending order; the absolute value stores the sort priority.
     /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
     public int Sort { get; set; }
 
     public override object Clone() => DeepCopy(this)!;

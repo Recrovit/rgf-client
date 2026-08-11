@@ -442,8 +442,8 @@
         {
             EntityName = _selector.SelectedEntityName,
             ViewType = _selector.SelectedViewType,
-            SettingsId = _selector.SelectedSettingsId,
-            SettingsName = _selector.SelectedSettingsName
+            SettingsId = _selector.SelectedSettingsId ?? 0,
+            SettingsName = _selector.SelectedSettingsName ?? string.Empty
         }));
     }
 
@@ -497,7 +497,7 @@
         if (!result.Succeeded)
         {
             LogCommandFailure(result);
-            _errorMessage = null;
+            _errorMessage = result.ErrorMessage;
             RefreshDerivedState();
             return;
         }
@@ -519,6 +519,7 @@
     {
         var previousSelectedPane = _selectedPane;
         _itemIndex = RgfDashboardDefinitionHelper.BuildItemIndex(_state.Dashboard);
+        _errorMessage = _state.ValidationResult.IsValid ? _errorMessage : _state.ValidationResult.FirstErrorMessage;
 
         if (!_state.ValidationResult.IsValid)
         {

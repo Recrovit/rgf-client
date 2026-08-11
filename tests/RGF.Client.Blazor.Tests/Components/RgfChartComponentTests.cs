@@ -139,15 +139,15 @@ public sealed class RgfChartComponentTests
         var cut = RenderChartComponent(testContext, entityParameters);
         cut.Instance.ChartSettings.AggregationSettings.Columns.Clear();
         cut.Instance.ChartSettings.AggregationSettings.Columns.Add(new RgfAggregationColumn { Id = 999, Aggregate = "Sum" });
-        cut.Instance.ChartSettings.AggregationSettings.Groups.Add(new RgfIdAliasPair(888, "MissingGroup"));
-        cut.Instance.ChartSettings.AggregationSettings.SubGroup.Add(new RgfIdAliasPair(777, "MissingSubGroup"));
+        cut.Instance.ChartSettings.AggregationSettings.GroupsOrEmpty.Add(new RgfIdAliasPair(888, "MissingGroup"));
+        cut.Instance.ChartSettings.AggregationSettings.SubGroupsOrEmpty.Add(new RgfIdAliasPair(777, "MissingSubGroup"));
 
         var isValid = cut.Instance.EditContext.Validate();
 
         Assert.False(isValid);
         Assert.NotEmpty(cut.Instance.EditContext.GetValidationMessages(() => cut.Instance.ChartSettings.AggregationSettings.Columns[0]));
-        Assert.NotEmpty(cut.Instance.EditContext.GetValidationMessages(() => cut.Instance.ChartSettings.AggregationSettings.Groups[0]));
-        Assert.NotEmpty(cut.Instance.EditContext.GetValidationMessages(() => cut.Instance.ChartSettings.AggregationSettings.SubGroup[0]));
+        Assert.NotEmpty(cut.Instance.EditContext.GetValidationMessages(() => cut.Instance.ChartSettings.AggregationSettings.GroupsOrEmpty[0]));
+        Assert.NotEmpty(cut.Instance.EditContext.GetValidationMessages(() => cut.Instance.ChartSettings.AggregationSettings.SubGroupsOrEmpty[0]));
     }
 
     [Fact]

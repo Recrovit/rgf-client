@@ -260,7 +260,7 @@ public partial class RgfChartComponent : ComponentBase, IDisposable
             }
 
             var order = new List<string>();
-            foreach (var group in aggregationSettings.Groups.Concat(aggregationSettings.SubGroup))
+            foreach (var group in aggregationSettings.GroupsOrEmpty.Concat(aggregationSettings.SubGroupsOrEmpty))
             {
                 var oprop = AllowedProperties.FirstOrDefault(e => e.Id == group.Id);
                 if (oprop == null)
@@ -352,39 +352,36 @@ public partial class RgfChartComponent : ComponentBase, IDisposable
         }
         if (rgfChartSettings.SeriesType == RgfChartSeriesType.Card)
         {
-            if (aggregationSettings.Columns.Count > 1 || aggregationSettings.SubGroup.Count > 0)
+            if (aggregationSettings.Columns.Count > 1 || aggregationSettings.SubGroupsOrEmpty.Count > 0)
             {
                 messageStore.Add(() => ChartSettings.SeriesType, GetRecroDictChart("CardRequiresSingleAggregate"));
             }
         }
         else if (rgfChartSettings.SeriesType != RgfChartSeriesType.Bar && rgfChartSettings.SeriesType != RgfChartSeriesType.Line)
         {
-            if (aggregationSettings.Columns.Count > 1 || aggregationSettings.SubGroup.Count > 0)
+            if (aggregationSettings.Columns.Count > 1 || aggregationSettings.SubGroupsOrEmpty.Count > 0)
             {
                 messageStore.Add(() => ChartSettings.SeriesType, GetRecroDictChart("SingleSeriesChartSingleAggregateOnly"));
             }
         }
-        for (int i = aggregationSettings.SubGroup.Count - 1; i >= 0; i--)
+        for (int i = aggregationSettings.SubGroupsOrEmpty.Count - 1; i >= 0; i--)
         {
-            var group = aggregationSettings.SubGroup[i];
-            if (group.Id == 0 || !allowedPropertyIds.Contains(group.Id) || aggregationSettings.SubGroup.IndexOf(group) < i || aggregationSettings.Groups.IndexOf(group) != -1)
+            var group = aggregationSettings.SubGroupsOrEmpty[i];
+            if (group.Id == 0 || !allowedPropertyIds.Contains(group.Id) || aggregationSettings.SubGroupsOrEmpty.IndexOf(group) < i || aggregationSettings.GroupsOrEmpty.IndexOf(group) != -1)
             {
-                messageStore.Add(() => aggregationSettings.SubGroup[i], "");
+                messageStore.Add(() => aggregationSettings.SubGroupsOrEmpty[i], "");
             }
         }
-        for (int i = aggregationSettings.Groups.Count - 1; i >= 0; i--)
+        for (int i = aggregationSettings.GroupsOrEmpty.Count - 1; i >= 0; i--)
         {
-            var group = aggregationSettings.Groups[i];
-            if (group.Id == 0 || !allowedPropertyIds.Contains(group.Id) || aggregationSettings.Groups.IndexOf(group) < i)
+            var group = aggregationSettings.GroupsOrEmpty[i];
+            if (group.Id == 0 || !allowedPropertyIds.Contains(group.Id) || aggregationSettings.GroupsOrEmpty.IndexOf(group) < i)
             {
-                messageStore.Add(() => aggregationSettings.Groups[i], "");
+                messageStore.Add(() => aggregationSettings.GroupsOrEmpty[i], "");
             }
         }
 
-        if (aggregationSettings.Take <= 0)
-        {
-            aggregationSettings.Take = null;
-        }
+        aggregationSettings.Normalize();
 
         int s = 1;
         foreach (var column in aggregationSettings.Columns.Where(column => column.Sort != 0).OrderBy(column => Math.Abs(column.Sort)).ToArray())
@@ -416,25 +413,25 @@ public partial class RgfChartComponent : ComponentBase, IDisposable
     public void AddGroup()
     {
         SetDataStatus(RgfProcessingStatus.Invalid);
-        ChartSettings.AggregationSettings.Groups.Add(new());
+        ChartSettings.AggregationSettings.GroupsOrEmpty.Add(new());
     }
 
     public void RemoveAtGroup(int idx)
     {
         SetDataStatus(RgfProcessingStatus.Invalid);
-        ChartSettings.AggregationSettings.Groups.RemoveAt(idx);
+        ChartSettings.AggregationSettings.GroupsOrEmpty.RemoveAt(idx);
     }
 
     public void AddSubGroup()
     {
         SetDataStatus(RgfProcessingStatus.Invalid);
-        ChartSettings.AggregationSettings.SubGroup.Add(new());
+        ChartSettings.AggregationSettings.SubGroupsOrEmpty.Add(new());
     }
 
     public void RemoveAtSubGroup(int idx)
     {
         SetDataStatus(RgfProcessingStatus.Invalid);
-        ChartSettings.AggregationSettings.SubGroup.RemoveAt(idx);
+        ChartSettings.AggregationSettings.SubGroupsOrEmpty.RemoveAt(idx);
     }
 
     public void SetColumnSortPriority(RgfAggregationColumn column, int? priority)

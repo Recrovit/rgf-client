@@ -67,6 +67,7 @@ public class RgfDashboardItem
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Title { get; set; }
 
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
     public bool ShowHeader { get; set; } = true;
 
     public RgfDashboardViewReference ViewReference { get; set; } = new();
@@ -74,18 +75,23 @@ public class RgfDashboardItem
 
 public class RgfDashboardViewReference
 {
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public int SettingsId { get; set; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string SettingsName { get; set; } = string.Empty;
+
     public string EntityName { get; set; } = string.Empty;
 
     public RgfDashboardViewType ViewType { get; set; } = RgfDashboardViewType.Grid;
 
-    public int? SettingsId { get; set; }
-
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public string? SettingsName { get; set; }
+    public string? ExportKey { get; set; }
 }
 
 public class RgfDashboardEntityOption
 {
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
     public int EntityId { get; set; }
 
     public string EntityName { get; set; } = string.Empty;
@@ -95,8 +101,13 @@ public class RgfDashboardEntityOption
 
 public class RgfDashboardSavedViewOption
 {
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
     public int SettingsId { get; set; }
 
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? ExportKey { get; set; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string SettingsName { get; set; } = string.Empty;
 
     public RgfDashboardSavedViewType Type { get; set; }
@@ -109,8 +120,10 @@ public class RgfDashboardEntitySettingsResult
 
 public class RgfDashboardPane
 {
-    public string PaneId { get; set; } = Guid.NewGuid().ToString("N");
+    [JsonIgnore]
+    public string PaneId { get; init; } = Guid.NewGuid().ToString("N");
 
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public int? DashboardItemId { get; set; }
 
     public RgfDashboardSplit? Split { get; set; }
@@ -127,6 +140,7 @@ public class RgfDashboardSplitPane
 {
     public decimal Size { get; set; } = 1;
 
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public decimal? MinSize { get; set; }
 
     public RgfDashboardPane Pane { get; set; } = new();
@@ -153,4 +167,13 @@ public class RgfDashboardCatalogResult
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
     public bool IsPublicDashboardSettingAllowed { get; set; }
+}
+
+public class RgfDashboardExport
+{
+    public RgfDashboardDefinition Dashboard { get; set; } = new();
+
+    public List<RgfChartSettings> ChartSettings { get; set; } = [];
+
+    public List<RgfGridSettings> GridSettings { get; set; } = [];
 }

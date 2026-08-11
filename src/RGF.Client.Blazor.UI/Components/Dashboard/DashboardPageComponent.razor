@@ -195,7 +195,7 @@ else
         _errorMessage = null;
         _selectedDashboardId = null;
         _dashboard = null;
-        ResetEditorState(RgfDashboardDefinitionHelper.CreateLocalDashboard(), isDirty: true, isNameEditable: true);
+        ResetEditorState(new RgfDashboardDefinition(), isDirty: true, isNameEditable: true);
         _isDesignerOpen = true;
         ConfigureDesigner();
         return Task.CompletedTask;
@@ -283,7 +283,7 @@ else
 
         try
         {
-            var payload = _editorDashboard.DeepCopy() ?? RgfDashboardDefinitionHelper.CreateLocalDashboard();
+            var payload = _editorDashboard.DeepCopy() ?? new();
             payload.Normalize();
 
             var response = await ApiService.SaveDashboardAsync(payload);
@@ -381,7 +381,7 @@ else
     {
         _designerParameters = new()
         {
-            Dashboard = _editorDashboard ?? RgfDashboardDefinitionHelper.CreateLocalDashboard(),
+            Dashboard = _editorDashboard ?? new(),
             DashboardEdited = EventCallback.Factory.Create<RgfDashboardDefinition>(this, OnDashboardEditedAsync),
             DirtyStateChanged = EventCallback.Factory.Create<bool>(this, OnDesignerDirtyStateChangedAsync),
             SaveRequested = EventCallback.Factory.Create(this, SaveDashboardAsync),

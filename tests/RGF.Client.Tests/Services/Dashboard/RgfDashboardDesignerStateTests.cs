@@ -6,7 +6,63 @@ namespace Recrovit.RecroGridFramework.Client.Tests.Services.Dashboard;
 public sealed class RgfDashboardDesignerStateTests
 {
     [Fact]
-    public void Load_NormalizesDashboard_AndResetsDirtyState()
+    public void GetDisplayTitle_PrefersExplicitTitle()
+    {
+        var item = new RgfDashboardItem
+        {
+            Title = " Orders title ",
+            ViewReference = CreateViewReference("Orders", 12, "Orders default")
+        };
+
+        var title = RgfDashboardDefinitionHelper.GetDisplayTitle(item);
+
+        Assert.Equal("Orders title", title);
+    }
+
+    [Fact]
+    public void GetDisplayTitle_FallsBackToSettingsName_WhenTitleIsBlank()
+    {
+        var item = new RgfDashboardItem
+        {
+            Title = "   ",
+            ViewReference = CreateViewReference("Orders", 12, " Orders default ")
+        };
+
+        var title = RgfDashboardDefinitionHelper.GetDisplayTitle(item);
+
+        Assert.Equal("Orders default", title);
+    }
+
+    [Fact]
+    public void GetDisplayTitle_FallsBackToEntityName_WhenTitleAndSettingsNameAreBlank()
+    {
+        var item = new RgfDashboardItem
+        {
+            Title = null,
+            ViewReference = CreateViewReference(" Orders ", 12, "   ")
+        };
+
+        var title = RgfDashboardDefinitionHelper.GetDisplayTitle(item);
+
+        Assert.Equal("Orders", title);
+    }
+
+    [Fact]
+    public void AssignItem_LeavesDashboardInvalid_WhenSettingsNameIsBlank()
+    {
+        var state = CreateLoadedState();
+        var rootPaneId = state.Dashboard.Layout.RootPane.PaneId;
+
+        var result = state.AssignItem(rootPaneId, CreateViewReference("Orders", 12, "   "));
+
+        Assert.False(result.Succeeded);
+        Assert.Equal("validation-failed", result.FailureCode);
+        Assert.Contains(result.ValidationResult.Issues, issue => issue.Code == "item-settings-name-missing");
+        Assert.True(state.ValidationResult.IsValid);
+    }
+
+    [Fact]
+    public void Load_SelectsRootPaneAndResetsDirtyState()
     {
         var state = new RgfDashboardDesignerState();
         var dashboard = new RgfDashboardDefinition
@@ -23,7 +79,7 @@ public sealed class RgfDashboardDesignerStateTests
 
         Assert.Equal("Sample", state.Dashboard.Name);
         Assert.NotNull(state.Dashboard.Layout.Items);
-        Assert.Equal("root", state.SelectedPaneId);
+        Assert.Equal(state.Dashboard.Layout.RootPane.PaneId, state.SelectedPaneId);
         Assert.True(state.ValidationResult.IsValid);
         Assert.False(state.IsDirty);
         Assert.True(state.IsNameEditable);
@@ -433,6 +489,6 @@ public sealed class RgfDashboardDesignerStateTests
             EntityName = entityName,
             ViewType = RgfDashboardViewType.Grid,
             SettingsId = settingsId,
-            SettingsName = settingsName
+            SettingsName = settingsName ?? string.Empty
         };
 }

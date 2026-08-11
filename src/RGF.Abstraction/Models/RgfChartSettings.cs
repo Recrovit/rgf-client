@@ -22,6 +22,7 @@ public class RgfChartSetting : ICloneable
         if (chartSetting != null)
         {
             ChartSettingsId = chartSetting.ChartSettingsId;
+            ExportKey = chartSetting.ExportKey;
             SettingsName = chartSetting.SettingsName;
             Remark = chartSetting.Remark;
             RoleId = chartSetting.RoleId;
@@ -36,6 +37,10 @@ public class RgfChartSetting : ICloneable
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public int? ChartSettingsId { get; set; }
 
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? ExportKey { get; set; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string SettingsName { get; set; } = string.Empty;
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -44,9 +49,10 @@ public class RgfChartSetting : ICloneable
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? RoleId { get; set; }
 
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public bool? IsReadonly { get; set; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool IsReadonly { get; set; }
 
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public RgfGridSettings? ParentGridSettings { get; set; }
 
     public virtual object Clone() => DeepCopy(this)!;
@@ -85,16 +91,22 @@ public class RgfChartSettings : RgfChartSetting
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public int? Width { get; set; }
 
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
     public bool ShowDataLabels { get; set; }
 
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
     public bool Legend { get; set; }
 
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
     public bool Stacked { get; set; }
 
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
     public bool Horizontal { get; set; }
 
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Theme { get; set; }
 
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Palette { get; set; }
 
     public override object Clone() => DeepCopy(this)!;
