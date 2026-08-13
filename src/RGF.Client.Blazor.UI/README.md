@@ -8,7 +8,7 @@ Official Website: [RecroGrid Framework](https://RecroGridFramework.com)
 
 [`Recrovit.RecroGridFramework.Client.Blazor.UI`](https://www.nuget.org/packages/Recrovit.RecroGridFramework.Client.Blazor.UI/) is the ready-to-use UI layer of the RecroGrid Framework Blazor stack.
 
-Its main responsibility is to provide a concrete, opinionated set of Blazor UI components, styles, and resource loading conventions on top of [`Recrovit.RecroGridFramework.Client.Blazor`](https://www.nuget.org/packages/Recrovit.RecroGridFramework.Client.Blazor/) and [`Recrovit.RecroGridFramework.Blazor.ApexCharts`](https://www.nuget.org/packages/Recrovit.RecroGridFramework.Blazor.ApexCharts/), using the shared contracts from [`Recrovit.RecroGridFramework.Abstraction`](https://www.nuget.org/packages/Recrovit.RecroGridFramework.Abstraction/).
+Its main responsibility is to provide a concrete, opinionated set of Blazor UI components, styles, and resource loading conventions on top of [`Recrovit.RecroGridFramework.Client.Blazor`](https://www.nuget.org/packages/Recrovit.RecroGridFramework.Client.Blazor/) and [`Recrovit.RecroGridFramework.Blazor.RgfApexCharts`](https://www.nuget.org/packages/Recrovit.RecroGridFramework.Blazor.RgfApexCharts/), using the shared contracts from [`Recrovit.RecroGridFramework.Abstraction`](https://www.nuget.org/packages/Recrovit.RecroGridFramework.Abstraction/).
 
 In practice, this package is the layer that gives RecroGrid a complete default UI in Blazor applications:
 
@@ -17,7 +17,7 @@ In practice, this package is the layer that gives RecroGrid a complete default U
 - it wires those components into the extension points defined by [`Recrovit.RecroGridFramework.Client.Blazor`](https://www.nuget.org/packages/Recrovit.RecroGridFramework.Client.Blazor/)
 - it ships the supporting Bootstrap and RecroGrid-specific UI resources needed by the default UI layer
 - it adds a root component and helper base controls for building consistent RecroGrid user interfaces
-- it initializes the default chart implementation from [`Recrovit.RecroGridFramework.Blazor.ApexCharts`](https://www.nuget.org/packages/Recrovit.RecroGridFramework.Blazor.ApexCharts/)
+- it initializes the default chart implementation from [`Recrovit.RecroGridFramework.Blazor.RgfApexCharts`](https://www.nuget.org/packages/Recrovit.RecroGridFramework.Blazor.RgfApexCharts/)
 
 Because of this, [`Recrovit.RecroGridFramework.Client.Blazor.UI`](https://www.nuget.org/packages/Recrovit.RecroGridFramework.Client.Blazor.UI/) is the package that turns the lower-level RecroGrid Blazor runtime into a complete out-of-the-box user interface.
 
@@ -122,7 +122,7 @@ At a high level, the flow looks like this:
 1. [`Recrovit.RecroGridFramework.Abstraction`](https://www.nuget.org/packages/Recrovit.RecroGridFramework.Abstraction/) provides the shared contracts and models.
 2. [`Recrovit.RecroGridFramework.Client`](https://www.nuget.org/packages/Recrovit.RecroGridFramework.Client/) provides the client-side API access, services, and orchestration.
 3. [`Recrovit.RecroGridFramework.Client.Blazor`](https://www.nuget.org/packages/Recrovit.RecroGridFramework.Client.Blazor/) provides the Blazor integration points, base components, and runtime services.
-4. [`Recrovit.RecroGridFramework.Blazor.ApexCharts`](https://www.nuget.org/packages/Recrovit.RecroGridFramework.Blazor.ApexCharts/) provides the concrete chart implementation.
+4. [`Recrovit.RecroGridFramework.Blazor.RgfApexCharts`](https://www.nuget.org/packages/Recrovit.RecroGridFramework.Blazor.RgfApexCharts/) provides the concrete chart implementation.
 5. [`Recrovit.RecroGridFramework.Client.Blazor.UI`](https://www.nuget.org/packages/Recrovit.RecroGridFramework.Client.Blazor.UI/) assembles those pieces into a complete default UI layer, including the packaged dashboard page and dashboard designer.
 
 This makes [`Recrovit.RecroGridFramework.Client.Blazor.UI`](https://www.nuget.org/packages/Recrovit.RecroGridFramework.Client.Blazor.UI/) the highest-level packaged UI layer in the current RecroGrid client stack.
@@ -146,7 +146,7 @@ In the packaged UI stack, dashboard navigation is exposed through the built-in d
 - [`Recrovit.RecroGridFramework.Abstraction`](https://www.nuget.org/packages/Recrovit.RecroGridFramework.Abstraction/): shared contracts, models, and abstractions used across the client and server packages
 - [`Recrovit.RecroGridFramework.Client`](https://www.nuget.org/packages/Recrovit.RecroGridFramework.Client/): client-side API access, runtime services, and orchestration for RecroGrid
 - [`Recrovit.RecroGridFramework.Client.Blazor`](https://www.nuget.org/packages/Recrovit.RecroGridFramework.Client.Blazor/): base Blazor integration layer and extension points used by the packaged UI
-- [`Recrovit.RecroGridFramework.Blazor.ApexCharts`](https://www.nuget.org/packages/Recrovit.RecroGridFramework.Blazor.ApexCharts/): ApexCharts-based chart implementation used by the packaged UI
+- [`Recrovit.RecroGridFramework.Blazor.RgfApexCharts`](https://www.nuget.org/packages/Recrovit.RecroGridFramework.Blazor.RgfApexCharts/): ApexCharts-based chart implementation used by the packaged UI
 - [`Recrovit.RecroGridFramework.Client.Blazor.UI`](https://www.nuget.org/packages/Recrovit.RecroGridFramework.Client.Blazor.UI/): complete default Blazor UI layer for the current RecroGrid client stack
 
 ## Getting Started
