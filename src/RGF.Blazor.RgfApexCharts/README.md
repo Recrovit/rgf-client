@@ -1,12 +1,12 @@
 # RecroGrid Framework Blazor ApexCharts
 
-[![NuGet Version](https://img.shields.io/nuget/v/Recrovit.RecroGridFramework.Blazor.RgfApexCharts.svg?label=Recrovit.RecroGridFramework.Blazor.ApexCharts)](https://www.nuget.org/packages/Recrovit.RecroGridFramework.Blazor.ApexCharts/)
+[![NuGet Version](https://img.shields.io/nuget/v/Recrovit.RecroGridFramework.Blazor.RgfApexCharts.svg?label=Recrovit.RecroGridFramework.Blazor.RgfApexCharts)](https://www.nuget.org/packages/Recrovit.RecroGridFramework.Blazor.RgfApexCharts/)
 
 Official Website: [RecroGrid Framework](https://RecroGridFramework.com)
 
 ## Overview
 
-[`Recrovit.RecroGridFramework.Blazor.ApexCharts`](https://www.nuget.org/packages/Recrovit.RecroGridFramework.Blazor.ApexCharts/) is the ApexCharts-based chart integration package of the RecroGrid Framework Blazor stack.
+[`Recrovit.RecroGridFramework.Blazor.RgfApexCharts`](https://www.nuget.org/packages/Recrovit.RecroGridFramework.Blazor.RgfApexCharts/) is the ApexCharts-based chart integration package of the RecroGrid Framework Blazor stack.
 
 Its main responsibility is to provide a concrete chart implementation for [`Recrovit.RecroGridFramework.Client.Blazor`](https://www.nuget.org/packages/Recrovit.RecroGridFramework.Client.Blazor/), using [`Blazor-ApexCharts`](https://www.nuget.org/packages/Blazor-ApexCharts/) to render chart data produced from RecroGrid aggregation workflows.
 
@@ -18,7 +18,7 @@ In practice, this package is a chart provider for the RecroGrid Blazor layer:
 - it loads the chart-specific JavaScript and stylesheet resources required by the ApexCharts integration
 - it extends the core RecroGrid chart experience without changing the shared contracts or the base client runtime
 
-Because of this, [`Recrovit.RecroGridFramework.Blazor.ApexCharts`](https://www.nuget.org/packages/Recrovit.RecroGridFramework.Blazor.ApexCharts/) is not a standalone charting library. It is a RecroGrid-specific chart implementation package built on top of the Blazor integration layer.
+Because of this, [`Recrovit.RecroGridFramework.Blazor.RgfApexCharts`](https://www.nuget.org/packages/Recrovit.RecroGridFramework.Blazor.RgfApexCharts/) is not a standalone charting library. It is a RecroGrid-specific chart implementation package built on top of the Blazor integration layer.
 
 ## What The Package Contains
 
@@ -75,14 +75,14 @@ At a high level, the flow looks like this:
 
 1. [`Recrovit.RecroGridFramework.Abstraction`](https://www.nuget.org/packages/Recrovit.RecroGridFramework.Abstraction/) provides the shared chart, aggregation, and entity contracts.
 2. [`Recrovit.RecroGridFramework.Client`](https://www.nuget.org/packages/Recrovit.RecroGridFramework.Client/) and [`Recrovit.RecroGridFramework.Client.Blazor`](https://www.nuget.org/packages/Recrovit.RecroGridFramework.Client.Blazor/) provide the chart workflow, managers, handlers, and Blazor integration points.
-3. [`Recrovit.RecroGridFramework.Blazor.ApexCharts`](https://www.nuget.org/packages/Recrovit.RecroGridFramework.Blazor.ApexCharts/) registers a concrete chart component implementation for that workflow.
+3. [`Recrovit.RecroGridFramework.Blazor.RgfApexCharts`](https://www.nuget.org/packages/Recrovit.RecroGridFramework.Blazor.RgfApexCharts/) registers a concrete chart component implementation for that workflow.
 4. Aggregated RecroGrid data is transformed into ApexCharts series and rendered through the `Blazor-ApexCharts` library.
 
-This makes [`Recrovit.RecroGridFramework.Blazor.ApexCharts`](https://www.nuget.org/packages/Recrovit.RecroGridFramework.Blazor.ApexCharts/) the default ApexCharts-based chart provider for the RecroGrid Blazor stack.
+This makes [`Recrovit.RecroGridFramework.Blazor.RgfApexCharts`](https://www.nuget.org/packages/Recrovit.RecroGridFramework.Blazor.RgfApexCharts/) the default ApexCharts-based chart provider for the RecroGrid Blazor stack.
 
 ## Typical Consumers
 
-[`Recrovit.RecroGridFramework.Blazor.ApexCharts`](https://www.nuget.org/packages/Recrovit.RecroGridFramework.Blazor.ApexCharts/) is typically referenced by:
+[`Recrovit.RecroGridFramework.Blazor.RgfApexCharts`](https://www.nuget.org/packages/Recrovit.RecroGridFramework.Blazor.RgfApexCharts/) is typically referenced by:
 
 - Blazor applications using RecroGrid chart functionality with ApexCharts rendering
 - applications that want a ready-made chart component plugged into the RecroGrid Blazor chart slot
@@ -93,6 +93,5 @@ This makes [`Recrovit.RecroGridFramework.Blazor.ApexCharts`](https://www.nuget.o
 - [`Recrovit.RecroGridFramework.Abstraction`](https://www.nuget.org/packages/Recrovit.RecroGridFramework.Abstraction/): shared contracts, models, and abstractions used across the client and server packages
 - [`Recrovit.RecroGridFramework.Client`](https://www.nuget.org/packages/Recrovit.RecroGridFramework.Client/): client-side API access, runtime services, and orchestration for RecroGrid
 - [`Recrovit.RecroGridFramework.Client.Blazor`](https://www.nuget.org/packages/Recrovit.RecroGridFramework.Client.Blazor/): core Blazor integration layer that defines the chart extension point used here
-- [`Recrovit.RecroGridFramework.Blazor.ApexCharts`](https://www.nuget.org/packages/Recrovit.RecroGridFramework.Blazor.ApexCharts/): ApexCharts-based chart implementation for the RecroGrid Blazor stack
+- [`Recrovit.RecroGridFramework.Blazor.RgfApexCharts`](https://www.nuget.org/packages/Recrovit.RecroGridFramework.Blazor.RgfApexCharts/): ApexCharts-based chart implementation for the RecroGrid Blazor stack
 - [`Recrovit.RecroGridFramework.Client.Blazor.UI`](https://www.nuget.org/packages/Recrovit.RecroGridFramework.Client.Blazor.UI/): higher-level UI components that can build on the Blazor chart integration
-- [`Blazor-ApexCharts`](https://www.nuget.org/packages/Blazor-ApexCharts/): third-party charting library used by this package for rendering

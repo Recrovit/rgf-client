@@ -10,6 +10,10 @@
                 {
                     @RgfCharComp.ChartDataGrid
                 }
+                else
+                {
+                    <SpinnerComponent Style="width: 1rem; height: 1rem;" />
+                }
             </div>
         }
         else
@@ -36,9 +40,11 @@
                                         {
                                             var idx = i;
                                             var col = RgfCharComp.ChartSettings.AggregationSettings.Columns[idx];
+                                            var sortState = RgfCharComp.GetColumnSortState(col);
                                             <div class="p-1 col-auto">
                                                 <ValidationMessage For="@(() => col.Aggregate)" />
                                                 <ValidationMessage For="@(() => col.Id)" />
+                                                <ValidationMessage For="@(() => col.Sort)" />
                                                 <RgfComboBox TValue="string"
                                                              Items="RgfAggregationColumn.AllowedAggregates"
                                                              @bind-Value="col.Aggregate"
@@ -46,10 +52,26 @@
                                                 @if (col.Aggregate != "Count")
                                                 {
                                                     <RgfComboBox TValue="int"
-                                                                 DataSource="RgfCharComp.ChartColumnsNumeric"
+                                                                 DataSource="RgfCharComp.GetAllowedAggregationColumns(col.Aggregate)"
                                                                  @bind-Value="col.Id"
                                                                  OnValueChanging="() => RgfCharComp.SetDataStatus(RgfProcessingStatus.Invalid)" />
                                                 }
+                                                <div class="mt-1">
+                                                    <div class="input-group-text">@RgfCharComp.GetRecroDictChart("LimitRanking")</div>
+                                                    <RgfInputNumber TValue="int?" Tooltip="@RgfCharComp.GetRecroDictChart("LimitRankingTooltip")"
+                                                                    Value="sortState.Priority" ValueExpression="() => sortState.Priority"
+                                                                    ValueChanged="(value) => RgfCharComp.SetColumnSortPriority(col, value)"
+                                                                    HideSpinButton="true"
+                                                                    Min="1" />
+
+                                                    <div class="col-sm-2 checkbox-lg">
+                                                        <RgfCheckBox Label="@RecroDict.GetRgfUiString("Descending")"
+                                                                     Value="sortState.Descending" ValueExpression="() => sortState.Descending"
+                                                                     ValueChanged="(value) => RgfCharComp.SetColumnSortDescending(col, value)"
+                                                                     Disabled="@(col.Sort == 0)" />
+                                                    </div>
+
+                                                </div>
                                             </div>
                                             @if (i != 0 || RgfCharComp.ChartSettings.AggregationSettings.Columns.Count > 1)
                                             {
@@ -67,14 +89,14 @@
                                             <div class="fw-bold">X @RgfCharComp.GetRecroDictChart("Axis").ToLower()</div>
                                             <div class="small">@RgfCharComp.GetRecroDictChart("GroupValues")</div>
                                         </div>
-                                        @for (int i = 0; i < RgfCharComp.ChartSettings.AggregationSettings.Groups.Count; i++)
+                                        @for (int i = 0; i < RgfCharComp.ChartSettings.AggregationSettings.GroupsOrEmpty.Count; i++)
                                         {
                                             var idx = i;
                                             <div class="p-1 col-auto">
-                                                <ValidationMessage For="@(() => RgfCharComp.ChartSettings.AggregationSettings.Groups[idx])" />
+                                                <ValidationMessage For="@(() => RgfCharComp.ChartSettings.AggregationSettings.GroupsOrEmpty[idx])" />
                                                 <RgfComboBox TValue="int"
                                                              DataSource="RgfCharComp.AllowedProperties.OrderBy(e => e.ColTitle).ToDictionary(p => p.Id, p => p.ColTitle)"
-                                                             @bind-Value="RgfCharComp.ChartSettings.AggregationSettings.Groups[idx].Id"
+                                                             @bind-Value="RgfCharComp.ChartSettings.AggregationSettings.GroupsOrEmpty[idx].Id"
                                                              OnValueChanging="() => RgfCharComp.SetDataStatus(RgfProcessingStatus.Invalid)" />
                                             </div>
                                             <div class="p-1 col-auto">
@@ -90,14 +112,14 @@
                                             <div class="fw-bold">@RgfCharComp.GetRecroDictChart("AdditionalGrouping")</div>
                                             <div class="small">@RgfCharComp.GetRecroDictChart("SeriesGrouping")</div>
                                         </div>
-                                        @for (int i = 0; i < RgfCharComp.ChartSettings.AggregationSettings.SubGroup.Count; i++)
+                                        @for (int i = 0; i < RgfCharComp.ChartSettings.AggregationSettings.SubGroupsOrEmpty.Count; i++)
                                         {
                                             var idx = i;
                                             <div class="p-1 col-auto">
-                                                <ValidationMessage For="@(() => RgfCharComp.ChartSettings.AggregationSettings.SubGroup[idx])" />
+                                                <ValidationMessage For="@(() => RgfCharComp.ChartSettings.AggregationSettings.SubGroupsOrEmpty[idx])" />
                                                 <RgfComboBox TValue="int"
                                                              DataSource="RgfCharComp.AllowedProperties.OrderBy(e => e.ColTitle).ToDictionary(p => p.Id, p => p.ColTitle)"
-                                                             @bind-Value="RgfCharComp.ChartSettings.AggregationSettings.SubGroup[idx].Id"
+                                                             @bind-Value="RgfCharComp.ChartSettings.AggregationSettings.SubGroupsOrEmpty[idx].Id"
                                                              OnValueChanging="() => RgfCharComp.SetDataStatus(RgfProcessingStatus.Invalid)" />
                                             </div>
                                             <div class="p-1 col-auto">
@@ -111,12 +133,26 @@
                                     <div class="row gx-3 gy-2 align-items-center">
                                         <div class="col-sm-3">
                                             <div class="input-group">
+                                                <div class="input-group-text">@RgfCharComp.GetRecroDictChart("Limit")</div>
+                                                <RgfInputNumber TValue="int?" Tooltip="@RgfCharComp.GetRecroDictChart("LimitTooltip")"
+                                                                Value="RgfCharComp.ChartSettings.AggregationSettings.Take"
+                                                                ValueExpression="() => RgfCharComp.ChartSettings.AggregationSettings.Take"
+                                                                ValueChanged="(value) => { RgfCharComp.ChartSettings.AggregationSettings.Take = value; RgfCharComp.SetDataStatus(RgfProcessingStatus.Invalid); }"
+                                                                HideSpinButton="true"
+                                                                Min="1" />
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="row gx-3 gy-2 align-items-center">
+                                        <div class="col-sm-3">
+                                            <div class="input-group">
                                                 <div class="input-group-text">@RecroDict.GetRgfUiString("ChartType")</div>
                                                 <RgfComboBox TValue="RgfChartSeriesType"
                                                              DataSource="EnumExtensions.ToDictionary<RgfChartSeriesType>()"
                                                              @bind-Value="RgfCharComp.ChartSettings.SeriesType"
                                                              OnValueChanging="(e) => ChangeChartType(e.NewValue)" />
                                             </div>
+                                            <ValidationMessage For="@(() => RgfCharComp.ChartSettings.SeriesType)" />
                                         </div>
                                         <div class="col-sm-2 checkbox-lg">
                                             <RgfCheckBox Label="@RecroDict.GetRgfUiString("Stacked")" Disabled="@(RgfCharComp.ChartSettings.SeriesType != RgfChartSeriesType.Bar)"
@@ -131,7 +167,8 @@
                                         <div class="col-sm-2 checkbox-lg">
                                             <RgfCheckBox Label="@RgfCharComp.GetRecroDictChart("Legend")"
                                                          Value="RgfCharComp.ChartSettings.Legend" ValueExpression="() => RgfCharComp.ChartSettings.Legend"
-                                                         ValueChanged="ChangedLegend" />
+                                                         ValueChanged="ChangedLegend"
+                                                         Disabled="@(RgfCharComp.ChartSettings.SeriesType == RgfChartSeriesType.Card)" />
                                         </div>
                                         <div class="col-sm-2 checkbox-lg">
                                             <RgfCheckBox Label="@RgfCharComp.GetRecroDictChart("ShowDataLabels")"
@@ -216,10 +253,12 @@
                             {
                                 @RgfCharComp.ChartDataGrid
                             }
+                            else
+                            {
+                                <SpinnerComponent Style="width: 1rem; height: 1rem;" />
+                            }
                         </div>
-                        <div id="@($"{_tabsId}-tab-{RecroChartTab.Chart}-pane")" class="@(Embedded
-                            ? $"rgf-apexchart-content rgf-apexchart-content-embedded tab-pane fade show{(ActiveTabIndex == RecroChartTab.Chart ? " active " : " ")}{ApexChartSettings.SeriesType.ToString().ToLower()}"
-                            : $"rgf-apexchart-content tab-pane fade show{(ActiveTabIndex == RecroChartTab.Chart ? " active " : " ")}{ApexChartSettings.SeriesType.ToString().ToLower()}")" role="tabpanel" tabindex="0">
+                        <div id="@($"{_tabsId}-tab-{RecroChartTab.Chart}-pane")" class="@ApexChartComponentClass" role="tabpanel" tabindex="0">
                             <ApexChartComponent @ref=ApexChartRef ChartSettings="@ApexChartSettings" />
                         </div>
                     </div>
@@ -236,7 +275,7 @@
                     <div class="rg-predef-name input-group input-group-sm">
                         <RgfComboBox TValue="int?" Value="@RgfCharComp.ChartSettings.ChartSettingsId" Text="@RgfCharComp.ChartSettings.SettingsName" AllowCustom="true"
                                      Tooltip="@RecroDict.GetRgfUiString("SavedName")"
-                                     DataSource="RgfCharComp.ChartSettingList.Select(e => new KeyValuePair<int?, string>(e.ChartSettingsId, e.SettingsName))"
+                                     DataSource="RgfCharComp.ChartSettingList.Select(e => new KeyValuePair<int?, string>(e.ChartSettingsId, e.SettingsName)).OrderBy(e => e.Value)"
                                      InputChanged="(arg) => OnChartSettingsChanged(arg.Key as int?, arg.Value)" />
                     </div>
                     <div class="rg-predef-save">
@@ -359,7 +398,7 @@
 
             if (redraw && RgfChartRef.DataStatus == RgfProcessingStatus.Valid)
             {
-                await UpdateChart();
+                await UpdateChart(EntityParameters.ChartParameters.SuppressAutomaticChartToast);
             }
 
             return;
@@ -387,6 +426,10 @@
             ContainerId,
             _selfRef);
     }
+
+    private string ApexChartComponentClass => Embedded
+        ? $"rgf-apexchart-content rgf-apexchart-content-embedded tab-pane fade show{(ActiveTabIndex == RecroChartTab.Chart ? " active " : " ")}{ApexChartSettings.ChartType.ToString().ToLowerInvariant()}"
+        : $"rgf-apexchart-content tab-pane fade show{(ActiveTabIndex == RecroChartTab.Chart ? " active " : " ")}{ApexChartSettings.ChartType.ToString().ToLowerInvariant()}";
 
     public override async ValueTask DisposeAsync()
     {

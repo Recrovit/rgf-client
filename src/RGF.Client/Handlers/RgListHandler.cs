@@ -286,7 +286,7 @@ internal class RgListHandler : IDisposable, IRgListHandler
         {
             foreach (var item in _externalColumns)
             {
-                var prop = EntityDesc.Properties.FirstOrDefault(e => e.GetAutoExternalId() == item.Property.Id);
+                var prop = EntityDesc.Properties.FirstOrDefault(e => e.GetAutoExternalId() == item.ExternalSettings?.ExternalId);
                 if (prop != null)
                 {
                     item.ExternalSettings.PropertyId = prop.Id;
@@ -635,6 +635,8 @@ internal class RgListHandler : IDisposable, IRgListHandler
             return true;
         }
 
+        _logger.LogDebug("Column settings changed:{changed}", changed);
+
         if (changed)
         {
             await GetDataListAsync();
@@ -655,7 +657,7 @@ internal class RgListHandler : IDisposable, IRgListHandler
                 item.Property.ColWidth = item.ColWidthOrNull ?? 0;
                 item.ExternalSettings.ColPos = item.Property.ColPos;
 
-                var prop = EntityDesc.Properties.FirstOrDefault(e => e.GetAutoExternalId() == item.Id);
+                var prop = EntityDesc.Properties.FirstOrDefault(e => e.GetAutoExternalId() == item.ExternalSettings?.ExternalId);
                 if (prop != null)
                 {
                     item.ExternalSettings.PropertyId = prop.Id;
@@ -983,7 +985,7 @@ internal class RgListHandler : IDisposable, IRgListHandler
             {
                 _logger.LogDebug("Replacing EntityDesc | {entityName}", rgResult.EntityDesc.EntityName);
                 EntityDesc = rgResult.EntityDesc;
-                _externalColumns = [];
+                RebuildExternalColumnsFromEntityDesc();
                 ListParam.SQLTimeout = EntityDesc.Options.TryGetIntValue("RGO_SQLTimeout");
                 ListParam.Columns = [.. UserColumns];
             }
@@ -1058,6 +1060,37 @@ internal class RgListHandler : IDisposable, IRgListHandler
         _dataCache = new DataCache(PageSize.Value);
         ListParam.Count = true;
         _manager.SelectedItems.Value = new();
+    }
+
+    private void RebuildExternalColumnsFromEntityDesc()
+    {
+        _externalColumns = EntityDesc.Properties
+            .Where(property =>
+                property.Readable &&
+                property.ColPos > 0 &&
+                !string.IsNullOrEmpty(property.Options?.GetStringValue("RGO_AutoExternal")))
+            .Select(property =>
+            {
+                var setting = new RgfGridColumnSettings(property);
+                var fullPath = property.Options?.GetStringValue("RGO_AutoExternal");
+                RgfGridColumnSettings.InitializeExternalSettings(setting, fullPath: fullPath);
+                return setting;
+            })
+            .OrderBy(setting => setting.ColPosOrNull ?? int.MaxValue)
+            .ThenBy(setting => setting.Property.ColTitle)
+            .ToList();
+
+        if (_externalColumns.Count == 0)
+        {
+            ListParam.ExternalColumns = null;
+        }
+        else
+        {
+            ListParam.ExternalColumns = _externalColumns
+                .Where(e => e.ExternalSettings != null)
+                .Select(e => e.ExternalSettings)
+                .ToList();
+        }
     }
 
     public void Dispose()

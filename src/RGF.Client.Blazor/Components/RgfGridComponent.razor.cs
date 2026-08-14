@@ -4,6 +4,7 @@ using Recrovit.RecroGridFramework.Abstraction.Contracts.Constants;
 using Recrovit.RecroGridFramework.Abstraction.Contracts.Services;
 using Recrovit.RecroGridFramework.Abstraction.Extensions;
 using Recrovit.RecroGridFramework.Abstraction.Models;
+using Recrovit.RecroGridFramework.Client.Blazor.Formatting;
 using Recrovit.RecroGridFramework.Client.Blazor.Parameters;
 using Recrovit.RecroGridFramework.Client.Events;
 using Recrovit.RecroGridFramework.Client.Handlers;
@@ -124,15 +125,10 @@ public partial class RgfGridComponent : RgfDataComponentBase
                 var title = _recroDict.GetRgfUiString(item == "Count" ? "ItemCount" : item);
                 int idx = Array.FindIndex(res.Result.DataColumns, col => col.EndsWith("_" + item));
                 var data = res.Result.Data[0][idx];
-                try
+                if (RgfDisplayValueFormatter.TryFormatNumericDisplayValue(data, culture, out var formattedNumericValue))
                 {
-                    var number = new RgfDynamicData(data).TryGetDecimal();
-                    if (number != null)
-                    {
-                        data = ((decimal)number).ToString("#,0.##", culture);
-                    }
+                    data = formattedNumericValue;
                 }
-                catch { }
                 details.AppendLine($"<tr><th>{title}</th><td rgf-grid-comp>{data}</td></tr>");
             }
             details.AppendLine("</table></div>");

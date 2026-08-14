@@ -1,5 +1,5 @@
 ﻿/*!
-* recrovit-rgf-apexcharts.js v1.2.0
+* recrovit-rgf-apexcharts.js v1.3.0
 */
 
 window.Recrovit = window.Recrovit || {};
@@ -30,6 +30,64 @@ Blazor.ApexCharts = {
             height = h2 - Math.floor($('.rgf-apexchart-settings', container).first().outerHeight(true)) | 0;
         }
         await chartRef.invokeMethodAsync('OnResize', width, height);
+    },
+    createValueFormatter: function (locale) {
+        const formatter = new Intl.NumberFormat(locale);
+
+        const formatValue = function (value) {
+            if (value === null || value === undefined) {
+                return '';
+            }
+
+            if (typeof value === 'number') {
+                return formatter.format(value);
+            }
+
+            return value;
+        };
+
+        return function (value) {
+            if (Array.isArray(value)) {
+                return value.map(formatValue).join('/');
+            }
+
+            return formatValue(value);
+        };
+    },
+    createTooltipYFormatter: function (locale) {
+        const formatter = new Intl.NumberFormat(locale);
+
+        return function (value) {
+            if (value === null || value === undefined) {
+                return '';
+            }
+
+            return typeof value === 'number'
+                ? formatter.format(value)
+                : value;
+        };
+    },
+    createLegendFormatter: function (locale) {
+        const formatter = new Intl.NumberFormat(locale);
+
+        const formatValue = function (value) {
+            if (value === null || value === undefined) {
+                return '';
+            }
+
+            return typeof value === 'number'
+                ? formatter.format(value)
+                : value;
+        };
+
+        return function (seriesName, opts) {
+            const values = opts?.w?.globals?.series?.[opts.seriesIndex];
+            const formattedValues = Array.isArray(values)
+                ? values.map(formatValue).join('/')
+                : formatValue(values);
+
+            return [seriesName, ' - ', formattedValues];
+        };
     }
 };
 

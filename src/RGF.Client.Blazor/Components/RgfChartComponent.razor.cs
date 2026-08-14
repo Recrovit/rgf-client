@@ -7,11 +7,13 @@ using Recrovit.RecroGridFramework.Abstraction.Contracts.Services;
 using Recrovit.RecroGridFramework.Abstraction.Extensions;
 using Recrovit.RecroGridFramework.Abstraction.Infrastructure.Security;
 using Recrovit.RecroGridFramework.Abstraction.Models;
+using Recrovit.RecroGridFramework.Client.Blazor.Formatting;
 using Recrovit.RecroGridFramework.Client.Blazor.Parameters;
 using Recrovit.RecroGridFramework.Client.Events;
 using Recrovit.RecroGridFramework.Client.Handlers;
 using System.Collections.Concurrent;
 using System.Data;
+using System.Globalization;
 
 namespace Recrovit.RecroGridFramework.Client.Blazor.Components;
 
@@ -26,11 +28,12 @@ public partial class RgfChartComponent : ComponentBase, IDisposable
     [Inject]
     private IRecroSecService _recroSec { get; set; } = null!;
 
-    public EditContext EditContext { get; private set; } = new(new RgfAggregationSettings());
+    public EditContext EditContext { get; private set; } = new(new RgfChartSettings());
 
     public ValidationMessageStore MessageStore { get; private set; } = null!;
 
     private ConcurrentDictionary<string, string> _recroDictChart = [];
+    private readonly Dictionary<RgfAggregationColumn, RgfAggregationSortState> _aggregationSortStates = [];
 
     public string GetRecroDictChart(string resourceKey, string? defaultValue = null) => _recroDict.GetItem(_recroDictChart, resourceKey, defaultValue);
 
@@ -76,29 +79,11 @@ public partial class RgfChartComponent : ComponentBase, IDisposable
 
         _recroDictChart = await _recroDict.GetDictionaryAsync("RGF.UI.Chart", _recroSec.UserLanguage);
 
-        var validFormTypes = new[] {
-            PropertyFormType.TextBox,
-            PropertyFormType.TextBoxMultiLine,
-            PropertyFormType.CheckBox,
-            PropertyFormType.DropDown,
-            PropertyFormType.Date,
-            PropertyFormType.DateTime,
-            PropertyFormType.StaticText
-        };
-
-        AllowedProperties = Manager.EntityDesc.Properties
-            .Where(p => p.Readable && !p.IsDynamic &&
-                p.Options?.GetStringValue("RGO_AutoExternal") == null &&
-                p.Options?.GetBoolValue("RGO_AggregationExclude") != true &&
-                (validFormTypes.Contains(p.FormType) || p.Options?.GetBoolValue("RGO_AggregationRequired") == true))
-            .OrderBy(e => e.ColTitle)
-            .ToArray();
+        RebuildAllowedProperties();
 
         ChartSettings.AggregationSettings.Columns = new List<RgfAggregationColumn> { new() { Id = 0, Aggregate = "Count" } };
 
-        EditContext = new(ChartSettings.AggregationSettings);
-        EditContext.OnValidationRequested += HandleValidationRequested;
-        MessageStore = new(EditContext);
+        ResetEditContext();
 
         EntityParameters.ToolbarParameters.MenuEventDispatcher.Subscribe(Menu.RecroChart, OnShowChart);
         EntityParameters.ToolbarParameters.EventDispatcher.Subscribe(RgfToolbarEventKind.RecroChart, OnShowChart);
@@ -145,15 +130,20 @@ public partial class RgfChartComponent : ComponentBase, IDisposable
 
     protected void HandleValidationRequested(object? sender, ValidationRequestedEventArgs e) => Validation(MessageStore, ChartSettings);
 
-    private void OnShowChart(IRgfEventArgs args)
+    private async Task OnShowChart(IRgfEventArgs args)
     {
-        SetDataStatus(RgfProcessingStatus.Invalid);
-        _showComponent = true;
         args.Handled = true;
         args.PreventDefault = true;
+
+        RebuildAllowedProperties();
+        _ = EditContext.Validate();
+
+        SetDataStatus(RgfProcessingStatus.Invalid);
+        _showComponent = true;
+
         StateHasChanged();
         var eventArgs = new RgfChartEventArgs(RgfChartEventKind.ShowChart);
-        _ = EntityParameters.ChartParameters.EventDispatcher.DispatchEventAsync(eventArgs.EventKind, new RgfEventArgs<RgfChartEventArgs>(this, eventArgs));
+        await EntityParameters.ChartParameters.EventDispatcher.DispatchEventAsync(eventArgs.EventKind, new RgfEventArgs<RgfChartEventArgs>(this, eventArgs));
     }
 
     private Task OnDialogCloseAsync(IRgfEventArgs<RgfDialogEventArgs> args) => CloseDialogAsync();
@@ -177,6 +167,27 @@ public partial class RgfChartComponent : ComponentBase, IDisposable
 
         _pendingParentRefresh = false;
         return true;
+    }
+
+    private void RebuildAllowedProperties()
+    {
+        var validFormTypes = new[]
+        {
+            PropertyFormType.TextBox,
+            PropertyFormType.TextBoxMultiLine,
+            PropertyFormType.CheckBox,
+            PropertyFormType.DropDown,
+            PropertyFormType.Date,
+            PropertyFormType.DateTime,
+            PropertyFormType.StaticText
+        };
+
+        AllowedProperties = Manager.EntityDesc.Properties
+            .Where(p => p.Readable && !p.IsDynamic &&
+                p.Options?.GetBoolValue("RGO_AggregationExclude") != true &&
+                (validFormTypes.Contains(p.FormType) || p.Options?.GetBoolValue("RGO_AggregationRequired") == true))
+            .OrderBy(e => e.ColTitle)
+            .ToArray();
     }
 
     public virtual async Task<bool> CreateChartDataAsyc()
@@ -213,6 +224,7 @@ public partial class RgfChartComponent : ComponentBase, IDisposable
             foreach (var item in aggregationSettings.Columns)
             {
                 string alias;
+                IRgfProperty? sourceProperty = null;
                 if (item.Aggregate == "Count")
                 {
                     alias = "Count";
@@ -224,6 +236,7 @@ public partial class RgfChartComponent : ComponentBase, IDisposable
                     {
                         continue;
                     }
+                    sourceProperty = oprop;
                     alias = $"{oprop.Alias}_{item.Aggregate.Replace('-', '_')}";
                 }
                 var prop = chartManager.EntityDesc.Properties.FirstOrDefault(e => e.Alias.Equals(alias, StringComparison.OrdinalIgnoreCase));
@@ -242,11 +255,12 @@ public partial class RgfChartComponent : ComponentBase, IDisposable
                 dataCol.SetMember("Index", idx);
                 var name = item.Aggregate == "Count" ? _recroDict.GetRgfUiString("ItemCount") : prop.ColTitle;
                 dataCol.SetMember("Name", name);
+                dataCol.SetMember("Property", sourceProperty);
                 DataColumns.Add(dataCol);
             }
 
             var order = new List<string>();
-            foreach (var group in aggregationSettings.Groups.Concat(aggregationSettings.SubGroup))
+            foreach (var group in aggregationSettings.GroupsOrEmpty.Concat(aggregationSettings.SubGroupsOrEmpty))
             {
                 var oprop = AllowedProperties.FirstOrDefault(e => e.Id == group.Id);
                 if (oprop == null)
@@ -269,6 +283,9 @@ public partial class RgfChartComponent : ComponentBase, IDisposable
                 dataCol.SetMember("PropertyId", group.Id);
                 dataCol.SetMember("Index", idx);
                 dataCol.SetMember("Name", prop.ColTitle);
+                dataCol.SetMember("Property", oprop);
+                dataCol.SetMember("FormType", oprop.FormType);
+                dataCol.SetMember("ListType", oprop.ListType);
                 DataColumns.Add(dataCol);
                 order.Add(prop.Alias);
             }
@@ -276,13 +293,18 @@ public partial class RgfChartComponent : ComponentBase, IDisposable
             IOrderedEnumerable<RgfDynamicDictionary>? ordered = null;
             foreach (var item in order)
             {
+                var property = DataColumns
+                    .Where(column => string.Equals(column.Get<string>("Alias"), item, StringComparison.Ordinal))
+                    .Select(column => column.GetMember("Property") as IRgfProperty)
+                    .FirstOrDefault();
+
                 if (ordered == null)
                 {
-                    ordered = dataList.OrderBy(e => e.GetMember(item)?.ToString());
+                    ordered = dataList.OrderBy(e => GetChartOrderValue(e.GetMember(item), property));
                 }
                 else
                 {
-                    ordered = ordered.ThenBy(e => e.GetMember(item)?.ToString());
+                    ordered = ordered.ThenBy(e => GetChartOrderValue(e.GetMember(item), property));
                 }
             }
             ChartData = ordered?.ToList() ?? dataList;
@@ -300,6 +322,7 @@ public partial class RgfChartComponent : ComponentBase, IDisposable
     {
         messageStore.Clear();
         var aggregationSettings = rgfChartSettings.AggregationSettings;
+        var allowedPropertyIds = AllowedProperties.Select(property => property.Id).ToHashSet();
         if (aggregationSettings.Columns.Count == 0)
         {
             ChartSettings.AggregationSettings.Columns = new List<RgfAggregationColumn> { new() { Id = 0, Aggregate = "Count" } };
@@ -322,33 +345,49 @@ public partial class RgfChartComponent : ComponentBase, IDisposable
             {
                 messageStore.Add(() => col.Id, "");
             }
-        }
-        if (rgfChartSettings.SeriesType != RgfChartSeriesType.Bar && rgfChartSettings.SeriesType != RgfChartSeriesType.Line)
-        {
-            if (aggregationSettings.Columns.Count > 1)
+            else if (!allowedPropertyIds.Contains(col.Id) || !GetAllowedAggregationColumns(col.Aggregate).ContainsKey(col.Id))
             {
-                messageStore.Add(() => aggregationSettings.Columns[1], "");
-            }
-            if (aggregationSettings.SubGroup.Count > 0)
-            {
-                messageStore.Add(() => aggregationSettings.SubGroup[0], "");
+                messageStore.Add(() => aggregationSettings.Columns[i], "");
             }
         }
-        for (int i = aggregationSettings.SubGroup.Count - 1; i >= 0; i--)
+        if (rgfChartSettings.SeriesType == RgfChartSeriesType.Card)
         {
-            var group = aggregationSettings.SubGroup[i];
-            if (group.Id == 0 || aggregationSettings.SubGroup.IndexOf(group) < i || aggregationSettings.Groups.IndexOf(group) != -1)
+            if (aggregationSettings.Columns.Count > 1 || aggregationSettings.SubGroupsOrEmpty.Count > 0)
             {
-                messageStore.Add(() => aggregationSettings.SubGroup[i], "");
+                messageStore.Add(() => ChartSettings.SeriesType, GetRecroDictChart("CardRequiresSingleAggregate"));
             }
         }
-        for (int i = aggregationSettings.Groups.Count - 1; i >= 0; i--)
+        else if (rgfChartSettings.SeriesType != RgfChartSeriesType.Bar && rgfChartSettings.SeriesType != RgfChartSeriesType.Line)
         {
-            var group = aggregationSettings.Groups[i];
-            if (group.Id == 0 || aggregationSettings.Groups.IndexOf(group) < i)
+            if (aggregationSettings.Columns.Count > 1 || aggregationSettings.SubGroupsOrEmpty.Count > 0)
             {
-                messageStore.Add(() => aggregationSettings.Groups[i], "");
+                messageStore.Add(() => ChartSettings.SeriesType, GetRecroDictChart("SingleSeriesChartSingleAggregateOnly"));
             }
+        }
+        for (int i = aggregationSettings.SubGroupsOrEmpty.Count - 1; i >= 0; i--)
+        {
+            var group = aggregationSettings.SubGroupsOrEmpty[i];
+            if (group.Id == 0 || !allowedPropertyIds.Contains(group.Id) || aggregationSettings.SubGroupsOrEmpty.IndexOf(group) < i || aggregationSettings.GroupsOrEmpty.IndexOf(group) != -1)
+            {
+                messageStore.Add(() => aggregationSettings.SubGroupsOrEmpty[i], "");
+            }
+        }
+        for (int i = aggregationSettings.GroupsOrEmpty.Count - 1; i >= 0; i--)
+        {
+            var group = aggregationSettings.GroupsOrEmpty[i];
+            if (group.Id == 0 || !allowedPropertyIds.Contains(group.Id) || aggregationSettings.GroupsOrEmpty.IndexOf(group) < i)
+            {
+                messageStore.Add(() => aggregationSettings.GroupsOrEmpty[i], "");
+            }
+        }
+
+        aggregationSettings.Normalize();
+
+        int s = 1;
+        foreach (var column in aggregationSettings.Columns.Where(column => column.Sort != 0).OrderBy(column => Math.Abs(column.Sort)).ToArray())
+        {
+            column.Sort = column.Sort > 0 ? s : -s;
+            s++;
         }
     }
 
@@ -374,29 +413,75 @@ public partial class RgfChartComponent : ComponentBase, IDisposable
     public void AddGroup()
     {
         SetDataStatus(RgfProcessingStatus.Invalid);
-        ChartSettings.AggregationSettings.Groups.Add(new());
+        ChartSettings.AggregationSettings.GroupsOrEmpty.Add(new());
     }
 
     public void RemoveAtGroup(int idx)
     {
         SetDataStatus(RgfProcessingStatus.Invalid);
-        ChartSettings.AggregationSettings.Groups.RemoveAt(idx);
+        ChartSettings.AggregationSettings.GroupsOrEmpty.RemoveAt(idx);
     }
 
     public void AddSubGroup()
     {
         SetDataStatus(RgfProcessingStatus.Invalid);
-        ChartSettings.AggregationSettings.SubGroup.Add(new());
+        ChartSettings.AggregationSettings.SubGroupsOrEmpty.Add(new());
     }
 
     public void RemoveAtSubGroup(int idx)
     {
         SetDataStatus(RgfProcessingStatus.Invalid);
-        ChartSettings.AggregationSettings.SubGroup.RemoveAt(idx);
+        ChartSettings.AggregationSettings.SubGroupsOrEmpty.RemoveAt(idx);
+    }
+
+    public void SetColumnSortPriority(RgfAggregationColumn column, int? priority)
+    {
+        SetDataStatus(RgfProcessingStatus.Invalid);
+
+        var state = GetColumnSortState(column);
+        if (priority == null || priority <= 0)
+        {
+            column.Sort = 0;
+            state.Priority = null;
+            return;
+        }
+
+        state.Priority = priority.Value;
+        column.Sort = state.Descending ? -priority.Value : priority.Value;
+    }
+
+    public void SetColumnSortDescending(RgfAggregationColumn column, bool descending)
+    {
+        SetDataStatus(RgfProcessingStatus.Invalid);
+
+        var state = GetColumnSortState(column);
+        state.Descending = descending;
+        if (column.Sort == 0)
+        {
+            return;
+        }
+
+        int priority = Math.Abs(column.Sort);
+        column.Sort = descending ? -priority : priority;
+    }
+
+    public RgfAggregationSortState GetColumnSortState(RgfAggregationColumn column)
+    {
+        if (!_aggregationSortStates.TryGetValue(column, out var state))
+        {
+            state = new RgfAggregationSortState();
+            _aggregationSortStates[column] = state;
+        }
+
+        int priority = Math.Abs(column.Sort);
+        state.Priority = priority == 0 ? null : priority;
+        state.Descending = column.Sort < 0;
+        return state;
     }
 
     public void Dispose()
     {
+        EditContext.OnValidationRequested -= HandleValidationRequested;
         EntityParameters?.UnsubscribeFromAll(this);
     }
 
@@ -409,21 +494,26 @@ public partial class RgfChartComponent : ComponentBase, IDisposable
             var gs = ChartSettingList.FirstOrDefault(e => e.ChartSettingsId == chartSettingsId);
             if (gs?.ChartSettingsId > 0)
             {
-                ChartSettings = RgfChartSettings.DeepCopy(gs);
+                ChartSettings = RgfChartSettings.DeepCopy(gs)!;
+                ResetEditContext();
                 var parentGridSettings = ChartSettings.ParentGridSettings ?? new RgfGridSettings();
                 var conditions = parentGridSettings.Conditions ?? [];
                 var filterHandler = await Manager.GetFilterHandlerAsync();
                 filterHandler.ApplyFilterState(conditions, parentGridSettings.SQLTimeout);
                 _pendingParentRefresh = !Embedded;
-                await Manager.ToastManager.RaiseEventAsync(new RgfToastEventArgs(Manager.EntityDesc.MenuTitle, RgfToastEventArgs.ActionTemplate(_recroDict.GetRgfUiString("Settings"), ChartSettings.SettingsName), delay: 2000), this);
+                if (!EntityParameters.ChartParameters.SuppressAutomaticChartToast)
+                {
+                    await Manager.ToastManager.RaiseEventAsync(new RgfToastEventArgs(Manager.EntityDesc.MenuTitle, RgfToastEventArgs.ActionTemplate(_recroDict.GetRgfUiString("Settings"), ChartSettings.SettingsName), delay: 2000), this);
+                }
                 return true;
             }
         }
 
-        ChartSettings = RgfChartSettings.DeepCopy(ChartSettings);
+        ChartSettings = RgfChartSettings.DeepCopy(ChartSettings)!;
         ChartSettings.SettingsName = name;
         ChartSettings.ChartSettingsId = null;
         ChartSettings.IsReadonly = false;
+        ResetEditContext();
         return false;
     }
 
@@ -438,7 +528,7 @@ public partial class RgfChartComponent : ComponentBase, IDisposable
                 ChartSettings.ChartSettingsId = res.ChartSettingsId;
             }
             ChartSettingList.RemoveAll(e => e.ChartSettingsId == ChartSettings.ChartSettingsId);
-            ChartSettingList.Insert(0, RgfChartSettings.DeepCopy(ChartSettings));
+            ChartSettingList.Insert(0, RgfChartSettings.DeepCopy(ChartSettings)!);
             return true;
         }
         return false;
@@ -464,5 +554,114 @@ public partial class RgfChartComponent : ComponentBase, IDisposable
             }
         }
         return false;
+    }
+
+    public RgfChartCardModel? CreateCardModel()
+    {
+        if (ChartSettings.SeriesType != RgfChartSeriesType.Card
+            || DataStatus != RgfProcessingStatus.Valid
+            || ChartData.Count != 1)
+        {
+            return null;
+        }
+
+        RgfDynamicDictionary? aggregateColumn = null;
+        foreach (var column in DataColumns)
+        {
+            if (string.IsNullOrWhiteSpace(column.Get<string?>("Aggregate")))
+            {
+                continue;
+            }
+
+            if (aggregateColumn != null)
+            {
+                return null;
+            }
+
+            aggregateColumn = column;
+        }
+
+        if (aggregateColumn == null)
+        {
+            return null;
+        }
+
+        var row = ChartData[0];
+        var alias = aggregateColumn.Get<string>("Alias");
+        if (string.IsNullOrWhiteSpace(alias))
+        {
+            return null;
+        }
+
+        var data = row.GetItemData(alias);
+        if (data == null)
+        {
+            return null;
+        }
+
+        CultureInfo culture = _recroSec.UserCultureInfo();
+        var property = aggregateColumn.GetMember("Property") as IRgfProperty;
+        string? formattedValue;
+        if (!RgfDisplayValueFormatter.TryFormatDisplayValue(data.Value, property, culture, out formattedValue))
+        {
+            formattedValue = data.ToString();
+        }
+        if (string.IsNullOrWhiteSpace(formattedValue))
+        {
+            return null;
+        }
+
+        var aggregate = aggregateColumn.Get<string?>("Aggregate");
+        var title = aggregateColumn.Get<string>("Name");
+        return new RgfChartCardModel
+        {
+            Title = title,
+            Value = formattedValue,
+            Remark = string.IsNullOrWhiteSpace(ChartSettings.Remark) ? null : ChartSettings.Remark.Trim()
+        };
+    }
+
+    private static object? GetChartOrderValue(object? value, IRgfProperty? property)
+    {
+        if (RgfDisplayValueFormatter.TryGetNormalizedDateTimeValue(value, property, out var normalizedDateTime))
+        {
+            return normalizedDateTime;
+        }
+
+        return value is IComparable comparable ? comparable : value?.ToString();
+    }
+
+    public Dictionary<int, string> GetAllowedAggregationColumns(string? aggregate)
+        => GetAllowedAggregationProperties(aggregate)
+            .OrderBy(e => e.ColTitle)
+            .ToDictionary(p => p.Id, p => p.ColTitle);
+
+    private IEnumerable<RgfProperty> GetAllowedAggregationProperties(string? aggregate)
+    {
+        if (string.Equals(aggregate, "Min", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(aggregate, "Max", StringComparison.OrdinalIgnoreCase))
+        {
+            return AllowedProperties.Where(property => IsNumericAggregationProperty(property) || RgfDisplayValueFormatter.IsDateDisplayProperty(property));
+        }
+
+        return AllowedProperties.Where(IsNumericAggregationProperty);
+    }
+
+    private static bool IsNumericAggregationProperty(RgfProperty property) => property.ListType == PropertyListType.Numeric || property.ClientDataType.IsNumeric();
+
+    private void ResetEditContext()
+    {
+        _aggregationSortStates.Clear();
+        EditContext.OnValidationRequested -= HandleValidationRequested;
+        EditContext = new(ChartSettings);
+        EditContext.OnValidationRequested += HandleValidationRequested;
+        MessageStore = new(EditContext);
+    }
+
+    public sealed class RgfAggregationSortState
+    {
+        public int? Priority { get; set; }
+
+        public bool Descending { get; set; }
     }
 }

@@ -40,7 +40,7 @@
                 else
                 {
                     <div class="p-1">
-                        <RgfComboBox TValue="int" Value="item.PropertyId" ValueExpression="() => item.PropertyId" Disabled="item.IsQuickFilter"
+                        <RgfComboBox TValue="int" Value="item.Id" ValueExpression="() => item.Id" Disabled="item.IsQuickFilter"
                                      DataSource="Columns"
                                      ValueChanged="(value) => OnChangeProperty(value, item)" />
                     </div>
@@ -51,7 +51,7 @@
                     </div>
                     @if (!(new[] { RgfFilter.QueryOperator.IsNull, RgfFilter.QueryOperator.IsNotNull, RgfFilter.QueryOperator.Exists }.Contains(item.QueryOperator)))
                     {
-                        var prop = FilterComponent.RgfFilterProperties.Single(e => e.Id == item.PropertyId);
+                        var prop = FilterComponent.RgfFilterProperties.Single(e => e.Id == item.Id);
                         <div class="p-1">
                             @switch (prop.ClientDataType)
                             {
@@ -178,7 +178,7 @@
 
     private Dictionary<int, string> Columns => FilterComponent.RgfFilterProperties.ToDictionary(p => p.Id, p => p.ColTitle);
     private Dictionary<RgfFilter.LogicalOperator, string> LogicalOperators => RgfFilter.GetLogicalOperators(RecroDict);
-    private Dictionary<RgfFilter.QueryOperator, string> GetQueryOperators(RgfFilter.Condition condition) => RgfFilter.GetQueryOperators(FilterComponent.RgfFilterProperties.SingleOrDefault(e => e.Id == condition.PropertyId)?.Operators, RecroDict);
+    private Dictionary<RgfFilter.QueryOperator, string> GetQueryOperators(RgfFilter.Condition condition) => RgfFilter.GetQueryOperators(FilterComponent.RgfFilterProperties.SingleOrDefault(e => e.Id == condition.Id)?.Operators, RecroDict);
 
     private void OnAddCondition(RgfFilter.Condition condition) => FilterComponent.AddCondition(condition);
     private void OnRemoveCondition(RgfFilter.Condition condition) => FilterComponent.RemoveCondition(condition);

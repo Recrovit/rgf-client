@@ -1,7 +1,19 @@
-﻿.rgf-apexchart-content {
+.rgf-apexchart-content {
     overflow-x: auto;
     overflow-y: hidden;
 }
+
+    .rgf-apexchart-content.card.active,
+    .rgf-apexchart-content-embedded.card {
+        display: flex;
+        flex: 1 1 auto;
+        flex-direction: column;
+        width: 100%;
+        height: 100%;
+        min-width: 0;
+        min-height: 0;
+        border: none;
+    }
 
 .rgf-apexchart-container-embedded {
     display: flex;
@@ -11,7 +23,6 @@
     height: 100%;
     min-width: 0;
     min-height: 0;
-    overflow: hidden;
 }
 
 .rgf-apexchart-card-body-embedded {
@@ -19,7 +30,6 @@
     flex: 1 1 auto;
     min-width: 0;
     min-height: 0;
-    overflow: hidden;
 }
 
 .rgf-apexchart-tab-content-embedded {
@@ -35,16 +45,15 @@
     min-height: 0;
 }
 
-.rgf-apexchart-tab-pane-embedded.active,
-.rgf-apexchart-content-embedded {
-    display: flex;
-    flex: 1 1 auto;
-    flex-direction: column;
-    width: 100%;
-    min-width: 0;
-    min-height: 0;
-    overflow: hidden;
-}
+    .rgf-apexchart-tab-pane-embedded.active,
+    .rgf-apexchart-content-embedded {
+        display: flex;
+        flex: 1 1 auto;
+        flex-direction: column;
+        width: 100%;
+        min-width: 0;
+        min-height: 0;
+    }
 
 .pie ::deep div.apx-legend-position-right,
 .donut ::deep div.apx-legend-position-right {
@@ -53,4 +62,17 @@
 
 .card-body {
     padding-bottom: 5px;
+}
+
+    .card-body.rgf-apexchart-card-body-embedded {
+        padding: 0;
+    }
+
+.rgf-apexchart-content.card ::deep .rgf-apexchart-card-view {
+    flex: 1 1 auto;
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    box-sizing: border-box;
 }

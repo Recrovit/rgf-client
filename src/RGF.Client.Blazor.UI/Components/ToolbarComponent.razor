@@ -117,7 +117,7 @@
                             <div class="rg-predef-name input-group input-group-sm">
                                 <RgfComboBox TValue="int?" Value="@RgfToolbar.GridSetting.GridSettingsId" Text="@RgfToolbar.GridSetting.SettingsName" AllowCustom="true"
                                              Tooltip="@RecroDict.GetRgfUiString("SavedViewName")"
-                                             DataSource="RgfToolbar.GridSettingList.Select(e => new KeyValuePair<int?, string>(e.GridSettingsId, e.SettingsName))"
+                                             DataSource="@RgfToolbar.GridSettingList.Select(e => new KeyValuePair<int?, string>(e.GridSettingsId, e.SettingsName ?? ""))"
                                              InputChanged="OnGridSettingsChanged" />
                             </div>
                             <div class="rg-predef-save">
@@ -162,7 +162,7 @@
 
     private IRgManager Manager => EntityParameters.Manager!;
     private RgfToolbarParameters ToolbarParameters { get => EntityParameters.ToolbarParameters; }
-    private string SettingsName => _rgfToolbarRef.GridSetting.SettingsName;
+    private string SettingsName => _rgfToolbarRef.GridSetting.SettingsName ?? "";
 
     private RgfToolbarComponent _rgfToolbarRef { get; set; } = null!;
 

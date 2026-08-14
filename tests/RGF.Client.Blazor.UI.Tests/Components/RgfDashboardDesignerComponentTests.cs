@@ -129,6 +129,82 @@ public sealed class RgfDashboardDesignerComponentTests
     }
 
     [Fact]
+    public void DesignerPreview_UsesSettingsName_WhenTitleIsBlank_AndHeaderIsVisible()
+    {
+        using var testContext = CreateTestContext();
+
+        var dashboard = CreateLeafDashboard(new RgfDashboardItem
+        {
+            DashboardItemId = 1,
+            Title = "   ",
+            ShowHeader = true,
+            ViewReference = new()
+            {
+                EntityName = "Orders",
+                ViewType = RgfDashboardViewType.Grid,
+                SettingsId = 42,
+                SettingsName = "Orders default"
+            }
+        });
+
+        var cut = RenderDesigner(testContext, dashboard);
+
+        var header = cut.Find(".rgf-dashboard-designer-pane-header");
+        Assert.Contains("Orders default", header.TextContent);
+        Assert.DoesNotContain("Orders title", header.TextContent);
+    }
+
+    [Fact]
+    public void DesignerPreview_HidesHeader_WhenShowHeaderIsFalse_EvenIfSettingsNameExists()
+    {
+        using var testContext = CreateTestContext();
+
+        var dashboard = CreateLeafDashboard(new RgfDashboardItem
+        {
+            DashboardItemId = 1,
+            Title = null,
+            ShowHeader = false,
+            ViewReference = new()
+            {
+                EntityName = "Orders",
+                ViewType = RgfDashboardViewType.Grid,
+                SettingsId = 42,
+                SettingsName = "Orders default"
+            }
+        });
+
+        var cut = RenderDesigner(testContext, dashboard);
+
+        Assert.Empty(cut.FindAll(".rgf-dashboard-designer-pane-header"));
+    }
+
+    [Fact]
+    public void DesignerPreview_ShowsValidationError_WhenSettingsNameIsBlank()
+    {
+        using var testContext = CreateTestContext();
+
+        var dashboard = CreateLeafDashboard(new RgfDashboardItem
+        {
+            DashboardItemId = 1,
+            ShowHeader = true,
+            ViewReference = new()
+            {
+                EntityName = "Orders",
+                ViewType = RgfDashboardViewType.Grid,
+                SettingsId = 42,
+                SettingsName = "   "
+            }
+        });
+
+        var cut = RenderDesigner(testContext, dashboard);
+
+        cut.WaitForAssertion(() =>
+        {
+            Assert.Contains("missing its saved view name", cut.Markup);
+        });
+    }
+
+    [Fact]
     public void SaveButton_IsControlledByParametersCanSave()
     {
         using var testContext = CreateTestContext();

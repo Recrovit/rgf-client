@@ -52,6 +52,7 @@ public class RgfBlazorConfiguration
         Dialog = 2,
         Chart = 3,
         DashboardPage = 4,
+        LoadingIndicator = 5,
     }
 
     public const string JsBlazorNamespace = "Recrovit.RGF.Blazor.Client";
@@ -64,7 +65,7 @@ public class RgfBlazorConfiguration
 
     private static readonly Lazy<string> _version = new Lazy<string>(() => Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyFileVersionAttribute>()!.Version);
 
-    public static Version MinimumRgfCoreVersion { get; } = new Version(10, 2, 0);//RGF.Core MinVersion
+    public static Version MinimumRgfCoreVersion { get; } = new Version(10, 3, 0);//RGF.Core MinVersion
 }
 
 public static class RgfBlazorConfigurationExtension

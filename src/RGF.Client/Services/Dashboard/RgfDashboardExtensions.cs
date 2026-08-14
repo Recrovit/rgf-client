@@ -1,4 +1,3 @@
-using Recrovit.RecroGridFramework.Abstraction.Contracts.Services;
 using Recrovit.RecroGridFramework.Abstraction.Models;
 
 namespace Recrovit.RecroGridFramework.Client.Services.Dashboard;
@@ -7,7 +6,7 @@ public static class RgfDashboardExtensions
 {
     public static RgfDashboardDefinition CreateClone(this RgfDashboardDefinition source)
     {
-        var clone = source.DeepCopy() ?? RgfDashboardDefinitionHelper.CreateLocalDashboard();
+        var clone = source.DeepCopy() ?? new();
         clone.DashboardId = 0;
         clone.Name = null;
         clone.IsReadonly = false;

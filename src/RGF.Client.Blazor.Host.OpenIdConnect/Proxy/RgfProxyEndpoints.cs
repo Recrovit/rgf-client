@@ -18,46 +18,56 @@ public static class RgfProxyEndpoints
     {
         endpoints.MapGet("/rgf/api/RGFSriptReferences/{**suffix}", ProxyAnonymousGetAsync)
             .AsProxyEndpoint()
+            .WithForwardedRgfHeaders()
             .WithSummary("Proxies RGF script reference metadata calls.");
 
         endpoints.MapGet("/rgf/api/RGFStylesheetsReferences", ProxyAnonymousGetAsync)
             .AsProxyEndpoint()
+            .WithForwardedRgfHeaders()
             .WithSummary("Proxies RGF stylesheet reference calls.");
 
         endpoints.MapGet("/rgf/api/RecroDict/{**path}", ProxyAnonymousGetAsync)
             .AsProxyEndpoint()
+            .WithForwardedRgfHeaders()
             .WithSummary("Proxies RecroDict calls.");
 
         endpoints.MapGet("/rgf/styles.{environment}/{**path}", ProxyAnonymousGetAsync)
             .AsProxyEndpoint()
+            .WithForwardedRgfHeaders()
             .WithSummary("Proxies RGF style calls.");
 
         endpoints.MapGet("/rgf/resource/{**path}", ProxyAnonymousGetAsync)
             .AsProxyEndpoint()
+            .WithForwardedRgfHeaders()
             .WithSummary("Proxies static RGF resources.");
 
         endpoints.MapMethods(RgfSignalR.RgfProgressHubEndpoint, ProxyEndpointConventionBuilderExtensions.ProxyTransportMethods, ProxyProgressHubAsync)
             .AsProxyEndpoint()
+            .WithForwardedRgfHeaders()
             .WithSummary("Proxies RGF progress hub calls.");
 
         endpoints.MapMethods($"{RgfSignalR.RgfProgressHubEndpoint}/{{**path}}", ProxyEndpointConventionBuilderExtensions.ProxyTransportMethods, ProxyProgressHubAsync)
             .AsProxyEndpoint()
+            .WithForwardedRgfHeaders()
             .WithSummary("Proxies RGF progress hub calls.");
 
         endpoints.MapMethods("/RGF/base/{**path}", ProxyEndpointConventionBuilderExtensions.StandardProxyMethods, ProxyAuthorizedAsync)
             .AsProxyEndpoint()
+            .WithForwardedRgfHeaders()
             .RequireAuthorization()
             .DisableAuthRedirects()
             .WithSummary("Proxies RGF base calls.");
 
         endpoints.MapMethods("/RGF/RecroGrid/{**path}", ProxyEndpointConventionBuilderExtensions.StandardProxyMethods, ProxyAuthorizedAsync)
             .AsProxyEndpoint()
+            .WithForwardedRgfHeaders()
             .RequireAuthorization()
             .DisableAuthRedirects()
             .WithSummary("Proxies RGF grid calls.");
 
         endpoints.MapMethods("/rgf/api/{**path}", ProxyEndpointConventionBuilderExtensions.StandardProxyMethods, ProxyAuthorizedAsync)
             .AsProxyEndpoint()
+            .WithForwardedRgfHeaders()
             .RequireAuthorization()
             .DisableAuthRedirects()
             .WithSummary("Proxies authorized RGF API calls to the downstream API.");
@@ -89,5 +99,12 @@ public static class RgfProxyEndpoints
         }
 
         await DownstreamProxyEndpointExecutor.ProxyHttpAsync(context, httpProxyClient, DownstreamApiName, context.User, cancellationToken);
+    }
+
+    public static TBuilder WithForwardedRgfHeaders<TBuilder>(this TBuilder builder)
+        where TBuilder : IEndpointConventionBuilder
+    {
+        builder.WithForwardedRequestHeaders(RgfHeaderKeys.RgfClientVersion, RgfHeaderKeys.RgfClientBlazorVersion, "RGF-SessionId");
+        return builder;
     }
 }

@@ -105,6 +105,7 @@ internal class RgFilterHandler : IRgFilterHandler
         {
             _conditions = value;
             _conditionsQuickFilter = [];
+            NormalizeConditionProperties(_conditions);
             _maxConditionId = InitClientId(new RgfFilter.Condition() { Conditions = _conditions }, 0);
         }
     }
@@ -117,7 +118,7 @@ internal class RgFilterHandler : IRgFilterHandler
     {
         foreach (var item in conditions)
         {
-            if (item.PropertyId == property.Id &&
+            if (item.Id == property.Id &&
                 (matchCriteria == null || item.IsQuickFilter && matchCriteria.Equals(item.Param1.ToString(), StringComparison.OrdinalIgnoreCase)))
             {
                 return true;
@@ -137,7 +138,7 @@ internal class RgFilterHandler : IRgFilterHandler
         {
             condition = null;
         }
-        var quickFilter = _conditionsQuickFilter.FirstOrDefault(e => e.IsQuickFilter && e.PropertyId == property.Id);
+        var quickFilter = _conditionsQuickFilter.FirstOrDefault(e => e.IsQuickFilter && e.Id == property.Id);
         if (quickFilter == null && condition == null)
         {
             return;
@@ -154,7 +155,8 @@ internal class RgFilterHandler : IRgFilterHandler
                 quickFilter = new RgfFilter.Condition()
                 {
                     ClientId = ++_maxConditionId,
-                    PropertyId = property.Id,
+                    Id = property.Id,
+                    Alias = property.Alias,
                     LogicalOperator = RgfFilter.LogicalOperator.And,
                     QueryOperator = property.ClientDataType == ClientDataType.String ? RgfFilter.QueryOperator.Like : RgfFilter.QueryOperator.Equal,
                     IsQuickFilter = true
@@ -296,7 +298,8 @@ internal class RgFilterHandler : IRgFilterHandler
             newCondition = new RgfFilter.Condition()
             {
                 ClientId = ++_maxConditionId,
-                PropertyId = prop.Id,
+                Id = prop.Id,
+                Alias = prop.Alias,
                 LogicalOperator = RgfFilter.LogicalOperator.And,
                 QueryOperator = prop.Operators.First(),
             };
@@ -366,9 +369,10 @@ internal class RgFilterHandler : IRgFilterHandler
     public bool ChangeProperty(RgfFilter.Condition condition, int newPropertyId)
     {
         var prop = RgfFilterProperties.FirstOrDefault(e => e.Id == newPropertyId);
-        if (prop != null && condition.PropertyId != newPropertyId)
+        if (prop != null && condition.Id != newPropertyId)
         {
-            condition.PropertyId = newPropertyId;
+            condition.Id = newPropertyId;
+            condition.Alias = prop.Alias;
             if (!prop.Operators.Contains(condition.QueryOperator))
             {
                 condition.QueryOperator = prop.Operators.First();
@@ -384,7 +388,7 @@ internal class RgFilterHandler : IRgFilterHandler
     {
         if (newOperator != RgfFilter.QueryOperator.Invalid && newOperator != condition.QueryOperator)
         {
-            var prop = RgfFilterProperties.FirstOrDefault(e => e.Id == condition.PropertyId);
+            var prop = RgfFilterProperties.FirstOrDefault(e => e.Id == condition.Id);
             if (prop != null && prop.Operators.Contains(newOperator))
             {
                 //var listTypes = new RgfFilter.QueryOperator[] { RgfFilter.QueryOperator.In, RgfFilter.QueryOperator.NotIn };
@@ -484,6 +488,30 @@ internal class RgFilterHandler : IRgFilterHandler
         return true;
     }
     #endregion
+
+    private void NormalizeConditionProperties(IEnumerable<RgfFilter.Condition> conditions)
+    {
+        foreach (var condition in conditions)
+        {
+            if (condition.Conditions?.Any() == true)
+            {
+                NormalizeConditionProperties(condition.Conditions);
+                continue;
+            }
+
+            var property = condition.Id > 0
+                ? RgfFilterProperties.FirstOrDefault(e => e.Id == condition.Id)
+                : !string.IsNullOrWhiteSpace(condition.Alias)
+                    ? RgfFilterProperties.FirstOrDefault(e => e.Alias.Equals(condition.Alias, StringComparison.OrdinalIgnoreCase))
+                    : null;
+
+            if (property != null)
+            {
+                condition.Id = property.Id;
+                condition.Alias = property.Alias;
+            }
+        }
+    }
 }
 
 public class RgfFilterProperty : IRgfProperty

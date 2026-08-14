@@ -1,0 +1,43 @@
+.rgf-apexchart-card-view {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    box-sizing: border-box;
+    text-align: center;
+}
+
+.rgf-apexchart-card-view-header {
+    color: #6c757d;
+    font-size: 0.875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.rgf-apexchart-card-view-title {
+    font-size: 1rem;
+    font-weight: 600;
+}
+
+.rgf-apexchart-card-view-value {
+    font-size: clamp(1rem, 2vw, 4rem);
+    font-weight: 700;
+    line-height: 1.1;
+    max-width: 100%;
+}
+
+.rgf-apexchart-card-view-remark {
+    color: #6c757d;
+    font-size: 0.95rem;
+}
+
+.rgf-apexchart-card-view-caption {
+    color: #6c757d;
+    font-size: 0.8rem;
+}

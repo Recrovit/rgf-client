@@ -8,6 +8,7 @@ using Recrovit.RecroGridFramework.Client.Blazor.Components;
 using Recrovit.RecroGridFramework.Client.Blazor.Parameters;
 using Recrovit.RecroGridFramework.Client.Events;
 using Recrovit.RecroGridFramework.Client.Handlers;
+using Recrovit.RecroGridFramework.Blazor.RgfApexCharts.Formatting;
 
 namespace Recrovit.RecroGridFramework.Blazor.RgfApexCharts.Components;
 
@@ -68,11 +69,18 @@ public abstract class BaseChartComponent : ComponentBase, IAsyncDisposable
                 DataLabels = new DataLabels
                 {
                     Enabled = true,
-                    Formatter = "function (value) { return Array.isArray(value) ? value.join('/') : value?.toLocaleString(); }"
+                },
+                Xaxis = new XAxis
+                {
+                    Type = XAxisType.Category
                 },
                 Yaxis = new List<YAxis>()
                 {
-                    new YAxis { Labels = new YAxisLabels { Formatter = "function (value) { return Array.isArray(value) ? value.join('/') : value?.toLocaleString(); }" } }
+                    new YAxis { Labels = new YAxisLabels() }
+                },
+                Tooltip = new Tooltip
+                {
+                    Y = new TooltipY()
                 }
             }
         };
@@ -83,6 +91,9 @@ public abstract class BaseChartComponent : ComponentBase, IAsyncDisposable
 
     [Inject]
     protected IRecroDictService RecroDict { get; init; } = null!;
+
+    [Inject]
+    protected IRecroSecService _recroSec { get; init; } = null!;
 
     protected RgfChartComponent RgfChartRef { get; set; } = null!;
 
@@ -109,6 +120,7 @@ public abstract class BaseChartComponent : ComponentBase, IAsyncDisposable
 
     protected override void OnInitialized()
     {
+        ApplyValueFormatters();
         EntityParameters.ChartParameters.EventDispatcher.Subscribe(RgfChartEventKind.ShowChart, (arg) => OnInitSizeAsync(true), true, this);
         EntityParameters.ChartParameters.EventDispatcher.Subscribe(RgfChartEventKind.Initialized, OnChartInitializedAsync, this);
     }
@@ -151,9 +163,10 @@ public abstract class BaseChartComponent : ComponentBase, IAsyncDisposable
         ChangeChartType(chartSetting.SeriesType);
         ChangedShowDataLabels(chartSetting.ShowDataLabels);
         ChangedLegend(chartSetting.Legend);
+        ApplyValueFormatters();
         ApexChartSettings.Width = chartSetting.Width;
         ApexChartSettings.Height = chartSetting.Height;
-        ApexChartSettings.Title = "";
+        ApexChartSettings.Card = null;
         ApexChartSettings.Series.Clear();
     }
 
@@ -219,7 +232,7 @@ public abstract class BaseChartComponent : ComponentBase, IAsyncDisposable
 
         if (redraw && RgfChartRef.DataStatus == RgfProcessingStatus.Valid)
         {
-            await UpdateChart();
+            await UpdateChart(EntityParameters.ChartParameters.SuppressAutomaticChartToast);
         }
     }
 
@@ -247,9 +260,10 @@ public abstract class BaseChartComponent : ComponentBase, IAsyncDisposable
         StateHasChanged();
         await Task.Delay(50);
         await OnInitSizeAsync();
-        if (RgfChartRef.DataStatus == RgfProcessingStatus.Valid || await GetData())
+        var suppressAutomaticToast = EntityParameters.ChartParameters.SuppressAutomaticChartToast;
+        if (RgfChartRef.DataStatus == RgfProcessingStatus.Valid || await GetData(suppressAutomaticToast))
         {
-            await UpdateChart();
+            await UpdateChart(suppressAutomaticToast);
             return true;
         }
         return false;
@@ -263,28 +277,39 @@ public abstract class BaseChartComponent : ComponentBase, IAsyncDisposable
         }
         SettingsAccordionActive = false;
         ActiveTabIndex = RecroChartTab.Grid;
-        return await GetData();
+        return await GetData(EntityParameters.ChartParameters.SuppressAutomaticChartToast);
     }
 
-    protected async Task<bool> GetData()
+    protected async Task<bool> GetData(bool suppressToast = false)
     {
         if (RgfChartRef.DataStatus == RgfProcessingStatus.Valid)
         {
             return false;
         }
-        var toast = RgfToastEventArgs.CreateActionEvent(RecroDict.GetRgfUiString("Request"), Manager.EntityDesc.MenuTitle, RgfChartRef.GetRecroDictChart("DataSet"), delay: 0);
-        await Manager.ToastManager.RaiseEventAsync(toast, this);
+        var toast = suppressToast
+            ? null
+            : RgfToastEventArgs.CreateActionEvent(RecroDict.GetRgfUiString("Request"), Manager.EntityDesc.MenuTitle, RgfChartRef.GetRecroDictChart("DataSet"), delay: 0);
+        if (toast != null)
+        {
+            await Manager.ToastManager.RaiseEventAsync(toast, this);
+        }
 
         var success = await RgfChartRef.CreateChartDataAsyc();
         if (!success)
         {
             // Switch to this tab because the error message appears here
             ActiveTabIndex = RecroChartTab.Grid;
-            await Manager.ToastManager.RaiseEventAsync(toast.Remove(), this);
+            if (toast != null)
+            {
+                await Manager.ToastManager.RaiseEventAsync(toast.Remove(), this);
+            }
             return false;
         }
-        await Manager.ToastManager.RaiseEventAsync(toast.RecreateAsSuccess(RecroDict.GetRgfUiString("Processed"), delay: 2000), this);
-        ApexChartSettings.Title = "";
+        if (toast != null)
+        {
+            await Manager.ToastManager.RaiseEventAsync(toast.RecreateAsSuccess(RecroDict.GetRgfUiString("Processed"), delay: 2000), this);
+        }
+        ApexChartSettings.Card = null;
         ApexChartSettings.Series.Clear();
         if (ApexChartRef != null)
         {
@@ -294,7 +319,7 @@ public abstract class BaseChartComponent : ComponentBase, IAsyncDisposable
         return true;
     }
 
-    protected virtual async Task UpdateChart()
+    protected virtual async Task UpdateChart(bool suppressToast = false)
     {
         var currentStatus = RgfChartRef.ChartStatus;
         if (ApexChartRef == null || currentStatus == RgfProcessingStatus.InProgress)
@@ -311,22 +336,43 @@ public abstract class BaseChartComponent : ComponentBase, IAsyncDisposable
         RgfChartRef.ChartStatus = RgfProcessingStatus.InProgress;// Prevents the chart from being redrawn when the data is updated
         try
         {
-            RgfToastEventArgs toast;
+            RgfToastEventArgs? toast;
             if (currentStatus == RgfProcessingStatus.Invalid)
             {
-                toast = RgfToastEventArgs.CreateActionEvent(RecroDict.GetRgfUiString("Request"), Manager.EntityDesc.MenuTitle, "Render", delay: 0);
-                await Manager.ToastManager.RaiseEventAsync(toast, this);
-                StateHasChanged();
-                await Task.Delay(50);
-                await ApexChartRef.RenderChartAsync(_chartSettings.SettingsName, $"{Manager.EntityDesc.Title} : ", _chartSettings.AggregationSettings, RgfChartRef.DataColumns, RgfChartRef.ChartData);
+                toast = suppressToast
+                    ? null
+                    : RgfToastEventArgs.CreateActionEvent(RecroDict.GetRgfUiString("Request"), Manager.EntityDesc.MenuTitle, "Render", delay: 0);
+                if (toast != null)
+                {
+                    await Manager.ToastManager.RaiseEventAsync(toast, this);
+                    StateHasChanged();
+                    await Task.Delay(50);
+                }
+                if (!await RenderCurrentVisualizationAsync(toast))
+                {
+                    RgfChartRef.ChartStatus = RgfProcessingStatus.Invalid;
+                    return;
+                }
             }
             else
             {
-                toast = RgfToastEventArgs.CreateActionEvent(RecroDict.GetRgfUiString("Request"), Manager.EntityDesc.MenuTitle, RecroDict.GetRgfUiString("Redraw"), delay: 0);
-                await Manager.ToastManager.RaiseEventAsync(toast, this);
-                await ApexChartRef.UpdateChart();
+                toast = suppressToast
+                    ? null
+                    : RgfToastEventArgs.CreateActionEvent(RecroDict.GetRgfUiString("Request"), Manager.EntityDesc.MenuTitle, RecroDict.GetRgfUiString("Redraw"), delay: 0);
+                if (toast != null)
+                {
+                    await Manager.ToastManager.RaiseEventAsync(toast, this);
+                }
+                if (!await RenderCurrentVisualizationAsync(toast, redrawOnly: true))
+                {
+                    RgfChartRef.ChartStatus = RgfProcessingStatus.Invalid;
+                    return;
+                }
             }
-            await Manager.ToastManager.RaiseEventAsync(toast.RecreateAsSuccess(RecroDict.GetRgfUiString("Processed"), delay: 2000), this);
+            if (toast != null)
+            {
+                await Manager.ToastManager.RaiseEventAsync(toast.RecreateAsSuccess(RecroDict.GetRgfUiString("Processed"), delay: 2000), this);
+            }
             RgfChartRef.ChartStatus = RgfProcessingStatus.Valid;
         }
         catch
@@ -347,6 +393,8 @@ public abstract class BaseChartComponent : ComponentBase, IAsyncDisposable
     protected Task ChangeChartType(RgfChartSeriesType seriesType)
     {
         _chartSettings.SeriesType = seriesType;
+        ApexChartSettings.ChartType = seriesType;
+        ApexChartSettings.Card = null;
         switch (seriesType)
         {
             case RgfChartSeriesType.Bar:
@@ -364,8 +412,42 @@ public abstract class BaseChartComponent : ComponentBase, IAsyncDisposable
             case RgfChartSeriesType.Donut:
                 ApexChartSettings.SeriesType = SeriesType.Donut;
                 break;
+
+            case RgfChartSeriesType.Card:
+                break;
         }
         return TryUpdateChart();
+    }
+
+    private async Task<bool> RenderCurrentVisualizationAsync(RgfToastEventArgs? toast, bool redrawOnly = false)
+    {
+        if (_chartSettings.SeriesType == RgfChartSeriesType.Card)
+        {
+            var cardModel = RgfChartRef.CreateCardModel();
+            if (cardModel == null)
+            {
+                if (toast != null)
+                {
+                    await Manager.ToastManager.RaiseEventAsync(toast.Remove(), this);
+                }
+                await Manager.ToastManager.RaiseEventAsync(new RgfToastEventArgs(RecroDict.GetRgfUiString("Warning"), "Card view requires exactly one aggregated result.", RgfToastType.Warning), this);
+                return false;
+            }
+
+            await ApexChartRef.RenderCardAsync(cardModel);
+            return true;
+        }
+
+        if (redrawOnly)
+        {
+            await ApexChartRef.UpdateChart();
+        }
+        else
+        {
+            await ApexChartRef.RenderChartAsync(_chartSettings.AggregationSettings, RgfChartRef.DataColumns, RgfChartRef.ChartData);
+        }
+
+        return true;
     }
 
     protected Task ChangedStacked(bool value)
@@ -392,11 +474,32 @@ public abstract class BaseChartComponent : ComponentBase, IAsyncDisposable
     protected Task ChangedLegend(bool value)
     {
         _chartSettings.Legend = value;
-        ApexChartSettings.Options.Legend = !value ? default : new Legend
-        {
-            Formatter = @"function(seriesName, opts) { return [seriesName, ' - ', opts.w.globals.series[opts.seriesIndex].toLocaleString()] }"
-        };
+        ApexChartSettings.Options.Legend = !value ? default : new Legend();
+        ApplyValueFormatters();
         return TryUpdateChart();
+    }
+
+    private void ApplyValueFormatters()
+    {
+        var cultureInfo = _recroSec.UserCultureInfo();
+        var valueFormatter = ApexChartJsValueFormatter.CreateValueFormatter(cultureInfo);
+
+        ApexChartSettings.Options.DataLabels.Formatter = valueFormatter;
+
+        foreach (var yAxis in ApexChartSettings.Options.Yaxis)
+        {
+            yAxis.Labels ??= new YAxisLabels();
+            yAxis.Labels.Formatter = valueFormatter;
+        }
+
+        ApexChartSettings.Options.Tooltip ??= new Tooltip();
+        ApexChartSettings.Options.Tooltip.Y ??= new TooltipY();
+        ApexChartSettings.Options.Tooltip.Y.Formatter = ApexChartJsValueFormatter.CreateTooltipYFormatter(cultureInfo);
+
+        if (ApexChartSettings.Options.Legend != null)
+        {
+            ApexChartSettings.Options.Legend.Formatter = ApexChartJsValueFormatter.CreateLegendFormatter(cultureInfo);
+        }
     }
 
     protected Task ChangeTheme(Mode? value)
@@ -406,7 +509,7 @@ public abstract class BaseChartComponent : ComponentBase, IAsyncDisposable
         return TryUpdateChart();
     }
 
-    protected virtual Task ChangePalette(string palette)
+    protected virtual Task ChangePalette(string? palette)
     {
         if (!string.IsNullOrEmpty(palette) && Enum.TryParse(palette, out PaletteType acPalette))
         {

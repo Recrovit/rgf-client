@@ -22,7 +22,7 @@ public sealed class RgfDashboardPaneMetadata
 
 public sealed class RgfDashboardRenderState
 {
-    public RgfDashboardDefinition Dashboard { get; init; } = RgfDashboardDefinitionHelper.CreateLocalDashboard();
+    public RgfDashboardDefinition Dashboard { get; init; } = new();
 
     public string Snapshot { get; init; } = string.Empty;
 
@@ -51,30 +51,9 @@ public static class RgfDashboardDefinitionHelper
         RecroDictDashboard = await recroDict.GetDictionaryAsync("RGF.UI.Dashboard", authClient: false);
     }
 
-    public static RgfDashboardDefinition CreateLocalDashboard()
-    {
-        var dashboard = new RgfDashboardDefinition()
-        {
-            DashboardId = 0,
-            Name = null,
-            Description = null,
-            RoleId = null,
-            LayoutVersion = 1,
-            IsReadonly = false,
-            Layout = new RgfDashboardLayout()
-            {
-                Items = [],
-                RootPane = new RgfDashboardPane()
-            }
-        };
-
-        dashboard.Normalize();
-        return dashboard;
-    }
-
     public static RgfDashboardDefinition CreateNormalizedCopy(RgfDashboardDefinition? dashboard, bool pruneOrphanItems = false)
     {
-        var normalizedDashboard = dashboard.DeepCopy() ?? RgfDashboardDefinitionHelper.CreateLocalDashboard();
+        var normalizedDashboard = dashboard.DeepCopy() ?? new();
         normalizedDashboard.Normalize();
 
         if (pruneOrphanItems)
@@ -106,11 +85,8 @@ public static class RgfDashboardDefinitionHelper
         dashboard.Name = string.IsNullOrWhiteSpace(dashboard.Name) ? null : dashboard.Name.Trim();
         dashboard.Description = string.IsNullOrWhiteSpace(dashboard.Description) ? null : dashboard.Description.Trim();
         dashboard.RoleId = string.IsNullOrWhiteSpace(dashboard.RoleId) ? null : dashboard.RoleId;
-        dashboard.Layout ??= new();
         dashboard.Layout.Width = dashboard.Layout.Width is > 0 ? dashboard.Layout.Width : null;
         dashboard.Layout.Height = dashboard.Layout.Height is > 0 ? dashboard.Layout.Height : null;
-        dashboard.Layout.Items ??= [];
-        dashboard.Layout.RootPane ??= new();
 
         foreach (var item in dashboard.Layout.Items)
         {
@@ -120,9 +96,6 @@ public static class RgfDashboardDefinitionHelper
             }
 
             item.Title = string.IsNullOrWhiteSpace(item.Title) ? null : item.Title.Trim();
-            item.ViewReference ??= new();
-            item.ViewReference.EntityName = string.IsNullOrWhiteSpace(item.ViewReference.EntityName) ? string.Empty : item.ViewReference.EntityName.Trim();
-            item.ViewReference.SettingsName = string.IsNullOrWhiteSpace(item.ViewReference.SettingsName) ? null : item.ViewReference.SettingsName.Trim();
         }
 
         NormalizePane(dashboard.Layout.RootPane, [], new HashSet<RgfDashboardPane>(ReferenceEqualityComparer.Instance));
@@ -150,7 +123,7 @@ public static class RgfDashboardDefinitionHelper
             {
                 issues?.Add(CreateIssue(
                     "item-id-invalid",
-                    $"Dashboard item '{GetItemName(item, i)}' must have a non-zero positive DashboardItemId.",
+                    $"Dashboard item '{GetDisplayTitle(item)}' must have a non-zero positive DashboardItemId.",
                     dashboardItemId: item.DashboardItemId));
                 continue;
             }
@@ -218,7 +191,27 @@ public static class RgfDashboardDefinitionHelper
     }
 
     public static string GetDisplayTitle(RgfDashboardItem? item)
-        => item?.Title ?? item?.ViewReference?.SettingsName ?? item?.ViewReference?.EntityName ?? "View";
+    {
+        var title = item?.Title?.Trim();
+        if (!string.IsNullOrEmpty(title))
+        {
+            return title;
+        }
+
+        var settingsName = item?.ViewReference?.SettingsName?.Trim();
+        if (!string.IsNullOrEmpty(settingsName))
+        {
+            return settingsName;
+        }
+
+        var entityName = item?.ViewReference?.EntityName?.Trim();
+        if (!string.IsNullOrEmpty(entityName))
+        {
+            return entityName;
+        }
+
+        return "View";
+    }
 
     public static RgfDashboardPane? FindPane(RgfDashboardPane? pane, string? paneId)
     {
@@ -251,8 +244,6 @@ public static class RgfDashboardDefinitionHelper
 
     private static void NormalizePane(RgfDashboardPane pane, HashSet<string> knownPaneIds, HashSet<RgfDashboardPane> visitedPanes)
     {
-        pane.PaneId = CreateUniquePaneId(pane.PaneId, knownPaneIds);
-
         if (!visitedPanes.Add(pane))
         {
             pane.DashboardItemId = null;
@@ -319,33 +310,6 @@ public static class RgfDashboardDefinitionHelper
         {
             CollectReferencedItemIds(child?.Pane, referencedItemIds);
         }
-    }
-
-    private static string CreateUniquePaneId(string? paneId, HashSet<string> knownPaneIds)
-    {
-        var normalizedPaneId = string.IsNullOrWhiteSpace(paneId) ? null : paneId.Trim();
-
-        if (!string.IsNullOrEmpty(normalizedPaneId) && knownPaneIds.Add(normalizedPaneId))
-        {
-            return normalizedPaneId;
-        }
-
-        string generatedPaneId;
-        do
-        {
-            generatedPaneId = Guid.NewGuid().ToString("N");
-        }
-        while (!knownPaneIds.Add(generatedPaneId));
-
-        return generatedPaneId;
-    }
-
-    private static string GetItemName(RgfDashboardItem item, int index = -1)
-    {
-        var name = GetDisplayTitle(item);
-        return !string.IsNullOrWhiteSpace(name)
-            ? name
-            : index >= 0 ? $"Item {index}" : "Item";
     }
 
     private static RgfDashboardValidationIssue CreateIssue(

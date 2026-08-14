@@ -1,5 +1,5 @@
-﻿using System;
-using System.Linq;
+﻿#nullable enable
+
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -14,6 +14,7 @@ public class RgfGridSetting : ICloneable
         if (gridSetting != null)
         {
             GridSettingsId = gridSetting.GridSettingsId;
+            ExportKey = gridSetting.ExportKey;
             SettingsName = gridSetting.SettingsName;
             RoleId = gridSetting.RoleId;
             IsReadonly = gridSetting.IsReadonly;
@@ -24,17 +25,20 @@ public class RgfGridSetting : ICloneable
     public int? GridSettingsId { get; set; }
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public string SettingsName { get; set; }
+    public string? ExportKey { get; set; }
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public string RoleId { get; set; }
+    public string? SettingsName { get; set; }
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public bool? IsReadonly { get; set; }
+    public string? RoleId { get; set; }
 
-    public virtual object Clone() => DeepCopy(this);
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool IsReadonly { get; set; }
 
-    public static RgfGridSetting DeepCopy(RgfGridSetting source) => source == null ? null : new RgfGridSetting(source);
+    public virtual object Clone() => DeepCopy(this)!;
+
+    public static RgfGridSetting? DeepCopy(RgfGridSetting source) => source == null ? null : new RgfGridSetting(source);
 }
 
 public class RgfGridSettings : RgfGridSetting
@@ -58,13 +62,13 @@ public class RgfGridSettings : RgfGridSetting
     }
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public RgfColumnSettings[] ColumnSettings { get; set; }
+    public RgfColumnSettings[]? ColumnSettings { get; set; }
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public int[][] Sort { get; set; }
+    public int[][]? Sort { get; set; }
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public RgfFilter.Condition[] Conditions { get; set; }
+    public RgfFilter.Condition[]? Conditions { get; set; }
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public int? PageSize { get; set; }
@@ -72,7 +76,7 @@ public class RgfGridSettings : RgfGridSetting
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public int? SQLTimeout { get; set; }
 
-    public override object Clone() => DeepCopy(this);
+    public override object Clone() => DeepCopy(this)!;
 
-    public static RgfGridSettings DeepCopy(RgfGridSettings source) => source == null ? null : new RgfGridSettings(source);
+    public static RgfGridSettings? DeepCopy(RgfGridSettings source) => source == null ? null : new RgfGridSettings(source);
 }

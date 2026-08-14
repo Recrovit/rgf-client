@@ -53,11 +53,21 @@ public static class RgfDashboardLayoutValidator
                 continue;
             }
 
-             if (item.ViewReference == null || string.IsNullOrWhiteSpace(item.ViewReference.EntityName))
+            if (item.ViewReference == null || string.IsNullOrWhiteSpace(item.ViewReference.EntityName))
             {
                 issues.Add(CreateIssue(
                     "item-entity-missing",
                     $"Dashboard item '{GetItemName(item)}' (DashboardItemId: {item.DashboardItemId}) is missing its entity reference.",
+                    dashboardItemId: item.DashboardItemId));
+            }
+
+            if (mode == RgfDashboardValidationMode.Designer
+                && item.ViewReference != null
+                && string.IsNullOrWhiteSpace(item.ViewReference.SettingsName))
+            {
+                issues.Add(CreateIssue(
+                    "item-settings-name-missing",
+                    $"Dashboard item '{GetItemName(item)}' (DashboardItemId: {item.DashboardItemId}) is missing its saved view name.",
                     dashboardItemId: item.DashboardItemId));
             }
 

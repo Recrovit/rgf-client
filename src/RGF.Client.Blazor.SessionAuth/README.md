@@ -1,6 +1,6 @@
 # Recrovit.RecroGridFramework.Client.Blazor.SessionAuth
 
-[![NuGet Version](https://img.shields.io/nuget/v/Recrovit.RecroGridFramework.Client.Blazor.SessionAuth.svg?label=Recrovit.RecroGridFramework.Client.Blazor.SessionAuth)](https://www.nuget.org/packages/RGF.Client.Blazor.SessionAuth/)
+[![NuGet Version](https://img.shields.io/nuget/v/Recrovit.RecroGridFramework.Client.Blazor.SessionAuth.svg?label=Recrovit.RecroGridFramework.Client.Blazor.SessionAuth)](https://www.nuget.org/packages/Recrovit.RecroGridFramework.Client.Blazor.SessionAuth/)
 
 Official Website: [RecroGrid Framework](https://RecroGridFramework.com)
 
@@ -164,7 +164,7 @@ Public routes continue to render without login redirection even after session in
 
 ## Related Packages
 
-- [`Recrovit.AspNetCore.Components.RoutingCore`](https://www.nuget.org/packages/Recrovit.AspNetCore.Components.RoutingCore/): route classification and host/client rendering infrastructure used by the RGF Blazor host integration packages
+- [`Recrovit.AspNetCore.Components.Routing`](https://www.nuget.org/packages/Recrovit.AspNetCore.Components.Routing/): route classification and host/client rendering infrastructure used by the RGF Blazor host integration packages
 - [`Recrovit.RecroGridFramework.Client.Blazor.Host.OpenIdConnect`](https://www.nuget.org/packages/Recrovit.RecroGridFramework.Client.Blazor.Host.OpenIdConnect/): typical server-side host integration that brings in the SessionAuth SSR infrastructure
 - [`Recrovit.RecroGridFramework.Client.Blazor`](https://www.nuget.org/packages/Recrovit.RecroGridFramework.Client.Blazor/): core RGF Blazor integration
 - [`Recrovit.RecroGridFramework.Client`](https://www.nuget.org/packages/Recrovit.RecroGridFramework.Client/): base client runtime and HTTP services

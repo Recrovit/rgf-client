@@ -1,23 +1,70 @@
-﻿<ApexChart TItem="ChartSerieData"
-           Title="@ChartSettings.Title"
-           Options="@ChartSettings.Options"
-           Width="@ChartSettings.Width"
-           Height="@ChartSettings.Height"
-           @ref=_chartRef>
+@using Recrovit.RecroGridFramework.Abstraction.Models
 
-    @foreach (var serie in ChartSettings.Series)
-    {
-        <ApexPointSeries TItem="ChartSerieData"
-                         Items="@serie.Data"
-                         Name="@serie.Name"
-                         SeriesType="(SeriesType)ChartSettings.SeriesType"
-                         XValue="@(e => e.X)"
-                         YValue="@(e => e.Y)"
-                         ShowDataLabels="ChartSettings.ShowDataLabels" />
-    }
-</ApexChart>
+@if (ChartSettings.ChartType == RgfChartSeriesType.Card && ChartSettings.Card != null)
+{
+    <div class="rgf-apexchart-card-view" style="@GetCardStyle()">
+        @if (ChartSettings.ShowDataLabels && !string.IsNullOrWhiteSpace(ChartSettings.Card.Title))
+        {
+            <div class="rgf-apexchart-card-view-title">@ChartSettings.Card.Title</div>
+        }
+        <div class="rgf-apexchart-card-view-value">@ChartSettings.Card.Value</div>
+        @if (!string.IsNullOrWhiteSpace(ChartSettings.Card.Remark))
+        {
+            <div class="rgf-apexchart-card-view-remark">@ChartSettings.Card.Remark</div>
+        }
+    </div>
+}
+else
+{
+    <ApexChart TItem="ChartSerieData"
+               Options="@ChartSettings.Options"
+               Width="@ChartSettings.Width"
+               Height="@ChartSettings.Height"
+               @ref=_chartRef>
+
+        @foreach (var serie in ChartSettings.Series)
+        {
+            <ApexPointSeries TItem="ChartSerieData"
+                             Items="@serie.Data"
+                             Name="@serie.Name"
+                             SeriesType="(SeriesType)ChartSettings.SeriesType"
+                             XValue="@(e => e.X)"
+                             YValue="@(e => e.Y)"
+                             ShowDataLabels="ChartSettings.ShowDataLabels" />
+        }
+    </ApexChart>
+}
 
 @code {
     [Parameter, EditorRequired]
     public ApexChartSettings ChartSettings { get; set; } = null!;
+
+    private string GetCardStyle()
+    {
+        var styles = new List<string>
+        {
+            "min-width:0",
+            "min-height:0"
+        };
+
+        if (ChartSettings.Width is > 0)
+        {
+            styles.Add($"width:{ChartSettings.Width.Value}px");
+        }
+        else
+        {
+            styles.Add("width:100%");
+        }
+
+        if (ChartSettings.Height is > 0)
+        {
+            styles.Add($"height:{ChartSettings.Height.Value}px");
+        }
+        else
+        {
+            styles.Add("height:100%");
+        }
+
+        return string.Join(';', styles) + ";";
+    }
 }

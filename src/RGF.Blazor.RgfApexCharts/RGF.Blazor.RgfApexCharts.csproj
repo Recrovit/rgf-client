@@ -17,7 +17,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Blazor-ApexCharts" Version="6.1.0" />
+    <PackageReference Include="Blazor-ApexCharts" Version="7.0.0" />
   </ItemGroup>
 
   <ItemGroup>
@@ -25,6 +25,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Update="Components\ApexChartComponent.razor.css" CssScope="rgf-apexchart-view" />
     <None Update="Components\ChartComponent.razor.css" CssScope="rgf-apexcharts" />
   </ItemGroup>
 

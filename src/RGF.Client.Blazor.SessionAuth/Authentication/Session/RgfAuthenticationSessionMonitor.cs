@@ -82,6 +82,11 @@ internal sealed class RgfAuthenticationSessionMonitor(
             shouldRedirect = requiresAuthentication && !_hasValidSession;
         }
 
+        if (!requiresAuthentication)
+        {
+            Interlocked.Exchange(ref _loginNavigationStarted, 0);
+        }
+
         if (shouldRedirect)
         {
             NavigateToLoginOnce();

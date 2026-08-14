@@ -1,5 +1,5 @@
 ﻿/*!
-* recrovit-rgf-blazor.js v1.1.0
+* recrovit-rgf-blazor.js v1.1.1
 */
 
 window.Recrovit = window.Recrovit || {};
@@ -87,5 +87,8 @@ Blazor.Client = {
         anchorElement.click();
         anchorElement.remove();
         URL.revokeObjectURL(url);
+    },
+    removeElementById(id) {
+        document.getElementById(id)?.remove();
     }
 };
