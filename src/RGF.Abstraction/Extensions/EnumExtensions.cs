@@ -50,7 +50,7 @@ public static class EnumExtensions
     /// <remarks>
     /// This method can be used to retrieve specific information from custom attributes applied to enum members.
     /// For example, if an enum member has a <see cref="System.ComponentModel.DataAnnotations.DisplayAttribute"/>,
-    /// the value can be retrieved using this method by passing a function that selects the <see cref="DisplayAttribute.Name"/> property:
+    /// the value can be retrieved using this method by passing a function that selects the <see cref="System.ComponentModel.DataAnnotations.DisplayAttribute.Name"/> property:
     /// 
     /// <code>
     /// public enum Status
@@ -64,9 +64,10 @@ public static class EnumExtensions
     ///     [Display(Name = "Rejected")]
     ///     Rejected
     /// }
+    /// </code>
     /// 
     /// // Example usage:
-    /// var statusName = Status.Pending.GetAttributeValue<DisplayAttribute>(attr => attr.Name);
+    /// var statusName = Status.Pending.GetAttributeValue&lt;DisplayAttribute&gt;(attr => attr.Name);
     /// </remarks>
     public static string GetAttributeValue<TAttribute>(this Enum enumerator, Func<TAttribute, string> valueSelector, string defaultValue = null) where TAttribute : Attribute
     {

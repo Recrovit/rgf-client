@@ -433,6 +433,7 @@ src/Directory.Build.targets
 .codex/config.toml
 **/AGENTS.md
 
-/docs/*/Help
+/docs/
+/src/**/docs/
 
 /.idea/*
