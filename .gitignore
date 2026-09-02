@@ -427,6 +427,8 @@ FodyWeavers.xsd
 *.msm
 *.msp
 
+/.idea/*
+
 **/appsettings.*.json
 src/Directory.Build.targets
 
@@ -435,5 +437,4 @@ src/Directory.Build.targets
 
 /docs/
 /src/**/docs/
-
-/.idea/*
+/.agents/rgf-docs/guidelines.md
