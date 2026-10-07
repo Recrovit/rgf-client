@@ -30,6 +30,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\RGF.Client.Blazor.SessionAuth\RGF.Client.Blazor.SessionAuth.csproj" />
+    <ProjectReference Include="..\..\src\RGF.Client.Blazor.Host.OpenIdConnect\RGF.Client.Blazor.Host.OpenIdConnect.csproj" />
   </ItemGroup>
 
 </Project>
