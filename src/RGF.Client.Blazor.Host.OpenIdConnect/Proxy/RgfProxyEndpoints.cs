@@ -72,6 +72,13 @@ public static class RgfProxyEndpoints
             .DisableAuthRedirects()
             .WithSummary("Proxies authorized RGF API calls to the downstream API.");
 
+        // RGF-DOC: rgf.client.recroby.integration
+        endpoints.MapPost("/api/rgf/ai/recroby", ProxyAuthorizedAsync)
+            .AsProxyEndpoint()
+            .WithForwardedRgfHeaders()
+            .RequireAuthorization()
+            .DisableAuthRedirects()
+            .WithSummary("Proxies authenticated Recroby turns to the downstream RGF API.");
         return endpoints;
     }
 

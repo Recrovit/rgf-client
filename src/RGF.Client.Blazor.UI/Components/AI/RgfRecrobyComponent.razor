@@ -1,0 +1,15 @@
+@using Recrovit.RecroGridFramework.Client.AI
+@using Recrovit.RecroGridFramework.Client.AI.Transport
+@inject IRgfApiService Api
+
+@* RGF-DOC: rgf.client.recroby.integration *@
+<RgfAiChatComponent Session="_session" />
+
+@code {
+    private RgfAiConversationSession _session = null!;
+
+    protected override void OnInitialized()
+    {
+        _session = new RgfAiConversationSession(new RgfAiApiTransport(Api));
+    }
+}
