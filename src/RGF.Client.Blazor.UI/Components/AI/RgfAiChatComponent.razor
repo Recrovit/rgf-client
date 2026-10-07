@@ -1,0 +1,20 @@
+@using Recrovit.RecroGridFramework.Abstraction.Contracts.AI
+
+<div class="container mt-4">
+    <div class="chat-box d-flex flex-column">
+        @foreach (var message in Session.Conversation.Messages)
+        {
+            <div class="message @(message.Role == RgfAiMessageRole.User ? "text-bg-primary align-self-end" : "text-bg-secondary align-self-start")">
+                @message.Message
+            </div>
+        }
+        @if (Session.IsProcessing)
+        {
+            <SpinnerComponent Style="width: 2rem; height: 2rem;" />
+        }
+    </div>
+    <div class="input-group mt-3">
+        <RgfInputText Id="@InputId" @bind-Value="Prompt" Multiline="true" />
+    </div>
+    <RgfButton CssClass="btn-primary m-1" MinWidth="5rem" Label="Send" OnClick="OnSendAsync" Disabled="Session.IsProcessing" />
+</div>

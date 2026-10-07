@@ -50,6 +50,7 @@ public sealed class RgfAiCustomFunctionTransportTests
         fake.Call = context =>
         {
             Assert.Equal(Options.FunctionName, context.FunctionName);
+            Assert.False(context.RequireQueryParams);
             Assert.True(context.EnableProgressTracking);
             Assert.Null(context.ProgressChangedAsync);
             Assert.Same(toast, context.Toast);
@@ -66,6 +67,7 @@ public sealed class RgfAiCustomFunctionTransportTests
         var request = new RgfAiRequest { CurrentUserMessage = "turn" };
         Assert.Equal("answer", (await transport.SendAsync(request, TestContext.Current.CancellationToken)).Message);
         Assert.Same(request, fake.Context!.CustomParams![Options.RequestParameterName]);
+        Assert.Single(fake.Context.CustomParams);
     }
 
     [Theory]

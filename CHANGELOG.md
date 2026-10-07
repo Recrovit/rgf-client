@@ -6,6 +6,7 @@ This file contains the consolidated release history for the `rgf-client` solutio
 
 ### Features Added
 
+- Added a reusable Blazor AI chat with message history, multiline prompts, processing feedback and optional send-failure callbacks. Hosts supply a conversation session without grid or application dependencies.
 - Added shared, provider-independent RGF AI conversation contracts with message history, thread continuation, model selection, extension parameters and token, timing and currency-aware cost metadata.
 - Added UI-independent AI conversation state with read-only presentation history, conversation continuation and model selection. Programmatic requests can be created without adding displayed chat messages; backend history remains authoritative.
 - Added independent AI conversation sessions with turn lifecycle, cancellation and configurable transports. Grid hosts can adapt existing CustomFunctions and final progress responses without taking ownership of progress connections.
