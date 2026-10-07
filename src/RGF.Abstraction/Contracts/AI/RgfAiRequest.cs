@@ -3,10 +3,10 @@
 namespace Recrovit.RecroGridFramework.Abstraction.Contracts.AI;
 
 // RGF-DOC: rgf.client.abstraction.ai-contracts
-/// <summary>A conversation turn with its complete message history and optional execution settings.</summary>
+/// <summary>A conversation turn with one or more messages and optional execution settings.</summary>
 public class RgfAiRequest
 {
-    /// <summary>Conversation history in chronological order, including the current user message.</summary>
+    /// <summary>Messages for this turn in chronological order. Complete authoritative history is not required; backend runtimes may own it.</summary>
     public List<RgfAiMessage> Messages { get; set; } = [];
 
     /// <summary>Convenience access to the current user message in <see cref="Messages"/>.</summary>
