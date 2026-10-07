@@ -23,6 +23,10 @@ Because of this, [`Recrovit.RecroGridFramework.Client`](https://www.nuget.org/pa
 
 ## What The Package Contains
 
+### AI conversation state
+
+`RgfAiConversationState` manages conversation identity, model selection and read-only presentation history independently of UI and transport. Creating a request does not add displayed messages or copy presentation history; the backend owns conversation history.
+
 ### API client implementation
 
 The central implementation is `ApiService`, which provides the concrete implementation of `IRgfApiService`.

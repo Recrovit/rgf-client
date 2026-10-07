@@ -7,6 +7,7 @@ This file contains the consolidated release history for the `rgf-client` solutio
 ### Features Added
 
 - Added shared, provider-independent RGF AI conversation contracts with message history, thread continuation, model selection, extension parameters and token, timing and currency-aware cost metadata.
+- Added UI-independent AI conversation state with read-only presentation history, conversation continuation and model selection. Programmatic requests can be created without adding displayed chat messages; backend history remains authoritative.
 
 ## [10.3.0] - 2026-08-14
 
