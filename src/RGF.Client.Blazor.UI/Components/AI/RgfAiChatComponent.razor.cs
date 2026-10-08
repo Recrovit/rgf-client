@@ -14,10 +14,20 @@ public partial class RgfAiChatComponent : IDisposable
     [Parameter]
     public EventCallback<Exception> SendFailed { get; set; }
 
+    [Parameter]
+    public bool ShowSendErrors { get; set; }
+
+    [Parameter] public bool AllowCancellation { get; set; }
+
     private string InputId { get; } = RgfBaseComponent.GetNextId();
     private string Prompt { get; set; } = string.Empty;
     private RgfAiConversationSession? subscribedSession;
     private volatile bool disposed;
+    private CancellationTokenSource? _sendCancellation;
+    private string? _sendError;
+    private string? _errorKind;
+
+    private void CancelSend() => _sendCancellation?.Cancel();
 
     protected override void OnParametersSet()
     {
@@ -55,22 +65,37 @@ public partial class RgfAiChatComponent : IDisposable
         }
         var message = Prompt.Trim();
         Prompt = string.Empty;
+        _sendError = null;
+        using var cancellation = new CancellationTokenSource();
+        _sendCancellation = cancellation;
         try
         {
-            await Session.SendAsync(message);
+            var response = await Session.SendAsync(message, cancellationToken: cancellation.Token);
+            if (!response.Success)
+            {
+                _errorKind = "workflow";
+                _sendError = "The Recroby workflow could not complete the request.";
+            }
         }
         catch (Exception exception)
         {
+            _errorKind = exception is OperationCanceledException ? "cancelled" : "transport";
+            _sendError = exception is OperationCanceledException ? "Request cancelled." : "The Recroby service could not be reached or returned an invalid response. Please try again.";
             if (SendFailed.HasDelegate)
             {
                 await SendFailed.InvokeAsync(exception);
             }
+        }
+        finally
+        {
+            if (ReferenceEquals(_sendCancellation, cancellation)) _sendCancellation = null;
         }
     }
 
     public void Dispose()
     {
         disposed = true;
+        if (AllowCancellation) _sendCancellation?.Cancel();
         if (subscribedSession != null)
         {
             subscribedSession.StateChanged -= OnSessionStateChanged;

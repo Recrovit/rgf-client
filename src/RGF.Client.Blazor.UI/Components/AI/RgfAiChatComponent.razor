@@ -16,5 +16,13 @@
     <div class="input-group mt-3">
         <RgfInputText Id="@InputId" @bind-Value="Prompt" Multiline="true" />
     </div>
-    <RgfButton CssClass="btn-primary m-1" MinWidth="5rem" Label="Send" OnClick="OnSendAsync" Disabled="Session.IsProcessing" />
+    <RgfButton CssClass="btn-primary m-1 align-self-start" MinWidth="5rem" Label="Send" OnClick="OnSendAsync" Disabled="Session.IsProcessing" />
+    @if (AllowCancellation && Session.IsProcessing && _sendCancellation != null)
+    {
+        <button type="button" class="btn btn-outline-secondary m-1 align-self-start" @onclick="CancelSend" aria-label="Cancel request">Cancel</button>
+    }
+    @if (ShowSendErrors && _sendError != null)
+    {
+        <div class="alert @(_errorKind == "workflow" ? "alert-warning" : "alert-danger") mt-2 mb-0" role="alert" data-error-kind="@_errorKind">@_sendError</div>
+    }
 </div>

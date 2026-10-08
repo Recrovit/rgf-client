@@ -1,10 +1,21 @@
-﻿@ChildContent
+@using Recrovit.RecroGridFramework.Client.Blazor.UI.Components.AI
+
+@* RGF-DOC: rgf.client.recroby.integration *@
+@if (EnableRecroby)
+{
+    <RgfRecrobyWorkspace>@ChildContent</RgfRecrobyWorkspace>
+}
+else
+{
+    @ChildContent
+}
 
 <ToastComponent />
 
 @code {
-
     [Parameter]
     public RenderFragment? ChildContent { get; set; }
 
+    [Parameter]
+    public bool EnableRecroby { get; set; } = true;
 }

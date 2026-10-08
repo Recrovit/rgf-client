@@ -1,18 +1,25 @@
 @using Recrovit.RecroGridFramework.Client.AI
 @using Recrovit.RecroGridFramework.Client.AI.Transport
-@inject IRgfApiService Api
+@inject IServiceProvider Services
 
 @* RGF-DOC: rgf.client.recroby.integration *@
-<RgfAiChatComponent Session="_session" SendFailed="SendFailed" />
+<RgfAiChatComponent Session="@(Session ?? _session!)" SendFailed="SendFailed" ShowSendErrors="true" AllowCancellation="true" />
 
 @code {
     [Parameter]
     public EventCallback<Exception> SendFailed { get; set; }
 
-    private RgfAiConversationSession _session = null!;
+    [Parameter]
+    public RgfAiConversationSession? Session { get; set; }
 
-    protected override void OnInitialized()
+    private RgfAiConversationSession? _session;
+
+    protected override void OnParametersSet()
     {
-        _session = new RgfAiConversationSession(new RgfAiApiTransport(Api));
+        if (Session == null)
+        {
+            _session ??= new RgfAiConversationSession(new RgfAiApiTransport(
+                Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetRequiredService<IRgfApiService>(Services)));
+        }
     }
 }

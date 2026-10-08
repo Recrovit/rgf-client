@@ -6,8 +6,7 @@ This file contains the consolidated release history for the `rgf-client` solutio
 
 ### Features Added
 
-- Added a general Recroby chat backed by the authenticated RGF API, with a separate conversation per component and support for OpenIdConnect proxy hosts.
-
+- Added an integrated Recroby Workspace with multiple conversations, a compact searchable conversation switcher, floating and docked layouts, and mobile support.
 - Added a reusable Blazor AI chat with message history, multiline prompts, processing feedback and optional send-failure callbacks. Hosts supply a conversation session without grid or application dependencies.
 - Added shared, provider-independent RGF AI conversation contracts with message history, thread continuation, model selection, extension parameters and token, timing and currency-aware cost metadata.
 - Added UI-independent AI conversation state with read-only presentation history, conversation continuation and model selection. Programmatic requests can be created without adding displayed chat messages; backend history remains authoritative.

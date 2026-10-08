@@ -1,0 +1,70 @@
+@* RGF-DOC: rgf.client.recroby.integration *@
+<div @ref="_element" class="rgf-recroby-workspace" data-mode="@_layout.Mode" data-collapsed="@_layout.IsCollapsed.ToString().ToLowerInvariant()">
+    <div class="rgf-recroby-content">@ChildContent</div>
+    <button type="button" class="rgf-recroby-launcher btn btn-primary" hidden="@(!_layout.IsCollapsed)" aria-label="Open Recroby" aria-expanded="false" @onclick="() => _layout.IsCollapsed = false"><i class="bi bi-robot" aria-hidden="true"></i> Recroby</button>
+    <section class="rgf-recroby-panel card" aria-label="Recroby" hidden="@_layout.IsCollapsed">
+        <header class="card-header d-flex flex-wrap align-items-center gap-2" data-drag-handle>
+            <strong><i class="bi bi-robot" aria-hidden="true"></i> Recroby</strong>
+            <div class="dropdown ms-auto rgf-recroby-desktop-controls">
+                <button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false" title="Window layout" aria-label="Window layout"><i class="bi bi-window" aria-hidden="true"></i></button>
+                <ul class="dropdown-menu dropdown-menu-end">
+                @foreach (var mode in Enum.GetValues<RgfRecrobyWindowMode>())
+                {
+                    var (icon, label) = mode switch
+                    {
+                        RgfRecrobyWindowMode.DockLeft => ("bi-layout-sidebar", "Dock left"),
+                        RgfRecrobyWindowMode.DockRight => ("bi-layout-sidebar-reverse", "Dock right"),
+                        RgfRecrobyWindowMode.DockBottom => ("bi-window-dock", "Dock bottom"),
+                        _ => ("bi-window", "Floating window")
+                    };
+                    <li><button type="button" class="dropdown-item @(_layout.Mode == mode ? "active" : "")" data-dock="@mode" title="@label" aria-label="@label" aria-pressed="@((_layout.Mode == mode).ToString().ToLowerInvariant())" @onclick="() => SetMode(mode)"><i class="bi @icon" aria-hidden="true"></i><span class="ms-2">@label</span></button></li>
+                }
+                </ul>
+            </div>
+            <button type="button" class="btn btn-sm btn-outline-secondary" aria-label="Collapse Recroby" @onclick="Collapse">−</button>
+        </header>
+        <div class="card-header rgf-recroby-conversation-bar" @onkeydown="SwitcherKeyDown">
+            <button id="@_selectorId" type="button" class="btn btn-sm btn-outline-secondary rgf-recroby-selector" data-action="switch"
+                    aria-label="Choose conversation" aria-haspopup="dialog" aria-expanded="@_switcherOpen.ToString().ToLowerInvariant()" aria-controls="@(_selectorId + "-list")"
+                    title="@($"{_active?.RecrobyType}: {_active?.Title}")" @onclick="ToggleSwitcher">
+                <span class="rgf-recroby-type">@_active?.RecrobyType</span>
+                <span class="rgf-recroby-title">@_active?.Title</span>
+                <i class="bi bi-chevron-down" aria-hidden="true"></i>
+            </button>
+            <button type="button" class="btn btn-sm btn-outline-secondary" data-action="new" title="New conversation" aria-label="New conversation" @onclick="NewConversation"><i class="bi bi-plus-lg" aria-hidden="true"></i></button>
+            <div id="@(_selectorId + "-list")" class="rgf-recroby-switcher" popover="manual" hidden="@(!_switcherOpen)" role="dialog" aria-label="Conversations">
+                @if (_conversations.Count > 8)
+                {
+                    <input type="search" class="form-control form-control-sm" aria-label="Search conversations" placeholder="Search conversations" @bind="_search" @bind:event="oninput" />
+                }
+                <div class="rgf-recroby-switcher-list">
+                    @foreach (var group in FilteredConversations.GroupBy(c => c.RecrobyType))
+                    {
+                        <div role="group" aria-label="@group.Key" data-conversation-type="@group.Key">
+                            <div class="rgf-recroby-group-title">@group.Key</div>
+                            @foreach (var conversation in group)
+                            {
+                                <div class="rgf-recroby-choice @(conversation == _active ? "active" : "")" @key="conversation.Id">
+                                    <button type="button" class="rgf-recroby-choice-select" data-action="select" title="@conversation.Title"
+                                            aria-controls="@($"recroby-panel-{conversation.Id:N}")" aria-pressed="@((conversation == _active).ToString().ToLowerInvariant())" @onclick="() => SelectConversation(conversation)">
+                                        <span class="rgf-recroby-choice-title">@conversation.Title</span>
+                                        @if (conversation == _active) { <i class="bi bi-check-lg" aria-hidden="true"></i> }
+                                    </button>
+                                    <button type="button" class="btn-close" title="Close @conversation.Title" aria-label="Close @conversation.Title" @onclick="() => CloseConversation(conversation)"></button>
+                                </div>
+                            }
+                        </div>
+                    }
+                    @if (!FilteredConversations.Any()) { <p class="p-2 mb-0" role="status">No conversations found.</p> }
+                </div>
+            </div>
+        </div>
+        @foreach (var conversation in _conversations)
+        {
+            <div @key="conversation.Id" id="@($"recroby-panel-{conversation.Id:N}")" class="rgf-recroby-conversation" hidden="@(conversation != _active)" role="region" aria-label="@($"{conversation.RecrobyType}: {conversation.Title}")">
+                <RgfRecrobyComponent Session="conversation.Session" />
+            </div>
+        }
+        <div class="rgf-recroby-resize" data-resize-handle role="separator" aria-label="Resize Recroby" tabindex="0"></div>
+    </section>
+</div>
