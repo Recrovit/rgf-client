@@ -12,6 +12,10 @@
         {
             <SpinnerComponent Style="width: 2rem; height: 2rem;" />
         }
+        @if (_errorKind == "configuration" && _sendError != null)
+        {
+            <div class="alert alert-warning mt-2 mb-0" role="alert" data-error-kind="configuration">@_sendError</div>
+        }
     </div>
     <div class="input-group mt-3">
         <RgfInputText Id="@InputId" @bind-Value="Prompt" Multiline="true" />
@@ -21,7 +25,7 @@
     {
         <button type="button" class="btn btn-outline-secondary m-1 align-self-start" @onclick="CancelSend" aria-label="Cancel request">Cancel</button>
     }
-    @if (ShowSendErrors && _sendError != null)
+    @if (ShowSendErrors && _sendError != null && _errorKind != "configuration")
     {
         <div class="alert @(_errorKind == "workflow" ? "alert-warning" : "alert-danger") mt-2 mb-0" role="alert" data-error-kind="@_errorKind">@_sendError</div>
     }

@@ -16,8 +16,10 @@ namespace Recrovit.RecroGridFramework.Client.Blazor.SessionAuth.Tests.Proxy;
 
 public sealed class RgfRecrobyProxyEndpointTests
 {
-    [Fact]
-    public async Task RecrobyPostRequiresAuthorizationAndUsesStandardRgfDownstreamAndHeaders()
+    [Theory]
+    [InlineData("/api/rgf/ai/recroby", "POST", true)]
+    [InlineData("/api/rgf/capabilities", "GET", false)]
+    public async Task RecrobyAndCapabilitiesUseBackendProxyWithAppropriateAuthorization(string path, string method, bool authorized)
     {
         var proxy = new RecordingProxy();
         var builder = WebApplication.CreateBuilder(new WebApplicationOptions { Args = [] });
@@ -28,16 +30,16 @@ public sealed class RgfRecrobyProxyEndpointTests
         await using var app = builder.Build();
         app.MapRgfProxyEndpoints();
         var endpoint = Assert.Single(((IEndpointRouteBuilder)app).DataSources.SelectMany(source => source.Endpoints)
-            .OfType<RouteEndpoint>(), item => item.RoutePattern.RawText == "/api/rgf/ai/recroby");
-        Assert.NotEmpty(endpoint.Metadata.GetOrderedMetadata<IAuthorizeData>());
-        Assert.Null(endpoint.Metadata.GetMetadata<IAllowAnonymous>());
-        Assert.Equal(new[] { "POST" }, endpoint.Metadata.GetMetadata<HttpMethodMetadata>()!.HttpMethods);
+            .OfType<RouteEndpoint>(), item => item.RoutePattern.RawText == path);
+        Assert.Equal(authorized, endpoint.Metadata.GetOrderedMetadata<IAuthorizeData>().Count > 0);
+        Assert.Equal(!authorized, endpoint.Metadata.GetMetadata<IAllowAnonymous>() is not null);
+        Assert.Equal(new[] { method }, endpoint.Metadata.GetMetadata<HttpMethodMetadata>()!.HttpMethods);
 
         var user = new ClaimsPrincipal(new ClaimsIdentity([new Claim("sub", "owner")], "test"));
         var context = new DefaultHttpContext { RequestServices = app.Services, User = user };
         context.SetEndpoint(endpoint);
-        context.Request.Method = "POST";
-        context.Request.Path = "/api/rgf/ai/recroby";
+        context.Request.Method = method;
+        context.Request.Path = path;
         context.Request.Headers[RgfHeaderKeys.RgfClientVersion] = "client-version";
         context.Request.Headers[RgfHeaderKeys.RgfClientBlazorVersion] = "blazor-version";
         context.Request.Headers["RGF-SessionId"] = "session-id";
@@ -47,9 +49,10 @@ public sealed class RgfRecrobyProxyEndpointTests
         await endpoint.RequestDelegate!(context);
 
         Assert.Equal("RgfApi", proxy.Downstream);
-        Assert.Equal(HttpMethod.Post, proxy.Method);
-        Assert.Equal("/api/rgf/ai/recroby", proxy.Path);
-        Assert.Same(user, proxy.User);
+        Assert.Equal(new HttpMethod(method), proxy.Method);
+        Assert.Equal(path, proxy.Path);
+        if (authorized) Assert.Same(user, proxy.User);
+        else Assert.Null(proxy.User);
         Assert.Equal("client-version", proxy.Headers[RgfHeaderKeys.RgfClientVersion].ToString());
         Assert.Equal("blazor-version", proxy.Headers[RgfHeaderKeys.RgfClientBlazorVersion].ToString());
         Assert.Equal("session-id", proxy.Headers["RGF-SessionId"].ToString());

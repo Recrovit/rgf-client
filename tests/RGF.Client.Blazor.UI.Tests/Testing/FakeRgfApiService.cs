@@ -21,6 +21,8 @@ internal sealed class FakeRgfApiService : IRgfApiService
     public RgfEmptyResult DeleteDashboardResult { get; set; } = new();
 
     public bool Success { get; set; } = true;
+    public bool RecrobyEnabled { get; set; } = true;
+    public bool CapabilitySuccess { get; set; } = true;
     public bool DashboardCatalogSuccess { get; set; } = true;
     public bool DashboardLoadSuccess { get; set; } = true;
     public bool SaveDashboardSuccess { get; set; } = true;
@@ -44,6 +46,13 @@ internal sealed class FakeRgfApiService : IRgfApiService
         where ResultType : class
     {
         Requests.Add(new(request.Uri, request.AuthClient));
+
+        if (typeof(ResultType) == typeof(Recrovit.RecroGridFramework.Abstraction.Contracts.AI.RgfCapabilitiesResponse))
+            return Task.FromResult<IRgfApiResponse<ResultType>>(new ApiResponse<ResultType>
+            {
+                Success = CapabilitySuccess,
+                Result = (ResultType)(object)new Recrovit.RecroGridFramework.Abstraction.Contracts.AI.RgfCapabilitiesResponse(RecrobyEnabled)
+            });
 
         if (typeof(ResultType) == typeof(string[]))
         {

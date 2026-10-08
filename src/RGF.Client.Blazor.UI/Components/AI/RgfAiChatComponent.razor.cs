@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Components;
+using Recrovit.RecroGridFramework.Abstraction.Contracts.AI;
 using Recrovit.RecroGridFramework.Client.AI;
 using Recrovit.RecroGridFramework.Client.Blazor.UI.Components.Base;
 
@@ -73,8 +74,11 @@ public partial class RgfAiChatComponent : IDisposable
             var response = await Session.SendAsync(message, cancellationToken: cancellation.Token);
             if (!response.Success)
             {
-                _errorKind = "workflow";
-                _sendError = "The Recroby workflow could not complete the request.";
+                var providerMissing = response.ErrorCode == RgfAiErrorCodes.AiProviderNotConfigured;
+                _errorKind = providerMissing ? "configuration" : "workflow";
+                _sendError = providerMissing
+                    ? "No AI provider is configured. Configure an AI provider and model to use Recroby."
+                    : "The Recroby workflow could not complete the request.";
             }
         }
         catch (Exception exception)

@@ -75,6 +75,7 @@ public static class RgfClientConfigurationExtension
         });
 
         services.AddSingleton<IRgfApiService, ApiService>();
+        services.AddScoped<AI.RgfRecrobyCapabilityService>();
         services.AddScoped<IRgfAccessTokenAccessor, NoOpRgfAccessTokenAccessor>();
         services.AddSingleton<IRgfAuthenticationFailureHandler, NoOpRgfAuthenticationFailureHandler>();
         services.AddScoped<IRgfEventNotificationService, RgfEventNotificationService>();

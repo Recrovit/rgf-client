@@ -1,7 +1,7 @@
 @using Recrovit.RecroGridFramework.Client.Blazor.UI.Components.AI
 
 @* RGF-DOC: rgf.client.recroby.integration *@
-@if (EnableRecroby)
+@if (EnableRecroby && _recrobyEnabled)
 {
     <RgfRecrobyWorkspace>@ChildContent</RgfRecrobyWorkspace>
 }

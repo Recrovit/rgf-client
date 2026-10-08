@@ -19,9 +19,11 @@ public sealed class RgfRecrobyRootRegressionTests : IDisposable
     public void Dispose() => RgfClientBlazorUiTestState.Reset();
 
     [Theory]
-    [InlineData(true)]
-    [InlineData(false)]
-    public async Task RealRootRetainsNavbarDashboardDialogAndToastAcrossDocking(bool enabled)
+    [InlineData(true, true, true)]
+    [InlineData(false, true, true)]
+    [InlineData(true, false, true)]
+    [InlineData(true, false, false)]
+    public async Task RealRootRetainsNavbarDashboardDialogAndToastAcrossDocking(bool enabled, bool backendEnabled, bool capabilitySuccess)
     {
         using var context = new BunitContext();
         context.JSInterop.Mode = JSRuntimeMode.Loose;
@@ -30,7 +32,7 @@ public sealed class RgfRecrobyRootRegressionTests : IDisposable
         { ["Recrovit:RecroGridFramework:API:BaseAddress"] = "https://api.example.test" }).Build());
         context.Services.AddSingleton<IRecroSecService, FakeRecroSecService>();
         context.Services.AddSingleton<IRecroDictService, FakeDashboardRecroDictService>();
-        var api = new FakeRgfApiService();
+        var api = new FakeRgfApiService { RecrobyEnabled = backendEnabled, CapabilitySuccess = capabilitySuccess };
         context.Services.AddSingleton<IRgfApiService>(api);
         RenderFragment content = builder =>
         {
@@ -45,11 +47,13 @@ public sealed class RgfRecrobyRootRegressionTests : IDisposable
             builder.CloseComponent();
         };
         var cut = context.Render<RgfRootComponent>(p => p.Add(c => c.EnableRecroby, enabled).Add(c => c.ChildContent, content));
+        var effectiveEnabled = enabled && (!capabilitySuccess || backendEnabled);
+        Assert.Equal(effectiveEnabled ? 1 : 0, cut.FindComponents<RgfRecrobyWorkspace>().Count);
         var navbar = cut.FindComponent<NavbarComponent>().Instance;
         var dashboard = cut.FindComponent<DashboardPageComponent>().Instance;
         var dialog = cut.FindComponent<DialogComponent>().Instance;
         var toast = cut.FindComponent<ToastComponent>().Instance;
-        if (enabled)
+        if (effectiveEnabled)
         {
             cut.Find("[aria-label='Open Recroby']").Click();
             foreach (var mode in new[] { "DockLeft", "DockRight", "DockBottom", "Floating" })
@@ -68,7 +72,7 @@ public sealed class RgfRecrobyRootRegressionTests : IDisposable
         await cut.InvokeAsync(() => manager.RaiseEventAsync(new RgfToastEventArgs("Toast", "Still working", delay: 0), this));
         cut.WaitForAssertion(() => Assert.Contains("Still working", cut.Find(".toast-container").TextContent));
         Assert.DoesNotContain(api.Requests, r => r.Uri == "/api/rgf/ai/recroby");
-        if (!enabled)
+        if (!effectiveEnabled)
             Assert.DoesNotContain(context.JSInterop.Invocations, call => call.Identifier == "import" && call.Arguments.Any(a => a?.ToString()?.EndsWith("RgfRecrobyWorkspace.razor.js") == true));
     }
 }

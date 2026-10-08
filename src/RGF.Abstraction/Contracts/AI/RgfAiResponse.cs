@@ -14,6 +14,10 @@ public class RgfAiResponse : RgfAiMessage
 
     public bool Success { get; set; }
 
+    /// <summary>The machine-readable error code for a failed request.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? ErrorCode { get; set; }
+
     public string ConversationId { get; set; } = string.Empty;
 
     /// <summary>Reported usage, or null when the host does not supply usage information.</summary>
