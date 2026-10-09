@@ -9,6 +9,8 @@ import { spawn } from "node:child_process";
 import { setTimeout as delay } from "node:timers/promises";
 
 const base = new URL("../src/RGF.Client.Blazor.UI/", import.meta.url);
+const appRoot = "/recroby-test";
+const moduleRoot = "/_content/Recrovit.RecroGridFramework.Client.Blazor.UI/Components/AI/";
 const assets = {
     "/selection.js": ["text/javascript", await readFile(new URL("Components/AI/RgfRecrobyComponent.razor.js", base), "utf8")],
     "/selection.css": ["text/css", (await readFile(new URL("Components/AI/RgfRecrobyComponent.razor.css", base), "utf8")).replaceAll("::deep", "")],
@@ -21,6 +23,8 @@ assets['/bootstrap.js'] = ['text/javascript', await readFile(new URL('wwwroot/li
 assets['/jquery.js'] = ['text/javascript', await readFile(new URL('../RGF.Client.Blazor/wwwroot/lib/jquery/jquery.min.js', base), 'utf8')];
 assets['/ui.js'] = ['text/javascript', await readFile(new URL('wwwroot/scripts/recrovit-rgf-blazor-ui.js', base), 'utf8')];
 assets['/components.css'] = ['text/css', (await Promise.all(['Dashboard/DashboardPageComponent', 'GridComponent', 'NavbarComponent', 'DialogComponent'].map(name => readFile(new URL(`Components/${name}.razor.css`, base), 'utf8')))).join('\n').replaceAll('::deep', '')];
+assets[moduleRoot + 'RgfRecrobyComponent.razor.js'] = assets['/selection.js'];
+assets[moduleRoot + 'RgfRecrobyWorkspace.razor.js'] = assets['/module.js'];
 const html = `<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="/bootstrap.css"><link rel="stylesheet" href="/style.css">
 <link rel="stylesheet" href="/components.css"><link rel="stylesheet" href="/selection.css"><link rel="stylesheet" href="/chat.css"><script src="/jquery.js"></script><script src="/bootstrap.js"></script><script src="/ui.js"></script>
 <style>body {margin:0} #outside {height:60px} #host {margin-left:120px; width:calc(100% - 160px)}
@@ -49,8 +53,8 @@ const html = `<!doctype html><html><head><meta charset="utf-8"><link rel="styles
 <div class="rgf-recroby-resize" data-resize-handle tabindex="0"></div></section></div></div>
 <div class="toast-container position-fixed bottom-0 end-0 p-3" hidden><div class="toast show" role="alert"><div class="toast-header"><strong class="me-auto">Host toast</strong><button id="toast-close" class="btn-close"></button></div><div class="toast-body">Still working</div></div></div>
 <div id="form-reference" class="card" style="position:fixed;left:-1000px;width:360px"><div class="dialog-header card-header"><ul class="nav nav-tabs card-header-tabs"><li class="nav-item"><button class="nav-link active">Form tab</button></li></ul></div></div>
-<script type="module">import * as workspace from '/module.js';
-import * as selection from '/selection.js';
+<script type="module">import * as workspace from '${appRoot}${moduleRoot}RgfRecrobyWorkspace.razor.js';
+import * as selection from '${appRoot}${moduleRoot}RgfRecrobyComponent.razor.js';
 const selectors = document.querySelector('.rgf-recroby-selectors');
 selection.sync(selectors, false);
 window.selectionSync = close => selection.sync(selectors, close);
@@ -71,8 +75,13 @@ document.querySelector('#collapse').onclick = () => setLayout({isCollapsed:true}
 reinitialize(); window.ready = true;
 </script></body></html>`;
 
+const hostedHtml = html.replaceAll('href="/', `href="${appRoot}/`).replaceAll('src="/', `src="${appRoot}/`);
 const server = createServer((req, res) => {
-    const [type, body] = assets[req.url] ?? ["text/html", html];
+    if (!req.url.startsWith(appRoot + '/')) { res.writeHead(404); res.end(); return; }
+    const path = req.url.slice(appRoot.length);
+    const asset = assets[path];
+    if (!asset && /\.(js|css)$/.test(path)) { res.writeHead(404); res.end(); return; }
+    const [type, body] = asset ?? ["text/html", hostedHtml];
     res.setHeader("Content-Type", type); res.end(body);
 });
 await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
@@ -119,7 +128,7 @@ try {
         await delay(100);
     };
     await viewport(1200, 800);
-    await cdp("Page.navigate", { url: `http://127.0.0.1:${server.address().port}/` });
+    await cdp("Page.navigate", { url: `http://127.0.0.1:${server.address().port}${appRoot}/nested/route` });
     for (let i = 0; i < 100 && !await evaluate("window.ready === true"); i++) await delay(50);
     assert.equal(await evaluate("document.querySelector('section').hidden"), true);
     const full = await rect(".rgf-recroby-content");

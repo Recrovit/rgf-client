@@ -11,8 +11,63 @@ using Recrovit.RecroGridFramework.Client.AI.Transport;
 
 namespace Recrovit.RecroGridFramework.Client.Blazor.UI.Tests.Components;
 
+[Collection(RgfBlazorUiStaticStateCollection.Name)]
 public sealed class RgfRecrobyComponentTests
 {
+    [Theory]
+    [InlineData("")]
+    [InlineData("/test-root")]
+    public void RecrobyModuleImportsUseConfiguredAppRoot(string root)
+    {
+        RgfClientBlazorUiTestState.ConfigureClientPaths(root, "https://api.example.test");
+        try
+        {
+            using var context = SelectionContext(out _);
+            context.Render<RgfRecrobyWorkspace>();
+            foreach (var module in new[] { "RgfRecrobyComponent", "RgfRecrobyWorkspace" })
+                Assert.Contains(context.JSInterop.Invocations, invocation => invocation.Identifier == "import"
+                    && Equals(invocation.Arguments[0], $"{root}/_content/Recrovit.RecroGridFramework.Client.Blazor.UI/Components/AI/{module}.razor.js"));
+        }
+        finally { RgfClientBlazorUiTestState.Reset(); }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void FailedCatalogIsRetriedOnLaterRenderAndSuccessIsShared(bool throws)
+    {
+        using var context = SelectionContext(out var api);
+        api.FailNextCatalog = true;
+        api.ThrowOnFailure = throws;
+        var first = context.Render<RgfRecrobyComponent>();
+        Assert.Empty(first.FindAll("[popovertarget]"));
+        Assert.Equal(1, api.CatalogCalls);
+        first.Render();
+        first.WaitForAssertion(() => Assert.Equal(3, first.FindAll("select").Count));
+        Assert.Equal(2, api.CatalogCalls);
+        var second = context.Render<RgfRecrobyComponent>();
+        Assert.Equal(3, second.FindAll("select").Count);
+        Assert.Equal(2, api.CatalogCalls);
+    }
+
+    [Fact]
+    public void ConcurrentCatalogLookupSurvivesClosingOneConversation()
+    {
+        using var context = new BunitContext();
+        context.JSInterop.Mode = JSRuntimeMode.Loose;
+        context.Services.AddSingleton<IRecroDictService, FakeDashboardRecroDictService>();
+        var api = new DelayedCatalogApi();
+        context.Services.AddSingleton<IRgfApiService>(api);
+        var first = context.Render<RgfRecrobyComponent>();
+        var second = context.Render<RgfRecrobyComponent>();
+        Assert.Equal(1, api.CatalogCalls);
+        first.Dispose();
+        api.Catalog.SetResult(new ApiResponse<RgfAiCatalogResponse> { Success = true,
+            Result = new("p", [new("p", "model", [new("model", [], [], null, null)])]) });
+        second.WaitForAssertion(() => Assert.Equal(3, second.FindAll("select").Count));
+        Assert.Equal(1, api.CatalogCalls);
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
@@ -36,9 +91,13 @@ public sealed class RgfRecrobyComponentTests
 
     private sealed class DelayedCatalogApi : IRgfApiService
     {
+        public int CatalogCalls { get; private set; }
         public TaskCompletionSource<IRgfApiResponse<RgfAiCatalogResponse>> Catalog { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public async Task<IRgfApiResponse<T>> GetAsync<T>(IRgfApiRequest request) where T : class
-            => (IRgfApiResponse<T>)(object)await Catalog.Task;
+        {
+            CatalogCalls++;
+            return (IRgfApiResponse<T>)(object)await Catalog.Task;
+        }
         public Task<IRgfApiResponse<T>> PostAsync<T>(IRgfApiRequest request) where T : class
             => Task.FromResult<IRgfApiResponse<T>>(new ApiResponse<T> { Success = true,
                 Result = (T)(object)new RgfAiResponse { Success = true, WorkflowStatus = "Completed" } });
@@ -51,7 +110,7 @@ public sealed class RgfRecrobyComponentTests
     [InlineData("DockBottom")]
     public void WorkspacePreservesSelectionsAcrossSwitchCollapseAndReopen(string mode)
     {
-        using var context = SelectionContext(out _);
+        using var context = SelectionContext(out var api);
         var cut = context.Render<RgfRecrobyWorkspace>();
         cut.Find("[aria-label='Open Recroby']").Click();
         cut.Find($"[data-dock={mode}]").Click();
@@ -68,6 +127,7 @@ public sealed class RgfRecrobyComponentTests
         Assert.Contains("high", first.Find("button[aria-label='Reasoning effort']").TextContent);
         Assert.Contains("q / other", second.Find("[aria-label='Provider / Model']").TextContent);
         Assert.Null(second.FindComponent<RgfAiChatComponent>().Instance.Session.Conversation.AiReasoningEffortOverride);
+        Assert.Equal(1, api.CatalogCalls);
     }
 
     [Fact]
@@ -145,10 +205,20 @@ public sealed class RgfRecrobyComponentTests
 
     private sealed class CatalogApi : IRgfApiService
     {
+        public int CatalogCalls { get; private set; }
+        public bool FailNextCatalog { get; set; }
+        public bool ThrowOnFailure { get; set; }
         public RgfAiRequest? Request { get; private set; }
         public string? CatalogUri { get; private set; }
         public Task<IRgfApiResponse<T>> GetAsync<T>(IRgfApiRequest request) where T : class
         {
+            CatalogCalls++;
+            if (FailNextCatalog)
+            {
+                FailNextCatalog = false;
+                if (ThrowOnFailure) throw new HttpRequestException("Transient catalog failure");
+                return Task.FromResult<IRgfApiResponse<T>>(new ApiResponse<T> { Success = false });
+            }
             CatalogUri = request.Uri;
             return Task.FromResult<IRgfApiResponse<T>>(new ApiResponse<T> { Success = true,
                 Result = (T)(object)new RgfAiCatalogResponse("p", [

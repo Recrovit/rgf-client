@@ -5,12 +5,14 @@ using Recrovit.RecroGridFramework.Abstraction.Contracts.AI;
 using Recrovit.RecroGridFramework.Abstraction.Contracts.Services;
 using Recrovit.RecroGridFramework.Client.AI;
 using Recrovit.RecroGridFramework.Client.AI.Transport;
+using System.Runtime.CompilerServices;
 
 namespace Recrovit.RecroGridFramework.Client.Blazor.UI.Components.AI;
 
 // RGF-DOC: rgf.client.recroby.integration
 public partial class RgfRecrobyComponent : IAsyncDisposable
 {
+    private static readonly ConditionalWeakTable<IServiceProvider, RgfRecrobyCatalogCache> Catalogs = new();
     [Inject] private IServiceProvider Services { get; set; } = null!;
     [Inject] private IJSRuntime JS { get; set; } = null!;
     [Parameter] public EventCallback<Exception> SendFailed { get; set; }
@@ -25,7 +27,7 @@ public partial class RgfRecrobyComponent : IAsyncDisposable
     private IJSObjectReference? _module;
     private bool _sessionChanged;
     private bool _disposed;
-    private bool _catalogRequested;
+    private bool _catalogLoading;
     private RgfAiConversationSession ActiveSession => Session ?? _session!;
     private bool SelectionDisabled => ActiveSession.IsProcessing || ActiveSession.Conversation.IsPendingWorkflow;
     private string SelectedProvider { get => Provider?.Id ?? string.Empty; set => SelectProvider(value); }
@@ -62,29 +64,38 @@ public partial class RgfRecrobyComponent : IAsyncDisposable
         _sessionChanged = true;
     }
 
-    protected override async Task OnParametersSetAsync()
+    protected override Task OnParametersSetAsync() => LoadCatalogAsync();
+
+    private async Task LoadCatalogAsync()
     {
-        if (_catalogRequested) return;
-        _catalogRequested = true;
+        if (_disposed || _catalog is not null || _catalogLoading) return;
+        _catalogLoading = true;
         try
         {
-            var response = await Services.GetRequiredService<IRgfApiService>().GetAsync<RgfAiCatalogResponse>(
-                "/api/rgf/ai/recroby/catalog", cancellationToken: _lifetime.Token);
-            if (!_disposed && response.Success && response.Result is { Providers: not null } catalog
-                && catalog.Providers.All(provider => provider is { Models: not null }
-                    && provider.Models.All(model => model is { Efforts: not null })))
-                _catalog = catalog;
+            var cache = Catalogs.GetValue(Services, services => new(services.GetRequiredService<IRgfApiService>()));
+            var catalog = await cache.GetAsync(_lifetime.Token);
+            if (!_disposed) _catalog = catalog;
         }
         catch (Exception) when (!_lifetime.IsCancellationRequested)
         {
             // The catalog is optional; chat remains usable with the existing defaults.
         }
         catch (OperationCanceledException) when (_lifetime.IsCancellationRequested) { }
+        finally { _catalogLoading = false; }
     }
 
     private void SessionChanged()
     {
-        if (!_disposed) _ = InvokeAsync(() => { if (!_disposed) StateHasChanged(); });
+        if (!_disposed) _ = InvokeAsync(async () =>
+        {
+            if (_disposed) return;
+            StateHasChanged();
+            if (!ActiveSession.IsProcessing && _catalog is null)
+            {
+                await LoadCatalogAsync();
+                if (!_disposed) StateHasChanged();
+            }
+        });
     }
 
     private void SelectProvider(string id)
@@ -122,7 +133,7 @@ public partial class RgfRecrobyComponent : IAsyncDisposable
     {
         if (_disposed || _catalog?.Providers.Count is not > 0) return;
         _module ??= await JS.InvokeAsync<IJSObjectReference>("import",
-            "./_content/Recrovit.RecroGridFramework.Client.Blazor.UI/Components/AI/RgfRecrobyComponent.razor.js");
+            $"{RgfClientConfiguration.AppRootPath}/_content/Recrovit.RecroGridFramework.Client.Blazor.UI/Components/AI/RgfRecrobyComponent.razor.js");
         if (_module is null || _disposed) return;
         await _module.InvokeVoidAsync("sync", _element, SelectionDisabled || _sessionChanged);
         _sessionChanged = false;
