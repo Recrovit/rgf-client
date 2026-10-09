@@ -188,10 +188,6 @@
     min-width: 0;
 }
 
-.rgf-navbar-language-selector {
-    z-index: 2147483647;
-}
-
 .rgf-navbar-custom-content-desktop {
     min-width: 0;
     max-width: 100%;

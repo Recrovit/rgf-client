@@ -12,9 +12,9 @@
         {
             <SpinnerComponent Style="width: 2rem; height: 2rem;" />
         }
-        @if (_errorKind == "configuration" && _sendError != null)
+        @if ((_errorKind == "configuration" || _errorKind == "credit") && _sendError != null)
         {
-            <div class="alert alert-warning mt-2 mb-0" role="alert" data-error-kind="configuration">@_sendError</div>
+            <div class="alert alert-warning mt-2 mb-0" role="alert" data-error-kind="@_errorKind">@_sendError</div>
         }
     </div>
     <div class="input-group mt-3">
@@ -31,7 +31,7 @@
             @InputFooter
         </div>
     }
-    @if (ShowSendErrors && _sendError != null && _errorKind != "configuration")
+    @if (ShowSendErrors && _sendError != null && _errorKind != "configuration" && _errorKind != "credit")
     {
         <div class="alert @(_errorKind == "workflow" ? "alert-warning" : "alert-danger") mt-2 mb-0" role="alert" data-error-kind="@_errorKind">@_sendError</div>
     }

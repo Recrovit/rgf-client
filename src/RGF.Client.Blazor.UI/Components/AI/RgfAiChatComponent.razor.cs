@@ -31,6 +31,16 @@ public partial class RgfAiChatComponent : IDisposable
     private string? _sendError;
     private string? _errorKind;
 
+    private static readonly HashSet<string> CreditErrorCodes = new(StringComparer.Ordinal)
+    {
+        "AiCredit.UserDisabled",
+        "AiCredit.InsufficientCredit",
+        "AiCredit.BalanceExpired",
+        "AiCredit.InvalidConfiguration",
+        "AiCredit.UserNotFound",
+        "AiCredit.InfrastructureFailure"
+    };
+
     private void CancelSend() => _sendCancellation?.Cancel();
 
     protected override void OnParametersSet()
@@ -78,9 +88,12 @@ public partial class RgfAiChatComponent : IDisposable
             if (!response.Success)
             {
                 var providerMissing = response.ErrorCode == RgfAiErrorCodes.AiProviderNotConfigured;
-                _errorKind = providerMissing ? "configuration" : "workflow";
+                var creditRejected = response.ErrorCode != null && CreditErrorCodes.Contains(response.ErrorCode);
+                _errorKind = providerMissing ? "configuration" : creditRejected ? "credit" : "workflow";
                 _sendError = providerMissing
                     ? "No AI provider is configured. Configure an AI provider and model to use Recroby."
+                    : creditRejected && !string.IsNullOrWhiteSpace(response.Message)
+                    ? response.Message
                     : "The Recroby workflow could not complete the request.";
             }
         }
