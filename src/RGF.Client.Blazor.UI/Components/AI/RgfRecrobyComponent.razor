@@ -1,25 +1,27 @@
-@using Recrovit.RecroGridFramework.Client.AI
-@using Recrovit.RecroGridFramework.Client.AI.Transport
-@inject IServiceProvider Services
 
 @* RGF-DOC: rgf.client.recroby.integration *@
-<RgfAiChatComponent Session="@(Session ?? _session!)" SendFailed="SendFailed" ShowSendErrors="true" AllowCancellation="true" />
+<RgfAiChatComponent Session="ActiveSession" SendFailed="SendFailed" ShowSendErrors="true" AllowCancellation="true"
+                    InputFooter="@(_catalog?.Providers.Count > 0 ? Selectors : null)" />
 
 @code {
-    [Parameter]
-    public EventCallback<Exception> SendFailed { get; set; }
-
-    [Parameter]
-    public RgfAiConversationSession? Session { get; set; }
-
-    private RgfAiConversationSession? _session;
-
-    protected override void OnParametersSet()
-    {
-        if (Session == null)
-        {
-            _session ??= new RgfAiConversationSession(new RgfAiApiTransport(
-                Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions.GetRequiredService<IRgfApiService>(Services)));
-        }
-    }
+    private RenderFragment Selectors => @<div class="rgf-recroby-selectors" @ref="_element">
+        <button type="button" class="btn btn-sm btn-outline-secondary" popovertarget="@(_selectorId + "-model")"
+                disabled="@SelectionDisabled" aria-label="Provider / Model" aria-expanded="false">
+            @Provider?.Id / @Model?.Id ▾
+        </button>
+        <button type="button" class="btn btn-sm btn-outline-secondary" popovertarget="@(_selectorId + "-effort")"
+                disabled="@SelectionDisabled" aria-label="Reasoning effort" aria-expanded="false">
+            @(ActiveSession.Conversation.AiReasoningEffortOverride ?? "Default") ▾
+        </button>
+        <div id="@(_selectorId + "-model")" class="rgf-recroby-selection-panel" popover="auto" role="dialog" aria-label="Provider / Model">
+            <RgfComboBox TValue="string" Label="Provider" @bind-Value="SelectedProvider"
+                         DataSource="ProviderItems" Disabled="SelectionDisabled" />
+            <RgfComboBox TValue="string" Label="Model" @bind-Value="SelectedModel"
+                         DataSource="ModelItems" Disabled="SelectionDisabled" />
+        </div>
+        <div id="@(_selectorId + "-effort")" class="rgf-recroby-selection-panel" popover="auto" role="dialog" aria-label="Reasoning effort">
+            <RgfComboBox TValue="string" Label="Reasoning effort" @bind-Value="SelectedEffort"
+                         DataSource="EffortItems" Disabled="SelectionDisabled" />
+        </div>
+    </div>;
 }

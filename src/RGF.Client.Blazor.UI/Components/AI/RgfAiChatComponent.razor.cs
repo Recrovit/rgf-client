@@ -20,6 +20,9 @@ public partial class RgfAiChatComponent : IDisposable
 
     [Parameter] public bool AllowCancellation { get; set; }
 
+    /// <summary>Optional content below the input, beside the buttons, wrapping onto a new line when needed.</summary>
+    [Parameter] public RenderFragment? InputFooter { get; set; }
+
     private string InputId { get; } = RgfBaseComponent.GetNextId();
     private string Prompt { get; set; } = string.Empty;
     private RgfAiConversationSession? subscribedSession;

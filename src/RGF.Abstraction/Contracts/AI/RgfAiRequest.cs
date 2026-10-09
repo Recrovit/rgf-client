@@ -32,6 +32,9 @@ public class RgfAiRequest
     /// <summary>An optional model identifier interpreted by the host.</summary>
     public string? AiModelOverride { get; set; }
 
+    /// <summary>An optional reasoning effort; null preserves the configured default.</summary>
+    public string? AiReasoningEffortOverride { get; set; }
+
     /// <summary>Host-defined extension values; keys have no meaning in the shared protocol.</summary>
     public Dictionary<string, object?>? CustomParams { get; set; }
 }

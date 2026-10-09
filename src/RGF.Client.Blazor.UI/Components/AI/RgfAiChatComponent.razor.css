@@ -14,3 +14,12 @@
     border-radius: 10px;
     word-wrap: break-word;
 }
+
+.rgf-ai-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-start;
+    gap: .25rem;
+    margin-top: .25rem;
+}

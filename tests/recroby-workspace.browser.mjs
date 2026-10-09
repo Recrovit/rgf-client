@@ -10,6 +10,9 @@ import { setTimeout as delay } from "node:timers/promises";
 
 const base = new URL("../src/RGF.Client.Blazor.UI/", import.meta.url);
 const assets = {
+    "/selection.js": ["text/javascript", await readFile(new URL("Components/AI/RgfRecrobyComponent.razor.js", base), "utf8")],
+    "/selection.css": ["text/css", (await readFile(new URL("Components/AI/RgfRecrobyComponent.razor.css", base), "utf8")).replaceAll("::deep", "")],
+    "/chat.css": ["text/css", (await readFile(new URL("Components/AI/RgfAiChatComponent.razor.css", base), "utf8")).replaceAll("::deep", "")],
     "/module.js": ["text/javascript", await readFile(new URL("Components/AI/RgfRecrobyWorkspace.razor.js", base), "utf8")],
     "/style.css": ["text/css", (await readFile(new URL("Components/AI/RgfRecrobyWorkspace.razor.css", base), "utf8")).replaceAll("::deep", "")],
     "/bootstrap.css": ["text/css", await readFile(new URL("wwwroot/lib/bootstrap/dist/css/bootstrap.min.css", base), "utf8")]
@@ -19,7 +22,7 @@ assets['/jquery.js'] = ['text/javascript', await readFile(new URL('../RGF.Client
 assets['/ui.js'] = ['text/javascript', await readFile(new URL('wwwroot/scripts/recrovit-rgf-blazor-ui.js', base), 'utf8')];
 assets['/components.css'] = ['text/css', (await Promise.all(['Dashboard/DashboardPageComponent', 'GridComponent', 'NavbarComponent', 'DialogComponent'].map(name => readFile(new URL(`Components/${name}.razor.css`, base), 'utf8')))).join('\n').replaceAll('::deep', '')];
 const html = `<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="/bootstrap.css"><link rel="stylesheet" href="/style.css">
-<link rel="stylesheet" href="/components.css"><script src="/jquery.js"></script><script src="/bootstrap.js"></script><script src="/ui.js"></script>
+<link rel="stylesheet" href="/components.css"><link rel="stylesheet" href="/selection.css"><link rel="stylesheet" href="/chat.css"><script src="/jquery.js"></script><script src="/bootstrap.js"></script><script src="/ui.js"></script>
 <style>body {margin:0} #outside {height:60px} #host {margin-left:120px; width:calc(100% - 160px)}
 .chat-box {overflow-y:auto} .message {padding:10px} .navbar {height:56px} main {flex:1;min-height:0}
 .grid {width:100%} .modal {z-index:1055} .toast-container {z-index:1080}</style></head><body>
@@ -36,11 +39,21 @@ const html = `<!doctype html><html><head><meta charset="utf-8"><link rel="styles
 </div></div></div></div>
 <div class="rgf-recroby-conversation"><div class="container mt-4">
 <div class="chat-box d-flex flex-column">${"<div class='message'>Message</div>".repeat(40)}</div>
-<div class="input-group mt-3"><textarea class="form-control"></textarea></div><button class="btn align-self-start" id="send">Send</button></div></div>
+<div class="input-group mt-3"><textarea class="form-control"></textarea></div><div class="rgf-ai-actions"><button class="btn align-self-start" id="send">Send</button>
+<div class="rgf-recroby-selectors">
+<button id="model-choice" class="btn btn-sm btn-outline-secondary" popovertarget="model-panel" aria-expanded="false">Provider / Model ▾</button>
+<button id="effort-choice" class="btn btn-sm btn-outline-secondary" popovertarget="effort-panel" aria-expanded="false">Default ▾</button>
+<div id="model-panel" class="rgf-recroby-selection-panel" popover="auto" role="dialog"><label>Provider</label><select class="form-select"><option>Provider</option></select><label>Model</label><select class="form-select"><option>Model</option></select></div>
+<div id="effort-panel" class="rgf-recroby-selection-panel" popover="auto" role="dialog"><label>Reasoning effort</label><select class="form-select"><option>Default</option><option>High</option></select></div>
+</div></div></div></div>
 <div class="rgf-recroby-resize" data-resize-handle tabindex="0"></div></section></div></div>
 <div class="toast-container position-fixed bottom-0 end-0 p-3" hidden><div class="toast show" role="alert"><div class="toast-header"><strong class="me-auto">Host toast</strong><button id="toast-close" class="btn-close"></button></div><div class="toast-body">Still working</div></div></div>
 <div id="form-reference" class="card" style="position:fixed;left:-1000px;width:360px"><div class="dialog-header card-header"><ul class="nav nav-tabs card-header-tabs"><li class="nav-item"><button class="nav-link active">Form tab</button></li></ul></div></div>
 <script type="module">import * as workspace from '/module.js';
+import * as selection from '/selection.js';
+const selectors = document.querySelector('.rgf-recroby-selectors');
+selection.sync(selectors, false);
+window.selectionSync = close => selection.sync(selectors, close);
 const element = document.querySelector('.rgf-recroby-workspace');
 window.settings = {mode:0,isCollapsed:true,x:250,y:100,width:440,height:560,dockWidth:360,dockHeight:240};
 window.switcherOpen = false;
@@ -438,7 +451,49 @@ try {
     assert.equal(await evaluate('document.activeElement.id'), 'dialog-input');
     await click('#dialog-primary');
     assert.equal(await evaluate("document.querySelector('#host-dialog')"), null, 'Dialog above bottom dock remains operable');
-    console.log("PASS: conversation switcher, scrolling, focus, Escape/outside dismissal, all dock/mobile modes, push layout, host isolation, collapse, edge drag, bounds, persistence, dialog/toast stacking");
+    for (const [width, height] of [[1200, 800], [800, 400], [390, 700], [390, 260]]) {
+        await viewport(width, height);
+        for (const mode of [0, 1, 2, 3]) {
+            await layout({ mode, isCollapsed: false, height: 360, dockHeight: 300 });
+            const before = await rect('section');
+            for (const id of ['model', 'effort']) {
+                await evaluate(`document.querySelector('#${id}-choice').scrollIntoView({block:'nearest'})`);
+                await click(`#${id}-choice`);
+                const popup = await rect(`#${id}-panel`), anchor = await rect(`#${id}-choice`);
+                assert.equal(await evaluate(`document.querySelector('#${id}-panel').matches(':popover-open')`), true);
+                assert.ok(popup.y >= 7 && popup.bottom <= height - 7 && popup.x >= 7 && popup.right <= width - 7, `AI ${id} panel fits ${mode} at ${width}x${height}`);
+                assert.ok(popup.bottom <= anchor.y, 'AI selection opens upwards');
+                assert.deepEqual(await rect('section'), before, 'AI popover does not resize the workspace');
+                assert.ok(await evaluate(`(() => {const p=document.querySelector('#${id}-panel'),r=p.getBoundingClientRect();return p.contains(document.elementFromPoint(r.x+10,r.y+10));})()`), 'AI top layer is visible outside overflow hidden');
+                assert.equal(await evaluate(`document.querySelector('#${id}-panel').contains(document.activeElement)`), true);
+                await cdp('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape' });
+                await cdp('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Escape' });
+                await delay(50);
+                assert.equal(await evaluate(`document.querySelector('#${id}-panel').matches(':popover-open')`), false);
+            }
+            await click('#model-choice');
+            await layout({ isCollapsed: true });
+            assert.equal(await evaluate("document.querySelector('#model-panel').matches(':popover-open')"), false, 'collapse closes AI top layer');
+        }
+    }
+    await viewport(1200, 800);
+    await layout({ mode: 0, isCollapsed: false, height: 560 });
+    const input = await rect('textarea'), send = await rect('#send'), selectors = await rect('.rgf-recroby-selectors');
+    assert.ok(send.y >= input.bottom, 'Send is below the message input');
+    assert.ok(selectors.x >= send.right && selectors.y < send.bottom, 'selectors are beside Send when space permits');
+    await evaluate("document.querySelector('.rgf-ai-actions').style.width='180px'");
+    await delay(100);
+    assert.ok((await rect('.rgf-recroby-selectors')).y >= (await rect('#send')).bottom, 'selectors wrap below Send when space is limited');
+    await evaluate("document.querySelector('.rgf-ai-actions').style.width=''");
+    await click('#model-choice');
+    await evaluate("document.querySelector('.rgf-recroby-conversation').hidden=true");
+    await delay(50);
+    assert.equal(await evaluate("document.querySelector('#model-panel').matches(':popover-open')"), false, 'conversation switch closes AI top layer');
+    await evaluate("document.querySelector('.rgf-recroby-conversation').hidden=false");
+    await click('#effort-choice');
+    await evaluate('selectionSync(true)');
+    assert.equal(await evaluate("document.querySelector('#effort-panel').matches(':popover-open')"), false, 'processing closes AI top layer');
+    console.log("PASS: AI selectors and conversation switcher, top layer, viewport bounds, focus, Escape, collapse, all dock/mobile modes, host isolation, persistence, dialog/toast stacking");
 } finally {
     socket?.close(); child.kill();
     await new Promise(resolve => server.close(resolve));

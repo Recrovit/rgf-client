@@ -19,6 +19,11 @@ public sealed class RgfAiConversationState
 
     public string? AiModelOverride { get; set; }
 
+    public string? AiReasoningEffortOverride { get; set; }
+
+    /// <summary>Indicates whether the conversation is waiting to resume an existing workflow run.</summary>
+    public bool IsPendingWorkflow { get; private set; }
+
     /// <summary>Presentation history; authoritative conversation history belongs to the backend.</summary>
     public IReadOnlyList<RgfAiMessage> Messages { get; }
 
@@ -38,7 +43,8 @@ public sealed class RgfAiConversationState
             CurrentUserMessage = message,
             ConversationId = ConversationId,
             ConversationToken = ConversationToken,
-            AiModelOverride = AiModelOverride
+            AiModelOverride = AiModelOverride,
+            AiReasoningEffortOverride = AiReasoningEffortOverride
         };
     }
 
@@ -53,6 +59,7 @@ public sealed class RgfAiConversationState
 
         ConversationId = response.ConversationId;
         ConversationToken = response.ConversationToken;
+        IsPendingWorkflow = response.WorkflowStatus == "WaitingForInput";
         messages.Add(response);
     }
 
@@ -61,6 +68,7 @@ public sealed class RgfAiConversationState
     {
         ConversationId = null;
         ConversationToken = null;
+        IsPendingWorkflow = false;
         messages.Clear();
     }
 }

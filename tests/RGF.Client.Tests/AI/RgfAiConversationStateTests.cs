@@ -6,6 +6,21 @@ namespace Recrovit.RecroGridFramework.Client.Tests.AI;
 public sealed class RgfAiConversationStateTests
 {
     [Fact]
+    public void EffortAndPendingStateBelongToEachConversation()
+    {
+        var first = new RgfAiConversationState { AiModelOverride = "p/model", AiReasoningEffortOverride = "high" };
+        var second = new RgfAiConversationState();
+        first.ApplyResponse(new() { Success = true, WorkflowStatus = "WaitingForInput" });
+        Assert.True(first.IsPendingWorkflow);
+        Assert.False(second.IsPendingWorkflow);
+        Assert.Equal("high", first.CreateRequest("Hello").AiReasoningEffortOverride);
+        Assert.Null(second.CreateRequest("Hello").AiReasoningEffortOverride);
+        first.Reset();
+        Assert.False(first.IsPendingWorkflow);
+        Assert.Equal("high", first.AiReasoningEffortOverride);
+    }
+
+    [Fact]
     public void AddUserMessage_AppendsDisplayedUserMessage()
     {
         var state = new RgfAiConversationState();

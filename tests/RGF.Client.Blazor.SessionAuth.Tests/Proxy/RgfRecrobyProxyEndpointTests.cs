@@ -18,6 +18,7 @@ public sealed class RgfRecrobyProxyEndpointTests
 {
     [Theory]
     [InlineData("/api/rgf/ai/recroby", "POST", true)]
+    [InlineData("/api/rgf/ai/recroby/catalog", "GET", true)]
     [InlineData("/api/rgf/capabilities", "GET", false)]
     public async Task RecrobyAndCapabilitiesUseBackendProxyWithAppropriateAuthorization(string path, string method, bool authorized)
     {
