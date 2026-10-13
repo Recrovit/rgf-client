@@ -19,11 +19,13 @@
             <RgfComboBox TValue="string" Label="Provider" @bind-Value="SelectedProvider"
                          DataSource="ProviderItems" Disabled="SelectionDisabled" />
             <RgfComboBox TValue="string" Label="Model" @bind-Value="SelectedModel"
-                         DataSource="ModelItems" Disabled="SelectionDisabled" />
+                         DataSource="ModelItems" Disabled="SelectionDisabled"
+                         AdditionalAttributes="@(new() { { "data-close-popover", "" } })" />
         </div>
         <div id="@(_selectorId + "-effort")" class="rgf-recroby-selection-panel" popover="auto" role="dialog" aria-label="Reasoning effort">
             <RgfComboBox TValue="string" Label="Reasoning effort" @bind-Value="SelectedEffort"
-                         DataSource="EffortItems" Disabled="SelectionDisabled" />
+                         DataSource="EffortItems" Disabled="SelectionDisabled"
+                         AdditionalAttributes="@(new() { { "data-close-popover", "" } })" />
         </div>
     </div>;
 }

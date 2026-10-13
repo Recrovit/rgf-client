@@ -52,8 +52,8 @@ const html = `<!doctype html><html><head><meta charset="utf-8"><link rel="styles
 <div class="rgf-recroby-selectors">
 <button id="model-choice" class="btn btn-sm btn-outline-secondary" popovertarget="model-panel" aria-expanded="false"><i class="bi bi-cpu me-1" aria-hidden="true"></i>Provider / Model ▾</button>
 <button id="effort-choice" class="btn btn-sm btn-outline-secondary" popovertarget="effort-panel" aria-expanded="false"><i class="bi bi-lightbulb me-1" aria-hidden="true"></i>Default ▾</button>
-<div id="model-panel" class="rgf-recroby-selection-panel" popover="auto" role="dialog"><label>Provider</label><select class="form-select"><option>Provider</option></select><label>Model</label><select class="form-select"><option>Model</option></select></div>
-<div id="effort-panel" class="rgf-recroby-selection-panel" popover="auto" role="dialog"><label>Reasoning effort</label><select class="form-select"><option>Default</option><option>High</option></select></div>
+<div id="model-panel" class="rgf-recroby-selection-panel" popover="auto" role="dialog"><label>Provider</label><select class="form-select"><option>Provider</option></select><label>Model</label><select class="form-select" data-close-popover><option>Model</option></select></div>
+<div id="effort-panel" class="rgf-recroby-selection-panel" popover="auto" role="dialog"><label>Reasoning effort</label><select class="form-select" data-close-popover><option>Default</option><option>High</option></select></div>
 </div></div></div></div>
 <div class="rgf-recroby-resize" data-resize-handle tabindex="0"></div></section></div></div>
 <div class="toast-container position-fixed bottom-0 end-0 p-3" hidden><div class="toast show" role="alert"><div class="toast-header"><strong class="me-auto">Host toast</strong><button id="toast-close" class="btn-close"></button></div><div class="toast-body">Still working</div></div></div>
@@ -529,6 +529,18 @@ try {
     await viewport(1200, 800);
     await evaluate("document.querySelector('#model-choice').lastChild.textContent='Provider / Model ▾'");
     await layout({ mode: 0, isCollapsed: false, height: 560 });
+    for (const id of ['model', 'effort']) {
+        await click('#' + id + '-choice');
+        if (id === 'model') {
+            await evaluate("document.querySelector('#model-panel select').dispatchEvent(new Event('change', {bubbles:true}))");
+            assert.equal(await evaluate("document.querySelector('#model-panel').matches(':popover-open')"), true,
+                'provider selection leaves the model selector available');
+        }
+        await evaluate(`document.querySelector('#${id}-panel select[data-close-popover]').dispatchEvent(new Event('change', {bubbles:true}))`);
+        assert.equal(await evaluate(`document.querySelector('#${id}-panel').matches(':popover-open')`), false,
+            'committing a model or effort selection immediately closes its Popover');
+        assert.equal(await evaluate('document.activeElement.id'), id + '-choice');
+    }
     const input = await rect('textarea'), send = await rect('#send'), selectors = await rect('.rgf-recroby-selectors');
     assert.ok(send.y >= input.bottom, 'Send is below the message input');
     assert.ok(selectors.x >= send.right && selectors.y < send.bottom, 'selectors are beside Send when space permits');
@@ -560,6 +572,9 @@ try {
                 await click(button);
                 assert.equal(await evaluate(`document.querySelector('${panel}').matches(':popover-open')`), true, `usage ${group} opens in mode ${mode} at ${width}x${height}`);
                 const popup = await rect(panel), anchor = await rect(button);
+                const fieldName = await rect(panel + ' dt'), fieldValue = await rect(panel + ' dd');
+                assert.ok(fieldName.right <= fieldValue.x && Math.abs(fieldName.y - fieldValue.y) < 1,
+                    'Popover field names and values are adjacent on the same row');
                 assert.ok(popup.x >= 7 && popup.right <= width - 7 && popup.y >= 7 && popup.bottom <= height - 7, 'usage panel fits viewport in every layout');
                 assert.ok(Math.min(Math.abs(popup.bottom - anchor.y), Math.abs(popup.y - anchor.bottom)) <= 5, 'usage panel stays near trigger');
                 assert.deepEqual(await rect('section'), before, 'usage panel does not resize workspace');

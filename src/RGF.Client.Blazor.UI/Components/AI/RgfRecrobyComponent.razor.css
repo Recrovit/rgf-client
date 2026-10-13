@@ -29,7 +29,16 @@
     overflow: auto;
 }
 
+.rgf-recroby-selection-panel:popover-open {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+    gap: .5rem;
+    align-items: center;
+}
+
 .rgf-recroby-selection-panel ::deep .form-label {
     font-size: .8rem;
     margin: .25rem 0;
 }
+
+.rgf-recroby-selection-panel ::deep select { min-width: 0; }

@@ -6,32 +6,29 @@
     <div class="rgf-ai-usage" id="@_id" @ref="_element" aria-label="Response usage">
         @if (Response.CreditUsage is { } usage)
         {
-            @if (usage.Models.Count > 0)
-            {
-                @Item("models", "cpu", ModelLabel, "Models", ModelsContent)
-            }
             @if (usage.ExecutionTime is { } duration)
             {
                 <span class="rgf-ai-usage-duration" aria-label="Execution time"><i class="bi bi-stopwatch" aria-hidden="true"></i> @Duration(duration)</span>
             }
+            @if (usage.Models.Count > 0)
+            {
+                @Item("models", "cpu", ModelLabel, "Models", ModelsContent)
+            }
+            @Item("tokens", "bar-chart", usage.Tokens?.TotalTokens?.ToString() ?? "Usage", "Aggregated token statistics", TokensContent, showHeading: false)
             @Item("cost", "coin", Credit(usage.ChargedCredit), "Charged credit", CostContent)
         }
         @if (Response.CreditState is { } state)
         {
             @Item("credit", "piggy-bank", StateLabel(state), "Credit state at response completion", StateContent)
         }
-        @if (Response.CreditUsage is { Tokens: not null } tokenUsage)
-        {
-            @Item("tokens", "bar-chart", tokenUsage.Tokens?.TotalTokens?.ToString() ?? "Tokens", "Token statistics", TokensContent)
-        }
     </div>
 }
 
 @code {
-    private RenderFragment Item(string group, string icon, string value, string label, RenderFragment content) => @<text>
+    private RenderFragment Item(string group, string icon, string value, string label, RenderFragment content, bool showHeading = true) => @<text>
         <button type="button" class="rgf-ai-usage-item" popovertarget="@PanelId(group)" aria-controls="@PanelId(group)" aria-haspopup="dialog" aria-expanded="false" aria-label="@($"{label}: {value}")" title="@value"><i class="bi bi-@icon" aria-hidden="true"></i> @value</button>
         <div class="rgf-ai-usage-panel" id="@PanelId(group)" popover="auto" role="dialog" aria-label="@label" tabindex="-1">
-            <strong>@label</strong>
+            @if (showHeading) { <strong>@label</strong> }
             @content
         </div>
     </text>;
@@ -39,7 +36,8 @@
     private RenderFragment ModelsContent => @<text>
         @foreach (var model in Response.CreditUsage!.Models)
         {
-            <dl><dt>Provider</dt><dd>@Identity(model.ProviderId)</dd><dt>Model</dt><dd>@Identity(model.ModelId)</dd></dl>
+            <dl><dt>Provider</dt><dd>@Identity(model.ProviderId)</dd><dt>Model</dt><dd>@Identity(model.ModelId)</dd>
+                <dt>Effort</dt><dd>@(Response.CreditUsage.ReasoningEffort ?? "Default")</dd></dl>
         }
     </text>;
 
@@ -83,13 +81,20 @@
         }
     </text>;
 
-    private RenderFragment TokensContent => TokenFields(Response.CreditUsage!.Tokens);
+    private RenderFragment TokensContent => @<text>
+        <dl><dt>LLM calls</dt><dd>@Response.CreditUsage!.LlmCallCount</dd></dl>
+        @if (Response.CreditUsage.Tokens is { } tokens)
+        {
+            <strong>Aggregated token statistics</strong>
+            <dl>@TokenFields(tokens)</dl>
+        }
+    </text>;
 
-    private static RenderFragment TokenFields(RgfAiTokenUsage? tokens) => @<dl>
+    private static RenderFragment TokenFields(RgfAiTokenUsage? tokens) => @<text>
         <dt>Input tokens</dt><dd>@Count(tokens?.InputTokens)</dd>
         <dt>Output tokens</dt><dd>@Count(tokens?.OutputTokens)</dd>
         <dt>Total tokens</dt><dd>@Count(tokens?.TotalTokens)</dd>
         <dt>Cached input tokens</dt><dd>@Count(tokens?.CachedInputTokens)</dd>
         <dt>Reasoning tokens</dt><dd>@Count(tokens?.ReasoningTokens)</dd>
-    </dl>;
+    </text>;
 }

@@ -151,6 +151,9 @@ public sealed class RgfRecrobyComponentTests
         }
         Assert.Contains("p / first", cut.Find("[aria-label='Provider / Model']").TextContent);
         Assert.Equal(new[] { "first", "second" }, cut.FindAll("select")[1].QuerySelectorAll("option").Select(o => o.TextContent));
+        Assert.False(cut.FindAll("select")[0].HasAttribute("data-close-popover"));
+        Assert.True(cut.FindAll("select")[1].HasAttribute("data-close-popover"));
+        Assert.True(cut.FindAll("select")[2].HasAttribute("data-close-popover"));
         cut.FindAll("select")[2].Change("high");
         cut.FindAll("select")[1].Change("second");
         Assert.Equal("Default", cut.Find("button[aria-label='Reasoning effort']").TextContent.Trim().TrimEnd('▾').Trim());

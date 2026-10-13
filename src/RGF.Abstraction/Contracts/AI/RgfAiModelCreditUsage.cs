@@ -6,13 +6,13 @@ namespace Recrovit.RecroGridFramework.Abstraction.Contracts.AI;
 
 // RGF-DOC: rgf.client.abstraction.ai-contracts
 
-/// <summary>Aggregated Credit usage for one provider/model combination within a Recroby request.</summary>
+/// <summary>Aggregated Credit usage for one configured provider/model alias pair within a Recroby request.</summary>
 public class RgfAiModelCreditUsage
 {
-    /// <summary>The configured provider identifier, or null when unknown.</summary>
+    /// <summary>The configured provider alias used for Credit accounting, or null when unknown.</summary>
     public string? ProviderId { get; set; }
 
-    /// <summary>The actual model identifier, or null when unknown; do not infer it from a configured alias.</summary>
+    /// <summary>The configured model alias used for Credit accounting, or null when unknown.</summary>
     public string? ModelId { get; set; }
 
     /// <summary>The finalized Credit charge for this combination, independent of ISO currency costs.</summary>

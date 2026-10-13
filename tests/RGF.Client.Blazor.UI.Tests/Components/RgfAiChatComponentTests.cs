@@ -120,7 +120,7 @@ public sealed class RgfAiChatComponentTests
         await session.SendAsync("New question", cancellationToken: Xunit.TestContext.Current.CancellationToken);
         cut.WaitForAssertion(() => Assert.Equal(2, cut.FindAll(".rgf-ai-usage").Count));
         Assert.Equal(originalId, cut.Find("[popover]").Id);
-        Assert.Equal(4, cut.FindAll("[popover]").Select(e => e.Id).Distinct().Count());
+        Assert.Equal(6, cut.FindAll("[popover]").Select(e => e.Id).Distinct().Count());
 
         var other = new RgfAiConversationSession(new TestTransport());
         other.Conversation.ApplyResponse(new() { Success = true, Message = "Other answer", CreditState = new() });

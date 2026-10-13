@@ -39,6 +39,12 @@ export function sync(element, close) {
                 panel.hidePopover();
                 button.focus({ preventScroll: true });
             }, options);
+            panel.addEventListener("change", event => {
+                if (!event.target.matches("select[data-close-popover]") || event.target.disabled
+                    || !panel.matches(":popover-open")) return;
+                panel.hidePopover();
+                button.focus({ preventScroll: true });
+            }, options);
         }
         const observer = new ResizeObserver(() => position(element));
         observer.observe(element);

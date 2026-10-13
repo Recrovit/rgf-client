@@ -39,6 +39,7 @@
     overflow-wrap: anywhere;
     box-sizing: border-box;
 }
-.rgf-ai-usage-panel dl { margin: .5rem 0; }
-.rgf-ai-usage-panel dd { margin: 0 0 .35rem; }
+.rgf-ai-usage-panel dl { margin: .5rem 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: .35rem .75rem; }
+.rgf-ai-usage-panel[id$="-models"] dl { margin-top: .25rem; grid-template-columns: max-content minmax(0, 1fr); column-gap: .5rem; }
+.rgf-ai-usage-panel dt, .rgf-ai-usage-panel dd { min-width: 0; margin: 0; }
 .rgf-ai-usage-panel p { margin: .5rem 0; }

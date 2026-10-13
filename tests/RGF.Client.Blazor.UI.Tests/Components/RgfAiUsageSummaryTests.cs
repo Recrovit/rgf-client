@@ -8,6 +8,23 @@ namespace Recrovit.RecroGridFramework.Client.Blazor.UI.Tests.Components;
 public sealed class RgfAiUsageSummaryTests
 {
     [Fact]
+    public void CallCountAliasesAndSentEffortAreVisibleWithoutTokenData()
+    {
+        using var context = Context();
+        var cut = context.Render<RgfAiUsageSummary>(p => p.Add(c => c.Response, new()
+        {
+            CreditUsage = new() { LlmCallCount = 3, ReasoningEffort = "high",
+                Models = [new() { ProviderId = "provider-alias", ModelId = "model-alias" }] }
+        }));
+        Assert.Equal("3", cut.Find("[id$=-tokens] dd").TextContent);
+        Assert.Equal("LLM calls", cut.Find("[id$=-tokens] dt").TextContent);
+        Assert.Empty(cut.FindAll("[aria-label='LLM calls']"));
+        Assert.Equal(new[] { "provider-alias", "model-alias", "high" },
+            cut.FindAll("[id$=-models] dd").Select(element => element.TextContent));
+        Assert.Single(cut.FindAll("[id$=-tokens] dd"));
+    }
+
+    [Fact]
     public async Task PopoversHaveStableUniqueIdsAccessibleButtonsAndModuleDisposal()
     {
         await using var context = Context();
@@ -60,9 +77,9 @@ public sealed class RgfAiUsageSummaryTests
             Tokens = new() { InputTokens = 0, OutputTokens = 7, TotalTokens = 99, CachedInputTokens = 3, ReasoningTokens = 2 },
             Models = [new() { Tokens = new() }]
         } }));
-        Assert.Equal(new[] { "0", "7", "99", "3", "2" },
+        Assert.Equal(new[] { "0", "0", "7", "99", "3", "2" },
             cut.FindAll("[id$=-tokens] dd").Select(e => e.TextContent));
-        Assert.Equal(new[] { "Unknown", "Unknown" }, cut.FindAll("[id$=-models] dd").Select(e => e.TextContent));
+        Assert.Equal(new[] { "Unknown", "Unknown", "Default" }, cut.FindAll("[id$=-models] dd").Select(e => e.TextContent));
 
         var usage = cut.Instance.Response.CreditUsage!;
         var model = new RgfAiModelCreditUsage { ProviderId = "openai", ModelId = "gpt-6-luna", Tokens = new() {
@@ -71,27 +88,29 @@ public sealed class RgfAiUsageSummaryTests
         usage.Models = [model];
         cut.Render();
         var panel = cut.Find("[id$=-tokens]");
-        Assert.Single(panel.QuerySelectorAll("dl"));
+        Assert.Equal(2, panel.QuerySelectorAll("dl").Length);
+        Assert.Equal("Aggregated token statistics", panel.QuerySelector("strong")!.TextContent);
+        Assert.Equal("DL", panel.FirstElementChild!.TagName);
         Assert.DoesNotContain("openai / gpt-6-luna", panel.TextContent);
         Assert.DoesNotContain("Request tokens", panel.TextContent);
-        Assert.Equal(new[] { "0", "7", "99", "3", "2" }, panel.QuerySelectorAll("dd").Select(e => e.TextContent));
+        Assert.Equal(new[] { "0", "0", "7", "99", "3", "2" }, panel.QuerySelectorAll("dd").Select(e => e.TextContent));
 
         model.Tokens.ReasoningTokens = null;
         cut.Render();
-        Assert.Single(cut.FindAll("[id$=-tokens] dl"));
-        Assert.Equal("2", cut.FindAll("[id$=-tokens] dd")[4].TextContent);
+        Assert.Equal(2, cut.FindAll("[id$=-tokens] dl").Count);
+        Assert.Equal("2", cut.FindAll("[id$=-tokens] dd")[5].TextContent);
 
         model.Tokens.ReasoningTokens = 2;
         usage.Models = [model, new() { ProviderId = "other", ModelId = "other-model", Tokens = model.Tokens }];
         cut.Render();
-        Assert.Single(cut.FindAll("[id$=-tokens] dl"));
+        Assert.Equal(2, cut.FindAll("[id$=-tokens] dl").Count);
         Assert.DoesNotContain("other-model", cut.Find("[id$=-tokens]").TextContent);
         usage.Tokens!.TotalTokens = null;
         cut.Render();
-        Assert.Equal("Unknown", cut.FindAll("[id$=-tokens] dd")[2].TextContent);
+        Assert.Equal("Unknown", cut.FindAll("[id$=-tokens] dd")[3].TextContent);
         usage.Tokens = null;
         cut.Render();
-        Assert.Empty(cut.FindAll(".bi-bar-chart, [id$=-tokens]"));
+        Assert.Equal("0", Assert.Single(cut.FindAll("[id$=-tokens] dd")).TextContent);
     }
 
     [Fact]
@@ -112,26 +131,28 @@ public sealed class RgfAiUsageSummaryTests
         using var context = Context();
         var value = source is null ? (decimal?)null : decimal.Parse(source, System.Globalization.CultureInfo.InvariantCulture);
         var cut = context.Render<RgfAiUsageSummary>(p => p.Add(c => c.Response, new() { CreditUsage = new() { ChargedCredit = value } }));
-        Assert.Contains(expected.Replace('.', System.Globalization.CultureInfo.CurrentCulture.NumberFormat.NumberDecimalSeparator[0]), cut.Find(".rgf-ai-usage-item").TextContent);
+        Assert.Contains(expected.Replace('.', System.Globalization.CultureInfo.CurrentCulture.NumberFormat.NumberDecimalSeparator[0]), cut.Find("button[popovertarget$=-cost]").TextContent);
     }
 
     [Fact]
     public void UsesDistinctServerModelsAndNeverSumsUnknownCostsOrTokens()
     {
         using var context = Context();
-        var response = new RgfAiResponse { CreditUsage = new() { ExecutionTime = TimeSpan.FromSeconds(72), Models = [
+        var response = new RgfAiResponse { CreditState = new(), CreditUsage = new() { ExecutionTime = TimeSpan.FromSeconds(72), Models = [
             new() { ProviderId = "p", ModelId = "actual", ChargedCredit = 2 },
             new() { ProviderId = "p", ModelId = "actual", ChargedCredit = 3, Tokens = new() { InputTokens = 0, OutputTokens = 7 } }
         ] } };
         var cut = context.Render<RgfAiUsageSummary>(p => p.Add(c => c.Response, response));
         Assert.Contains("actual", cut.Find(".rgf-ai-usage-item").TextContent);
         Assert.Contains("1m 12s", cut.Markup);
+        Assert.Equal(new[] { "bi bi-stopwatch", "bi bi-cpu", "bi bi-bar-chart", "bi bi-coin", "bi bi-piggy-bank" },
+            cut.FindAll(".rgf-ai-usage > span > i, .rgf-ai-usage > button > i").Select(icon => icon.ClassName));
         Assert.Equal("Unknown", cut.Find("[id$=-cost] dd").TextContent);
-        Assert.Empty(cut.FindAll(".bi-bar-chart, [id$=-tokens]"));
+        Assert.Equal("0", Assert.Single(cut.FindAll("[id$=-tokens] dd")).TextContent);
         response.CreditUsage.Models = [new() { ProviderId = "p", ModelId = "a" }, new() { ProviderId = "q", ModelId = "a" }];
         cut.Render();
         Assert.Contains("2 models", cut.Markup);
-        Assert.Empty(cut.FindAll(".bi-bar-chart"));
+        Assert.Single(cut.FindAll(".bi-bar-chart"));
     }
 
     [Theory]
