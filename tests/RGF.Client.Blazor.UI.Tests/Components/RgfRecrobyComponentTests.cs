@@ -136,6 +136,19 @@ public sealed class RgfRecrobyComponentTests
         using var context = SelectionContext(out var api);
         var cut = context.Render<RgfRecrobyComponent>();
         cut.WaitForAssertion(() => Assert.Equal(3, cut.FindAll("select").Count));
+        foreach (var (label, iconClass, suffix) in new[] {
+            ("Provider / Model", "bi-cpu", "-model"), ("Reasoning effort", "bi-lightbulb", "-effort") })
+        {
+            var button = cut.Find($"button[aria-label='{label}']");
+            Assert.Equal($"bi {iconClass} me-1", button.FirstElementChild!.ClassName);
+            Assert.Equal("true", button.FirstElementChild.GetAttribute("aria-hidden"));
+            Assert.Empty(button.QuerySelectorAll("[class*=fill]"));
+            Assert.EndsWith("▾", button.TextContent.Trim());
+            var target = button.GetAttribute("popovertarget")!;
+            Assert.EndsWith(suffix, target);
+            Assert.Equal(label, cut.Find("#" + target).GetAttribute("aria-label"));
+            Assert.Equal("auto", cut.Find("#" + target).GetAttribute("popover"));
+        }
         Assert.Contains("p / first", cut.Find("[aria-label='Provider / Model']").TextContent);
         Assert.Equal(new[] { "first", "second" }, cut.FindAll("select")[1].QuerySelectorAll("option").Select(o => o.TextContent));
         cut.FindAll("select")[2].Change("high");

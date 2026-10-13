@@ -23,3 +23,12 @@
     gap: .25rem;
     margin-top: .25rem;
 }
+
+.container ::deep .rgf-ai-action-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    padding: 0;
+}

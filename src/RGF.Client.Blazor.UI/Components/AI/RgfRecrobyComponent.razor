@@ -7,10 +7,12 @@
     private RenderFragment Selectors => @<div class="rgf-recroby-selectors" @ref="_element">
         <button type="button" class="btn btn-sm btn-outline-secondary" popovertarget="@(_selectorId + "-model")"
                 disabled="@SelectionDisabled" aria-label="Provider / Model" aria-expanded="false">
+            <i class="bi bi-cpu me-1" aria-hidden="true"></i>
             @Provider?.Id / @Model?.Id ▾
         </button>
         <button type="button" class="btn btn-sm btn-outline-secondary" popovertarget="@(_selectorId + "-effort")"
                 disabled="@SelectionDisabled" aria-label="Reasoning effort" aria-expanded="false">
+            <i class="bi bi-lightbulb me-1" aria-hidden="true"></i>
             @(ActiveSession.Conversation.AiReasoningEffortOverride ?? "Default") ▾
         </button>
         <div id="@(_selectorId + "-model")" class="rgf-recroby-selection-panel" popover="auto" role="dialog" aria-label="Provider / Model">

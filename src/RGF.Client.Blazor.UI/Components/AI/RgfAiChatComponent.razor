@@ -2,11 +2,16 @@
 
 <div class="container mt-4">
     <div class="chat-box d-flex flex-column">
-        @foreach (var message in Session.Conversation.Messages)
+        @for (var messageIndex = 0; messageIndex < Session.Conversation.Messages.Count; messageIndex++)
         {
+            var message = Session.Conversation.Messages[messageIndex];
             <div class="message @(message.Role == RgfAiMessageRole.User ? "text-bg-primary align-self-end" : "text-bg-secondary align-self-start")">
                 @message.Message
             </div>
+            @if (message.Role == RgfAiMessageRole.Assistant && message is RgfAiResponse response)
+            {
+                <RgfAiUsageSummary @key="(Session, messageIndex, response)" Response="response" />
+            }
         }
         @if (Session.IsProcessing)
         {
@@ -15,6 +20,10 @@
         @if ((_errorKind == "configuration" || _errorKind == "credit") && _sendError != null)
         {
             <div class="alert alert-warning mt-2 mb-0" role="alert" data-error-kind="@_errorKind">@_sendError</div>
+            @if (_failedResponse is not null)
+            {
+                <RgfAiUsageSummary @key="_failedResponse" Response="_failedResponse" />
+            }
         }
     </div>
     <div class="input-group mt-3">
@@ -34,17 +43,25 @@
     @if (ShowSendErrors && _sendError != null && _errorKind != "configuration" && _errorKind != "credit")
     {
         <div class="alert @(_errorKind == "workflow" ? "alert-warning" : "alert-danger") mt-2 mb-0" role="alert" data-error-kind="@_errorKind">@_sendError</div>
+        @if (_failedResponse is not null)
+        {
+            <RgfAiUsageSummary @key="_failedResponse" Response="_failedResponse" />
+        }
     }
 </div>
 
 @code {
     private RenderFragment InputControls => @<text>
-        <RgfButton CssClass="btn-primary m-1 align-self-start"
-                   MinWidth="5rem" Label="Send" OnClick="OnSendAsync" Disabled="Session.IsProcessing" />
+        <RgfButton CssClass="btn-success m-1 align-self-start rgf-ai-action-icon"
+                   Title="Send" AdditionalAttributes="@(new() { { "aria-label", "Send" } })" OnClick="OnSendAsync" Disabled="Session.IsProcessing">
+            <i class="bi bi-send" aria-hidden="true"></i>
+        </RgfButton>
         @if (AllowCancellation && Session.IsProcessing && _sendCancellation != null)
         {
-            <button type="button" class="btn btn-outline-secondary m-1 align-self-start"
-                    @onclick="CancelSend" aria-label="Cancel request">Cancel</button>
+            <button type="button" class="btn btn-outline-danger m-1 align-self-start rgf-ai-action-icon"
+                    @onclick="CancelSend" title="Cancel request" aria-label="Cancel request">
+                <i class="bi bi-stop-circle" aria-hidden="true"></i>
+            </button>
         }
     </text>;
 }

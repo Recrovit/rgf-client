@@ -1,0 +1,95 @@
+@using Recrovit.RecroGridFramework.Abstraction.Contracts.AI
+@using Recrovit.RecroGridFramework.Abstraction.Contracts.AI.Server
+
+@if (Response.CreditUsage is not null || Response.CreditState is not null)
+{
+    <div class="rgf-ai-usage" id="@_id" @ref="_element" aria-label="Response usage">
+        @if (Response.CreditUsage is { } usage)
+        {
+            @if (usage.Models.Count > 0)
+            {
+                @Item("models", "cpu", ModelLabel, "Models", ModelsContent)
+            }
+            @if (usage.ExecutionTime is { } duration)
+            {
+                <span class="rgf-ai-usage-duration" aria-label="Execution time"><i class="bi bi-stopwatch" aria-hidden="true"></i> @Duration(duration)</span>
+            }
+            @Item("cost", "coin", Credit(usage.ChargedCredit), "Charged credit", CostContent)
+        }
+        @if (Response.CreditState is { } state)
+        {
+            @Item("credit", "piggy-bank", StateLabel(state), "Credit state at response completion", StateContent)
+        }
+        @if (Response.CreditUsage is { Tokens: not null } tokenUsage)
+        {
+            @Item("tokens", "bar-chart", tokenUsage.Tokens?.TotalTokens?.ToString() ?? "Tokens", "Token statistics", TokensContent)
+        }
+    </div>
+}
+
+@code {
+    private RenderFragment Item(string group, string icon, string value, string label, RenderFragment content) => @<text>
+        <button type="button" class="rgf-ai-usage-item" popovertarget="@PanelId(group)" aria-controls="@PanelId(group)" aria-haspopup="dialog" aria-expanded="false" aria-label="@($"{label}: {value}")" title="@value"><i class="bi bi-@icon" aria-hidden="true"></i> @value</button>
+        <div class="rgf-ai-usage-panel" id="@PanelId(group)" popover="auto" role="dialog" aria-label="@label" tabindex="-1">
+            <strong>@label</strong>
+            @content
+        </div>
+    </text>;
+
+    private RenderFragment ModelsContent => @<text>
+        @foreach (var model in Response.CreditUsage!.Models)
+        {
+            <dl><dt>Provider</dt><dd>@Identity(model.ProviderId)</dd><dt>Model</dt><dd>@Identity(model.ModelId)</dd></dl>
+        }
+    </text>;
+
+    private RenderFragment CostContent => @<text>
+        <dl><dt>Total charged credit</dt><dd>@Credit(Response.CreditUsage!.ChargedCredit)</dd></dl>
+        @foreach (var model in Response.CreditUsage.Models)
+        {
+            <dl><dt>@Identity(model.ProviderId) / @Identity(model.ModelId)</dt><dd>@Credit(model.ChargedCredit)</dd></dl>
+        }
+    </text>;
+
+    private RenderFragment StateContent => @<text>
+        <p>Snapshot at response completion.</p>
+        @switch (Response.CreditState!.Mode)
+        {
+            case AiCreditMode.Disabled:
+                <p>Credit access is disabled.</p>
+                break;
+            case AiCreditMode.Unlimited:
+                <p>Unlimited access.</p>
+                break;
+            case AiCreditMode.Prepaid:
+                <dl><dt>Balance</dt><dd>@Credit(Response.CreditState.Prepaid?.Balance)</dd>
+                    <dt>Expires on</dt><dd>@if (Response.CreditState.Prepaid?.ExpiresOn is { } expiry) { <time datetime="@expiry.ToString("yyyy-MM-dd")" data-local-date>@expiry.ToString("yyyy-MM-dd")</time> } else { <text>Unknown</text> }</dd>
+                    <dt>Expired</dt><dd>@(Response.CreditState.Prepaid is { } prepaid ? prepaid.IsExpired ? "Yes" : "No" : "Unknown")</dd></dl>
+                break;
+            case AiCreditMode.Periodic:
+                @foreach (var period in Response.CreditState.Periods)
+                {
+                    <strong>@period.PeriodType</strong>
+                    <dl><dt>Credit limit</dt><dd>@Credit(period.CreditLimit)</dd>
+                        <dt>Used credit</dt><dd>@Credit(period.UsedCredit)</dd>
+                        <dt>Remaining credit</dt><dd>@Credit(period.RemainingCredit)</dd>
+                        <dt>Resets at</dt><dd><time datetime="@Utc(period.ResetsAtUtc)" data-local-time>@Utc(period.ResetsAtUtc)</time></dd></dl>
+                }
+                @if (Response.CreditState.Periods.Count == 0) { <p>Unknown</p> }
+                break;
+            default:
+                <p>Unknown</p>
+                break;
+        }
+    </text>;
+
+    private RenderFragment TokensContent => TokenFields(Response.CreditUsage!.Tokens);
+
+    private static RenderFragment TokenFields(RgfAiTokenUsage? tokens) => @<dl>
+        <dt>Input tokens</dt><dd>@Count(tokens?.InputTokens)</dd>
+        <dt>Output tokens</dt><dd>@Count(tokens?.OutputTokens)</dd>
+        <dt>Total tokens</dt><dd>@Count(tokens?.TotalTokens)</dd>
+        <dt>Cached input tokens</dt><dd>@Count(tokens?.CachedInputTokens)</dd>
+        <dt>Reasoning tokens</dt><dd>@Count(tokens?.ReasoningTokens)</dd>
+    </dl>;
+}

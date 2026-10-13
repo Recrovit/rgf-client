@@ -34,6 +34,7 @@ public partial class RgfAiChatComponent : IDisposable
     private CancellationTokenSource? _sendCancellation;
     private string? _sendError;
     private string? _errorKind;
+    private RgfAiResponse? _failedResponse;
 
     private static readonly HashSet<string> CreditErrorCodes = new(StringComparer.Ordinal)
     {
@@ -59,16 +60,27 @@ public partial class RgfAiChatComponent : IDisposable
         }
         subscribedSession = Session;
         subscribedSession.StateChanged += OnSessionStateChanged;
+        ClearSendError();
+    }
+
+    private void ClearSendError()
+    {
+        _sendError = null;
+        _errorKind = null;
+        _failedResponse = null;
     }
 
     private void OnSessionStateChanged()
     {
+        var notifyingSession = subscribedSession;
+        var requestStarted = notifyingSession?.IsProcessing == true;
         if (!disposed)
         {
             _ = InvokeAsync(() =>
             {
-                if (!disposed)
+                if (!disposed && ReferenceEquals(Session, notifyingSession))
                 {
+                    if (requestStarted) ClearSendError();
                     StateHasChanged();
                 }
             });
@@ -83,18 +95,24 @@ public partial class RgfAiChatComponent : IDisposable
         }
         var message = Prompt.Trim();
         Prompt = string.Empty;
-        _sendError = null;
+        ClearSendError();
+        var sendingSession = Session;
         using var cancellation = new CancellationTokenSource();
         _sendCancellation = cancellation;
         try
         {
-            var response = await Session.SendAsync(message, cancellationToken: cancellation.Token);
+            var response = await sendingSession.SendAsync(message, cancellationToken: cancellation.Token);
+            if (disposed || !ReferenceEquals(Session, sendingSession)) return;
             if (!response.Success)
             {
+                _failedResponse = response;
                 var providerMissing = response.ErrorCode == RgfAiErrorCodes.AiProviderNotConfigured;
+                var creditConfiguration = response.ErrorCode == "AiCredit.InvalidConfiguration";
                 var creditRejected = response.ErrorCode != null && CreditErrorCodes.Contains(response.ErrorCode);
-                _errorKind = providerMissing ? "configuration" : creditRejected ? "credit" : "workflow";
-                _sendError = providerMissing
+                _errorKind = providerMissing || creditConfiguration ? "configuration" : creditRejected ? "credit" : "workflow";
+                _sendError = creditConfiguration
+                    ? "Recroby could not complete the request due to a configuration error. Please contact your system administrator."
+                    : providerMissing
                     ? "No AI provider is configured. Configure an AI provider and model to use Recroby."
                     : creditRejected && !string.IsNullOrWhiteSpace(response.Message)
                     ? response.Message
@@ -103,8 +121,11 @@ public partial class RgfAiChatComponent : IDisposable
         }
         catch (Exception exception)
         {
-            _errorKind = exception is OperationCanceledException ? "cancelled" : "transport";
-            _sendError = exception is OperationCanceledException ? "Request cancelled." : "The Recroby service could not be reached or returned an invalid response. Please try again.";
+            if (!disposed && ReferenceEquals(Session, sendingSession))
+            {
+                _errorKind = exception is OperationCanceledException ? "cancelled" : "transport";
+                _sendError = exception is OperationCanceledException ? "Request cancelled." : "The Recroby service could not be reached or returned an invalid response. Please try again.";
+            }
             if (SendFailed.HasDelegate)
             {
                 await SendFailed.InvokeAsync(exception);

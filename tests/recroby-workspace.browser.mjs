@@ -12,6 +12,11 @@ const base = new URL("../src/RGF.Client.Blazor.UI/", import.meta.url);
 const appRoot = "/recroby-test";
 const moduleRoot = "/_content/Recrovit.RecroGridFramework.Client.Blazor.UI/Components/AI/";
 const assets = {
+    "/icons.css": ["text/css", await readFile(new URL("wwwroot/lib/bootstrap-icons/font/bootstrap-icons.css", base), "utf8")],
+    "/fonts/bootstrap-icons.woff2": ["font/woff2", await readFile(new URL("wwwroot/lib/bootstrap-icons/font/fonts/bootstrap-icons.woff2", base))],
+    "/fonts/bootstrap-icons.woff": ["font/woff", await readFile(new URL("wwwroot/lib/bootstrap-icons/font/fonts/bootstrap-icons.woff", base))],
+    "/usage.js": ["text/javascript", await readFile(new URL("Components/AI/RgfAiUsageSummary.razor.js", base), "utf8")],
+    "/usage.css": ["text/css", await readFile(new URL("Components/AI/RgfAiUsageSummary.razor.css", base), "utf8")],
     "/selection.js": ["text/javascript", await readFile(new URL("Components/AI/RgfRecrobyComponent.razor.js", base), "utf8")],
     "/selection.css": ["text/css", (await readFile(new URL("Components/AI/RgfRecrobyComponent.razor.css", base), "utf8")).replaceAll("::deep", "")],
     "/chat.css": ["text/css", (await readFile(new URL("Components/AI/RgfAiChatComponent.razor.css", base), "utf8")).replaceAll("::deep", "")],
@@ -26,7 +31,7 @@ assets['/components.css'] = ['text/css', (await Promise.all(['Dashboard/Dashboar
 assets[moduleRoot + 'RgfRecrobyComponent.razor.js'] = assets['/selection.js'];
 assets[moduleRoot + 'RgfRecrobyWorkspace.razor.js'] = assets['/module.js'];
 const html = `<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="/bootstrap.css"><link rel="stylesheet" href="/style.css">
-<link rel="stylesheet" href="/components.css"><link rel="stylesheet" href="/selection.css"><link rel="stylesheet" href="/chat.css"><script src="/jquery.js"></script><script src="/bootstrap.js"></script><script src="/ui.js"></script>
+<link rel="stylesheet" href="/icons.css"><link rel="stylesheet" href="/usage.css"><link rel="stylesheet" href="/components.css"><link rel="stylesheet" href="/selection.css"><link rel="stylesheet" href="/chat.css"><script src="/jquery.js"></script><script src="/bootstrap.js"></script><script src="/ui.js"></script>
 <style>body {margin:0} #outside {height:60px} #host {margin-left:120px; width:calc(100% - 160px)}
 .chat-box {overflow-y:auto} .message {padding:10px} .navbar {height:56px} main {flex:1;min-height:0}
 .grid {width:100%} .modal {z-index:1055} .toast-container {z-index:1080}</style></head><body>
@@ -43,10 +48,10 @@ const html = `<!doctype html><html><head><meta charset="utf-8"><link rel="styles
 </div></div></div></div>
 <div class="rgf-recroby-conversation"><div class="container mt-4">
 <div class="chat-box d-flex flex-column">${"<div class='message'>Message</div>".repeat(40)}</div>
-<div class="input-group mt-3"><textarea class="form-control"></textarea></div><div class="rgf-ai-actions"><button class="btn align-self-start" id="send">Send</button>
+<div class="input-group mt-3"><textarea class="form-control"></textarea></div><div class="rgf-ai-actions"><button type="button" class="btn btn-sm btn-success m-1 align-self-start rgf-ai-action-icon" id="send" title="Send" aria-label="Send"><i class="bi bi-send" aria-hidden="true"></i></button>
 <div class="rgf-recroby-selectors">
-<button id="model-choice" class="btn btn-sm btn-outline-secondary" popovertarget="model-panel" aria-expanded="false">Provider / Model ▾</button>
-<button id="effort-choice" class="btn btn-sm btn-outline-secondary" popovertarget="effort-panel" aria-expanded="false">Default ▾</button>
+<button id="model-choice" class="btn btn-sm btn-outline-secondary" popovertarget="model-panel" aria-expanded="false"><i class="bi bi-cpu me-1" aria-hidden="true"></i>Provider / Model ▾</button>
+<button id="effort-choice" class="btn btn-sm btn-outline-secondary" popovertarget="effort-panel" aria-expanded="false"><i class="bi bi-lightbulb me-1" aria-hidden="true"></i>Default ▾</button>
 <div id="model-panel" class="rgf-recroby-selection-panel" popover="auto" role="dialog"><label>Provider</label><select class="form-select"><option>Provider</option></select><label>Model</label><select class="form-select"><option>Model</option></select></div>
 <div id="effort-panel" class="rgf-recroby-selection-panel" popover="auto" role="dialog"><label>Reasoning effort</label><select class="form-select"><option>Default</option><option>High</option></select></div>
 </div></div></div></div>
@@ -55,6 +60,30 @@ const html = `<!doctype html><html><head><meta charset="utf-8"><link rel="styles
 <div id="form-reference" class="card" style="position:fixed;left:-1000px;width:360px"><div class="dialog-header card-header"><ul class="nav nav-tabs card-header-tabs"><li class="nav-item"><button class="nav-link active">Form tab</button></li></ul></div></div>
 <script type="module">import * as workspace from '${appRoot}${moduleRoot}RgfRecrobyWorkspace.razor.js';
 import * as selection from '${appRoot}${moduleRoot}RgfRecrobyComponent.razor.js';
+import * as usage from '${appRoot}/usage.js';
+window.usage = usage;
+// Mirror the component's rendered native controls; use production CSS and JS.
+const chat = document.querySelector('.chat-box');
+window.usageListeners = 0;
+const addWindowListener = window.addEventListener.bind(window);
+window.addEventListener = (name, handler, options) => {
+    if (handler.name === 'position' && options?.signal) {
+        window.usageListeners++;
+        options.signal.addEventListener('abort', () => window.usageListeners--, {once:true});
+    }
+    addWindowListener(name, handler, options);
+};
+for (let index = 0; index < 40; index++) {
+    const row = document.createElement('div');
+    row.className = 'rgf-ai-usage';
+    row.id = 'usage-row-' + index;
+    for (const [group, icon] of [['models','cpu'],['cost','coin'],['credit','piggy-bank'],['tokens','bar-chart']]) {
+        const id = 'usage-' + index + '-' + group;
+        row.insertAdjacentHTML('beforeend', '<button type="button" class="rgf-ai-usage-item" id="' + id + '-button" popovertarget="' + id + '" aria-controls="' + id + '" aria-haspopup="dialog" aria-expanded="false" aria-label="' + group + '"><i class="bi bi-' + icon + '" aria-hidden="true"></i>' + (group === 'models' ? 'actual-model-' + 'long'.repeat(35) : group) + '</button><div class="rgf-ai-usage-panel" id="' + id + '" popover="auto" role="dialog" tabindex="-1" aria-label="' + group + '"><strong>' + group + '</strong><dl><dt>Model</dt><dd>' + 'long'.repeat(100) + '</dd></dl><time datetime="2026-10-14T00:00:00Z" data-local-time></time><time datetime="2026-10-13" data-local-date></time></div>');
+    }
+    chat.append(row);
+    usage.sync(row);
+}
 const selectors = document.querySelector('.rgf-recroby-selectors');
 selection.sync(selectors, false);
 window.selectionSync = close => selection.sync(selectors, close);
@@ -78,7 +107,7 @@ reinitialize(); window.ready = true;
 const hostedHtml = html.replaceAll('href="/', `href="${appRoot}/`).replaceAll('src="/', `src="${appRoot}/`);
 const server = createServer((req, res) => {
     if (!req.url.startsWith(appRoot + '/')) { res.writeHead(404); res.end(); return; }
-    const path = req.url.slice(appRoot.length);
+    const path = req.url.slice(appRoot.length).split('?')[0];
     const asset = assets[path];
     if (!asset && /\.(js|css)$/.test(path)) { res.writeHead(404); res.end(); return; }
     const [type, body] = asset ?? ["text/html", hostedHtml];
@@ -130,6 +159,14 @@ try {
     await viewport(1200, 800);
     await cdp("Page.navigate", { url: `http://127.0.0.1:${server.address().port}${appRoot}/nested/route` });
     for (let i = 0; i < 100 && !await evaluate("window.ready === true"); i++) await delay(50);
+    await evaluate("document.fonts.load('12px bootstrap-icons')");
+    assert.equal(await evaluate("document.fonts.check('12px bootstrap-icons')"), true, 'existing Bootstrap icon font is loaded');
+    for (const [button, icon] of [['model-choice','bi-cpu'], ['effort-choice','bi-lightbulb']]) {
+        assert.equal(await evaluate(`document.querySelector('#${button}').firstElementChild.className`), `bi ${icon} me-1`);
+        assert.equal(await evaluate(`document.querySelector('#${button}').firstElementChild.getAttribute('aria-hidden')`), 'true');
+        assert.equal(await evaluate(`document.querySelector('#${button}').textContent.trim().endsWith('▾')`), true);
+    }
+    assert.equal(await evaluate("document.querySelector('#usage-39-credit-button i').className"), 'bi bi-piggy-bank');
     assert.equal(await evaluate("document.querySelector('section').hidden"), true);
     const full = await rect(".rgf-recroby-content");
     assert.equal(full.height, 740, 'short host content fills the visible work area');
@@ -460,6 +497,7 @@ try {
     assert.equal(await evaluate('document.activeElement.id'), 'dialog-input');
     await click('#dialog-primary');
     assert.equal(await evaluate("document.querySelector('#host-dialog')"), null, 'Dialog above bottom dock remains operable');
+    await evaluate("document.querySelector('#model-choice').lastChild.textContent=' provider / ' + 'long-model-name-'.repeat(20) + ' ▾'");
     for (const [width, height] of [[1200, 800], [800, 400], [390, 700], [390, 260]]) {
         await viewport(width, height);
         for (const mode of [0, 1, 2, 3]) {
@@ -469,6 +507,9 @@ try {
                 await evaluate(`document.querySelector('#${id}-choice').scrollIntoView({block:'nearest'})`);
                 await click(`#${id}-choice`);
                 const popup = await rect(`#${id}-panel`), anchor = await rect(`#${id}-choice`);
+                const selectors = await rect('.rgf-recroby-selectors');
+                assert.ok(anchor.x >= selectors.x && anchor.right <= selectors.right + 1, 'selector with icon stays within its container');
+                assert.equal(await evaluate("getComputedStyle(document.querySelector('#model-choice')).textOverflow"), 'ellipsis');
                 assert.equal(await evaluate(`document.querySelector('#${id}-panel').matches(':popover-open')`), true);
                 assert.ok(popup.y >= 7 && popup.bottom <= height - 7 && popup.x >= 7 && popup.right <= width - 7, `AI ${id} panel fits ${mode} at ${width}x${height}`);
                 assert.ok(popup.bottom <= anchor.y, 'AI selection opens upwards');
@@ -486,6 +527,7 @@ try {
         }
     }
     await viewport(1200, 800);
+    await evaluate("document.querySelector('#model-choice').lastChild.textContent='Provider / Model ▾'");
     await layout({ mode: 0, isCollapsed: false, height: 560 });
     const input = await rect('textarea'), send = await rect('#send'), selectors = await rect('.rgf-recroby-selectors');
     assert.ok(send.y >= input.bottom, 'Send is below the message input');
@@ -502,7 +544,106 @@ try {
     await click('#effort-choice');
     await evaluate('selectionSync(true)');
     assert.equal(await evaluate("document.querySelector('#effort-panel').matches(':popover-open')"), false, 'processing closes AI top layer');
-    console.log("PASS: AI selectors and conversation switcher, top layer, viewport bounds, focus, Escape, collapse, all dock/mobile modes, host isolation, persistence, dialog/toast stacking");
+    assert.equal(await evaluate('usageListeners'), 0, 'closed usage history has no global listeners');
+    await cdp('Emulation.setTimezoneOverride', {timezoneId:'America/New_York'});
+    await evaluate("document.querySelectorAll('.rgf-ai-usage').forEach(usage.sync)");
+    assert.equal(await evaluate("document.querySelector('[data-local-time]').textContent"), await evaluate("new Date('2026-10-14T00:00:00Z').toLocaleString()"));
+    assert.equal(await evaluate("document.querySelector('[data-local-date]').textContent"), await evaluate("new Date('2026-10-13T00:00:00').toLocaleDateString()"));
+    for (const [width, height] of [[1200,800], [390,700], [390,260]]) {
+        await viewport(width, height);
+        for (const mode of [0,1,2,3]) {
+            await layout({mode, isCollapsed:false, height:560, dockHeight:300});
+            for (const group of ['models','cost','credit','tokens']) {
+                const button = '#usage-39-' + group + '-button', panel = '#usage-39-' + group;
+                await evaluate(`document.querySelector('${button}').scrollIntoView({block:'nearest'})`);
+                const before = await rect('section');
+                await click(button);
+                assert.equal(await evaluate(`document.querySelector('${panel}').matches(':popover-open')`), true, `usage ${group} opens in mode ${mode} at ${width}x${height}`);
+                const popup = await rect(panel), anchor = await rect(button);
+                assert.ok(popup.x >= 7 && popup.right <= width - 7 && popup.y >= 7 && popup.bottom <= height - 7, 'usage panel fits viewport in every layout');
+                assert.ok(Math.min(Math.abs(popup.bottom - anchor.y), Math.abs(popup.y - anchor.bottom)) <= 5, 'usage panel stays near trigger');
+                assert.deepEqual(await rect('section'), before, 'usage panel does not resize workspace');
+                assert.ok(await evaluate(`(() => {const p=document.querySelector('${panel}'), r=p.getBoundingClientRect(); return p.contains(document.elementFromPoint(r.x+10,r.y+10));})()`), 'usage panel is in visible top layer');
+                assert.equal(await evaluate(`document.activeElement.id`), panel.slice(1));
+                assert.equal(await evaluate(`document.querySelector('${button}').getAttribute('aria-expanded')`), 'true');
+                assert.equal(await evaluate("document.querySelector('.chat-box').scrollWidth <= document.querySelector('.chat-box').clientWidth"), true, 'long model identifiers wrap');
+                await cdp('Input.dispatchKeyEvent', {type:'keyDown',key:'Escape'});
+                await cdp('Input.dispatchKeyEvent', {type:'keyUp',key:'Escape'});
+                await delay(50);
+                assert.equal(await evaluate(`document.querySelector('${panel}').matches(':popover-open')`), false);
+                assert.equal(await evaluate('document.activeElement.id'), button.slice(1));
+                assert.equal(await evaluate('usageListeners'), 0, 'Escape releases active resources');
+            }
+            await click('#usage-39-cost-button');
+            await layout({isCollapsed:true});
+            assert.equal(await evaluate("document.querySelector('#usage-39-cost').matches(':popover-open')"), false, 'collapse closes usage panel');
+            assert.equal(await evaluate('usageListeners'), 0);
+        }
+    }
+    await viewport(1200,800);
+    await layout({mode:0,isCollapsed:false,height:560});
+    await evaluate("document.querySelector('#usage-39-cost-button').scrollIntoView({block:'nearest'})");
+    await click('#usage-39-cost-button');
+    await evaluate("document.querySelector('.rgf-recroby-conversation').hidden=true");
+    await delay(50);
+    assert.equal(await evaluate("document.querySelector('#usage-39-cost').matches(':popover-open')"), false, 'conversation switch closes usage panel');
+    assert.equal(await evaluate('usageListeners'), 0);
+    await evaluate("document.querySelector('.rgf-recroby-conversation').hidden=false");
+    await click('#usage-39-cost-button');
+    await cdp('Input.dispatchMouseEvent', {type:'mousePressed',x:5,y:5,button:'left',clickCount:1});
+    await cdp('Input.dispatchMouseEvent', {type:'mouseReleased',x:5,y:5,button:'left',clickCount:1});
+    await delay(50);
+    assert.equal(await evaluate("document.querySelector('#usage-39-cost').matches(':popover-open')"), false, 'outside click dismisses usage');
+    await click('#usage-39-cost-button');
+    await click('#effort-choice');
+    assert.equal(await evaluate("document.querySelector('#usage-39-cost').matches(':popover-open')"), false, 'existing selectors replace usage popovers');
+    assert.equal(await evaluate("document.querySelector('#effort-panel').matches(':popover-open')"), true);
+    await evaluate('selectionSync(true)');
+    await evaluate(`(() => {
+        const region = document.createElement('div');
+        region.id = 'other-conversation'; region.className = 'rgf-recroby-conversation'; region.hidden = true;
+        const row = document.querySelector('#usage-row-39').cloneNode(true);
+        for (const node of [row, ...row.querySelectorAll('[id]')]) node.id += '-other';
+        for (const button of row.querySelectorAll('[popovertarget]')) {
+            button.setAttribute('popovertarget', button.getAttribute('popovertarget') + '-other');
+            button.setAttribute('aria-controls', button.getAttribute('popovertarget'));
+        }
+        region.append(row); document.querySelector('section').append(region); usage.sync(row);
+    })()`);
+    await click('#usage-39-cost-button');
+    await evaluate("document.querySelector('.rgf-recroby-conversation').hidden=true; document.querySelector('#other-conversation').hidden=false");
+    await delay(50);
+    assert.equal(await evaluate("document.querySelector('#usage-39-cost').matches(':popover-open')"), false);
+    await click('#usage-39-cost-button-other');
+    assert.equal(await evaluate("document.querySelector('#usage-39-cost-other').matches(':popover-open')"), true, 'another conversation opens its own independent panel');
+    assert.equal(await evaluate('usageListeners'), 2, 'only the active panel holds global listeners');
+    await evaluate("document.querySelector('#other-conversation').hidden=true; document.querySelector('.rgf-recroby-conversation').hidden=false");
+    await delay(50);
+    assert.equal(await evaluate("document.querySelector('#usage-39-cost-other').matches(':popover-open')"), false);
+    await evaluate("document.querySelector('#other-conversation').remove(); usage.dispose('usage-row-39-other')");
+    assert.equal(await evaluate('usageListeners'), 0);
+    await evaluate("document.querySelector('#usage-39-cost-button').focus()");
+    assert.equal(await evaluate('document.activeElement.id'), 'usage-39-cost-button');
+    await cdp('Input.dispatchKeyEvent', {type:'keyDown',key:'Enter',code:'Enter',windowsVirtualKeyCode:13,text:'\r',unmodifiedText:'\r'});
+    await cdp('Input.dispatchKeyEvent', {type:'keyUp',key:'Enter',code:'Enter',windowsVirtualKeyCode:13});
+    await delay(50);
+    assert.equal(await evaluate("document.querySelector('#usage-39-cost').matches(':popover-open')"), true, 'keyboard activates native usage button');
+    await evaluate("document.querySelector('#usage-39-cost').hidePopover()");
+    await delay(50);
+    await click('#usage-39-cost-button');
+    await evaluate("usage.dispose('usage-row-39')");
+    assert.equal(await evaluate("document.querySelector('#usage-39-cost').matches(':popover-open')"), false, 'dispose closes top layer');
+    assert.equal(await evaluate('usageListeners'), 0, 'dispose releases all global listeners');
+    await click('#usage-39-cost-button');
+    await delay(50);
+    assert.equal(await evaluate('usageListeners'), 0, 'dispose removes panel toggle handlers');
+    await evaluate("document.querySelector('#usage-39-cost').hidePopover()");
+    await evaluate("document.querySelector('#usage-0-cost-button').scrollIntoView({block:'nearest'})");
+    await click('#usage-0-cost-button');
+    assert.equal(await evaluate('usageListeners'), 2);
+    await evaluate("document.querySelector('#usage-row-0').remove(); usage.dispose('usage-row-0')");
+    assert.equal(await evaluate('usageListeners'), 0, 'disposal by stable ID also works after Blazor removes the DOM node');
+    console.log("PASS: usage/selector top layer, viewport bounds, focus, Escape, outside click, collapse/switch/dispose, long history resources, local dates, all dock/mobile modes, host isolation, persistence, dialog/toast stacking");
 } finally {
     socket?.close(); child.kill();
     await new Promise(resolve => server.close(resolve));

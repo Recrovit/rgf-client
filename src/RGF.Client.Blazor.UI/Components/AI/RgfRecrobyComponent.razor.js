@@ -1,3 +1,7 @@
+/*!
+* RgfRecrobyComponent.razor.js v1.0.0
+*/
+
 const instances = new WeakMap();
 
 function position(element) {

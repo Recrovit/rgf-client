@@ -13,6 +13,128 @@ namespace Recrovit.RecroGridFramework.Client.Blazor.UI.Tests.Components;
 
 public sealed class RgfAiChatComponentTests
 {
+    [Theory]
+    [InlineData("AiCredit.UserDisabled", false, true)]
+    [InlineData("AiProviderNotConfigured", false, true)]
+    [InlineData("AiCredit.Unknown", false, false)]
+    [InlineData("AiCredit.Unknown", true, true)]
+    [InlineData(null, false, false)]
+    [InlineData(null, true, true)]
+    public async Task FailedResponseUsageFollowsAlertVisibilityWithoutChangingSafeText(string? code, bool showErrors, bool visible)
+    {
+        using var context = CreateContext();
+        if (code == "AiProviderNotConfigured") code = RgfAiErrorCodes.AiProviderNotConfigured;
+        var response = new RgfAiResponse { ErrorCode = code, Message = "<b>Hidden server detail</b>",
+            CreditUsage = new() { ChargedCredit = 0 }, CreditState = new() };
+        var session = new RgfAiConversationSession(new TestTransport { Send = _ => Task.FromResult(response) });
+        var cut = context.Render<RgfAiChatComponent>(p => p.Add(c => c.Session, session).Add(c => c.ShowSendErrors, showErrors));
+        cut.Find("textarea").Change("Question");
+        await cut.Find("button").ClickAsync(new MouseEventArgs());
+        Assert.Equal(visible ? 1 : 0, cut.FindAll(".rgf-ai-usage").Count);
+        Assert.Equal(RgfAiMessageRole.User, Assert.Single(session.Conversation.Messages).Role);
+        if (visible)
+        {
+            var alert = cut.Find("[role=alert]");
+            Assert.Empty(alert.Children);
+            Assert.DoesNotContain("Unknown", alert.TextContent);
+            Assert.Same(response, cut.FindComponent<RgfAiUsageSummary>().Instance.Response);
+            Assert.Equal(alert, cut.Find(".rgf-ai-usage").PreviousElementSibling);
+            if (code == "AiCredit.UserDisabled") Assert.Equal(response.Message, alert.TextContent);
+            else Assert.DoesNotContain("Hidden server detail", cut.Markup);
+        }
+        else Assert.DoesNotContain("Hidden server detail", cut.Markup);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task NewRequestClearsFailedUsageBeforeCompletionAndDoesNotInventExceptionUsage(bool external)
+    {
+        using var context = CreateContext();
+        var first = true;
+        var pending = new TaskCompletionSource<RgfAiResponse>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var session = new RgfAiConversationSession(new TestTransport { Send = _ => first
+            ? Task.FromResult(new RgfAiResponse { ErrorCode = "AiCredit.UserDisabled", CreditUsage = new() }) : pending.Task });
+        var cut = context.Render<RgfAiChatComponent>(p => p.Add(c => c.Session, session).Add(c => c.ShowSendErrors, true));
+        cut.Find("textarea").Change("First");
+        await cut.Find("button").ClickAsync(new MouseEventArgs());
+        Assert.Single(cut.FindAll(".rgf-ai-usage"));
+        first = false;
+        Task turn;
+        if (external) turn = session.SendAsync("External", cancellationToken: Xunit.TestContext.Current.CancellationToken);
+        else
+        {
+            cut.Find("textarea").Change("Next");
+            turn = cut.Find(".input-group ~ button").ClickAsync(new MouseEventArgs());
+        }
+        cut.WaitForAssertion(() => Assert.Empty(cut.FindAll(".rgf-ai-usage, [role=alert]")));
+        pending.SetException(new HttpRequestException("Hidden transport detail"));
+        if (external) await Assert.ThrowsAsync<HttpRequestException>(() => turn);
+        else await turn;
+        Assert.Empty(cut.FindAll(".rgf-ai-usage, .message.text-bg-secondary"));
+    }
+
+    [Fact]
+    public async Task SessionReplacementClearsFailureAndIgnoresOldInFlightFailure()
+    {
+        using var context = CreateContext();
+        var oldResponse = new RgfAiResponse { ErrorCode = "AiCredit.UserDisabled", Message = "Old denied", CreditUsage = new() };
+        var first = true;
+        var pending = new TaskCompletionSource<RgfAiResponse>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var session = new RgfAiConversationSession(new TestTransport { Send = _ => first ? Task.FromResult(oldResponse) : pending.Task });
+        var cut = context.Render<RgfAiChatComponent>(p => p.Add(c => c.Session, session));
+        cut.Find("textarea").Change("First");
+        await cut.Find("button").ClickAsync(new MouseEventArgs());
+        Assert.Single(cut.FindAll(".rgf-ai-usage"));
+        var other = new RgfAiConversationSession(new TestTransport());
+        cut.Render(p => p.Add(c => c.Session, other));
+        Assert.Empty(cut.FindAll(".rgf-ai-usage, [role=alert]"));
+        cut.Render(p => p.Add(c => c.Session, session));
+        first = false;
+        cut.Find("textarea").Change("Pending");
+        var turn = cut.Find("button").ClickAsync(new MouseEventArgs());
+        cut.Render(p => p.Add(c => c.Session, other));
+        pending.SetResult(oldResponse);
+        await turn;
+        Assert.Empty(cut.FindAll(".rgf-ai-usage, [role=alert]"));
+        Assert.Empty(other.Conversation.Messages);
+    }
+    [Fact]
+    public async Task UsageUsesOriginalResponsesPreservesBubblesAndIsolatesResetAndSessionReplacement()
+    {
+        using var context = CreateContext();
+        var response = new RgfAiResponse { Success = true, Message = "Original answer",
+            CreditUsage = new() { ChargedCredit = 0, Models = [new() { ProviderId = "p", ModelId = "server-model" }] } };
+        var session = new RgfAiConversationSession(new TestTransport { Send = _ => Task.FromResult(response) });
+        session.Conversation.AddUserMessage("Earlier question");
+        session.Conversation.ApplyResponse(response);
+        session.Conversation.ApplyResponse(Response("No usage"));
+        var cut = context.Render<RgfAiChatComponent>(p => p.Add(c => c.Session, session));
+        var usage = cut.FindAll(".rgf-ai-usage");
+        Assert.Single(usage);
+        Assert.Same(response, cut.FindComponents<RgfAiUsageSummary>()[0].Instance.Response);
+        Assert.Equal("Original answer", usage[0].PreviousElementSibling!.TextContent.Trim());
+        Assert.Equal("message text-bg-secondary align-self-start", usage[0].PreviousElementSibling!.ClassName);
+        Assert.Single(cut.FindAll(".message.text-bg-primary.align-self-end"));
+        var originalId = cut.Find("[popover]").Id!;
+        await session.SendAsync("New question", cancellationToken: Xunit.TestContext.Current.CancellationToken);
+        cut.WaitForAssertion(() => Assert.Equal(2, cut.FindAll(".rgf-ai-usage").Count));
+        Assert.Equal(originalId, cut.Find("[popover]").Id);
+        Assert.Equal(4, cut.FindAll("[popover]").Select(e => e.Id).Distinct().Count());
+
+        var other = new RgfAiConversationSession(new TestTransport());
+        other.Conversation.ApplyResponse(new() { Success = true, Message = "Other answer", CreditState = new() });
+        var second = context.Render<RgfAiChatComponent>(p => p.Add(c => c.Session, other));
+        Assert.DoesNotContain("server-model", second.Markup);
+        session.Conversation.Reset();
+        cut.Render();
+        Assert.Empty(cut.FindAll(".message, .rgf-ai-usage, [popover]"));
+        Assert.Single(second.FindAll(".rgf-ai-usage"));
+        cut.Render(p => p.Add(c => c.Session, other));
+        Assert.Equal("Other answer", cut.Find(".message").TextContent.Trim());
+        Assert.DoesNotContain(originalId, cut.Markup);
+        Assert.NotEqual(second.Find("[popover]").Id, cut.Find("[popover]").Id);
+    }
     [Fact]
     public void RendersUserAndAssistantWithExistingPresentationClasses()
     {
@@ -26,6 +148,10 @@ public sealed class RgfAiChatComponentTests
         Assert.Equal("Answer", cut.Find(".message.text-bg-secondary.align-self-start").TextContent.Trim());
         Assert.True(cut.FindComponent<RgfInputText>().Instance.Multiline);
         Assert.Empty(cut.FindComponents<SpinnerComponent>());
+        var send = cut.Find("button[aria-label=Send]");
+        Assert.Equal("Send", send.GetAttribute("title"));
+        Assert.Empty(send.TextContent.Trim());
+        Assert.Equal("true", send.QuerySelector(".bi-send")!.GetAttribute("aria-hidden"));
     }
 
     [Fact]
@@ -65,7 +191,7 @@ public sealed class RgfAiChatComponentTests
         using var context = CreateContext();
         var pending = new TaskCompletionSource<RgfAiResponse>(TaskCreationOptions.RunContinuationsAsynchronously);
         var session = new RgfAiConversationSession(new TestTransport { Send = _ => pending.Task });
-        var cut = context.Render<RgfAiChatComponent>(p => p.Add(c => c.Session, session));
+        var cut = context.Render<RgfAiChatComponent>(p => p.Add(c => c.Session, session).Add(c => c.AllowCancellation, true));
         cut.Find("textarea").Change("Hello");
 
         var click = cut.Find("button").ClickAsync(new MouseEventArgs());
@@ -74,6 +200,10 @@ public sealed class RgfAiChatComponentTests
             Assert.Single(cut.FindComponents<SpinnerComponent>());
             Assert.True(cut.Find("button").HasAttribute("disabled"));
             Assert.Equal(string.Empty, cut.FindComponent<RgfInputText>().Instance.Value);
+            var cancel = cut.Find("button[aria-label='Cancel request']");
+            Assert.Equal("Cancel request", cancel.GetAttribute("title"));
+            Assert.Empty(cancel.TextContent.Trim());
+            Assert.Equal("true", cancel.QuerySelector(".bi-stop-circle")!.GetAttribute("aria-hidden"));
         });
         pending.SetResult(Response("Done"));
         await click;
@@ -82,6 +212,7 @@ public sealed class RgfAiChatComponentTests
         {
             Assert.Empty(cut.FindComponents<SpinnerComponent>());
             Assert.False(cut.Find("button").HasAttribute("disabled"));
+            Assert.Empty(cut.FindAll("button[aria-label='Cancel request']"));
         });
     }
 
@@ -179,17 +310,20 @@ public sealed class RgfAiChatComponentTests
     [InlineData("AiCredit.UserDisabled", "AI Credit access is disabled for Kovács János.")]
     [InlineData("AiCredit.InsufficientCredit", "There is not enough AI Credit to start another model request.")]
     [InlineData("AiCredit.BalanceExpired", "The AI Credit balance has expired.")]
-    [InlineData("AiCredit.InvalidConfiguration", "AI Credit is not configured correctly for this user.")]
+    [InlineData("AiCredit.InvalidConfiguration", "Hidden server provider/model detail")]
+    [InlineData("AiCredit.InvalidConfiguration", null)]
+    [InlineData("AiCredit.InvalidConfiguration", "")]
+    [InlineData("AiCredit.InvalidConfiguration", " \n ")]
     [InlineData("AiCredit.UserNotFound", "An authenticated RGF user is required for AI Credit access.")]
     [InlineData("AiCredit.InfrastructureFailure", "AI Credit access could not be verified. Please try again later.")]
-    public async Task KnownCreditRejectionsShowServerMessageRegardlessOfShowSendErrors(string code, string message)
+    public async Task KnownCreditRejectionsShowSafeMessageRegardlessOfShowSendErrors(string code, string? message)
     {
         foreach (var showSendErrors in new[] { false, true })
         {
             using var context = CreateContext();
             var session = new RgfAiConversationSession(new TestTransport
             {
-                Send = _ => Task.FromResult(new RgfAiResponse { ErrorCode = code, Message = message })
+                Send = _ => Task.FromResult(new RgfAiResponse { ErrorCode = code, Message = message! })
             });
             var failures = new List<Exception>();
             var cut = context.Render<RgfAiChatComponent>(p => p
@@ -201,9 +335,13 @@ public sealed class RgfAiChatComponentTests
             await cut.Find("button").ClickAsync(new MouseEventArgs());
 
             var alert = Assert.Single(cut.FindAll("[role=alert]"));
-            Assert.Equal("credit", alert.GetAttribute("data-error-kind"));
+            var configuration = code == "AiCredit.InvalidConfiguration";
+            Assert.Equal(configuration ? "configuration" : "credit", alert.GetAttribute("data-error-kind"));
             Assert.Contains("alert-warning", alert.ClassList);
-            Assert.Equal(message, alert.TextContent);
+            Assert.Equal(configuration
+                ? "Recroby could not complete the request due to a configuration error. Please contact your system administrator."
+                : message, alert.TextContent);
+            Assert.DoesNotContain("Hidden server", cut.Markup);
             Assert.Equal(RgfAiMessageRole.User, Assert.Single(session.Conversation.Messages).Role);
             Assert.Empty(cut.FindAll(".message.text-bg-secondary"));
             Assert.Empty(failures);
