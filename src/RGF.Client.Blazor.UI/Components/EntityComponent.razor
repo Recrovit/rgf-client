@@ -1,4 +1,6 @@
-﻿<RgfEntityComponent EntityParameters="EntityParameters"
+﻿@* RGF-DOC: rgf.client.blazor-ui.entity-ui *@
+
+<RgfEntityComponent EntityParameters="EntityParameters"
                     ToolbarTemplate="ToolbarTemplate"
                     GridTemplate="GridTemplate"
                     TreeTemplate="TreeTemplate"
@@ -10,27 +12,35 @@
 
 @code {
 
+    /// <summary>Required settings retained for this entity instance.</summary>
     [Parameter, EditorRequired]
     public RgfEntityParameters EntityParameters { get; set; } = null!;
 
+    /// <summary>Toolbar rendering with the entity settings.</summary>
     [Parameter]
     public RenderFragment<RgfEntityParameters> ToolbarTemplate { get; set; } = (context) => @<ToolbarComponent EntityParameters="context" />;
 
+    /// <summary>Grid rendering with the entity settings.</summary>
     [Parameter]
     public RenderFragment<RgfEntityParameters> GridTemplate { get; set; } = (context) => @<GridComponent EntityParameters="context" />;
 
+    /// <summary>Optional tree rendering; the base entity falls back to grid when absent.</summary>
     [Parameter]
     public RenderFragment<RgfEntityParameters> TreeTemplate { get; set; } = (context) => @<TreeComponent EntityParameters="context" />;
 
+    /// <summary>Filter rendering with the entity settings.</summary>
     [Parameter]
     public RenderFragment<RgfEntityParameters> FilterTemplate { get; set; } = (context) => @<FilterComponent EntityParameters="context" />;
 
+    /// <summary>Pager rendering with the entity settings.</summary>
     [Parameter]
     public RenderFragment<RgfEntityParameters> PagerTemplate { get; set; } = (context) => @<PagerComponent EntityParameters="context" />;
 
+    /// <summary>Form rendering with the entity settings.</summary>
     [Parameter]
     public RenderFragment<RgfEntityParameters> FormTemplate { get; set; } = (context) => @<FormComponent EntityParameters="context" />;
 
+    /// <summary>Optional chart rendering with the entity settings.</summary>
     [Parameter]
     public RenderFragment<RgfEntityParameters>? ChartTemplate { get; set; }
 

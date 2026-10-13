@@ -3,6 +3,8 @@ using Recrovit.RecroGridFramework.Client.Services;
 
 namespace Recrovit.RecroGridFramework.Client.Blazor.SessionAuth.Proxy;
 
+// RGF-DOC: rgf.client.blazor-sessionauth.configuration
+
 /// <summary>
 /// Forwards the incoming authentication cookie when SSR code calls the local host proxy.
 /// </summary>

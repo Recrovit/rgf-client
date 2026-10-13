@@ -17,6 +17,12 @@ public sealed class RgfAiCustomFunctionTransport : IRgfAiTransport
     private readonly RgfAiCustomFunctionOptions options;
     private readonly RgfDynamicDictionary? rowData;
 
+    /// <summary>Creates an adapter for a host CustomFunction with final progress responses.</summary>
+    /// <param name="listHandler">Invocation and progress lifecycle owner.</param>
+    /// <param name="options">Required nonblank function, request and final response names.</param>
+    /// <param name="rowData">Optional explicit row; a valid signed entity key is required when supplied.</param>
+    /// <param name="additionalCustomParamsFactory">Optional per-send custom parameters; the request key is reserved.</param>
+    /// <param name="toastFactory">Optional per-send progress presentation.</param>
     public RgfAiCustomFunctionTransport(IRgListHandler listHandler, RgfAiCustomFunctionOptions options,
         RgfDynamicDictionary? rowData = null,
         Func<IDictionary<string, object>?>? additionalCustomParamsFactory = null,
@@ -34,10 +40,18 @@ public sealed class RgfAiCustomFunctionTransport : IRgfAiTransport
         ToastFactory = toastFactory;
     }
 
+    /// <summary>Per-send factory for copied host parameters; must not supply the reserved request key.</summary>
     public Func<IDictionary<string, object>?>? AdditionalCustomParamsFactory { get; }
 
+    /// <summary>Per-send factory for optional invocation toast presentation.</summary>
     public Func<RgfToastEventArgs?>? ToastFactory { get; }
 
+    /// <summary>Invokes the configured CustomFunction and waits for its final response progress event.</summary>
+    /// <param name="request">The AI turn placed under the configured request parameter key.</param>
+    /// <param name="cancellationToken">Cancels client waiting without cancelling the server workflow or disposing handler-owned progress.</param>
+    /// <returns>The deserialized final response, including workflow failure responses.</returns>
+    /// <exception cref="InvalidOperationException">Explicit row identity, parameter names, invocation or final response protocol is invalid.</exception>
+    /// <remarks>Intermediate response data is ignored. A final event received before invocation returns takes precedence over the immediate result.</remarks>
     public async Task<RgfAiResponse> SendAsync(RgfAiRequest request, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);

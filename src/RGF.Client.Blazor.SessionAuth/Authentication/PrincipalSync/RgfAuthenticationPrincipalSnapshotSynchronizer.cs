@@ -9,6 +9,8 @@ using Recrovit.RecroGridFramework.Client.Services;
 
 namespace Recrovit.RecroGridFramework.Client.Blazor.SessionAuth.Authentication.PrincipalSync;
 
+// RGF-DOC: rgf.client.blazor-sessionauth.configuration
+
 internal sealed class RgfAuthenticationPrincipalSnapshotSynchronizer(
     IHttpClientFactory httpClientFactory,
     RgfAuthenticationEndpointResolver authenticationEndpoints,

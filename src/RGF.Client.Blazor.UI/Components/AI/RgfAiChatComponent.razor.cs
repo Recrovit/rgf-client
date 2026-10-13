@@ -9,15 +9,19 @@ namespace Recrovit.RecroGridFramework.Client.Blazor.UI.Components.AI;
 /// <summary>Displays and sends manual turns through a UI-independent conversation session.</summary>
 public partial class RgfAiChatComponent : IDisposable
 {
+    /// <summary>Required conversation session; the component subscribes to state but does not own the transport.</summary>
     [Parameter, EditorRequired]
     public RgfAiConversationSession Session { get; set; } = null!;
 
+    /// <summary>Optional callback for caught manual-send exceptions, including cancellation.</summary>
     [Parameter]
     public EventCallback<Exception> SendFailed { get; set; }
 
+    /// <summary>Shows manual transport, workflow and cancellation alerts; defaults to false. Provider and supported Credit warnings remain visible.</summary>
     [Parameter]
     public bool ShowSendErrors { get; set; }
 
+    /// <summary>Shows Cancel and cancels this component's manual turn on disposal; defaults to false and does not own external turns.</summary>
     [Parameter] public bool AllowCancellation { get; set; }
 
     /// <summary>Optional content below the input, beside the buttons, wrapping onto a new line when needed.</summary>
@@ -112,6 +116,7 @@ public partial class RgfAiChatComponent : IDisposable
         }
     }
 
+    /// <summary>Detaches session notifications and cancels an owned manual turn only when AllowCancellation is enabled.</summary>
     public void Dispose()
     {
         disposed = true;

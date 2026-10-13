@@ -7,6 +7,8 @@ using Recrovit.RecroGridFramework.Abstraction.Contracts.Constants;
 
 namespace Recrovit.RecroGridFramework.Client.Blazor.Host.OpenIdConnect.Proxy;
 
+// RGF-DOC: rgf.client.blazor-host-openidconnect.server-side-proxy
+
 /// <summary>
 /// Maps the standard RGF proxy endpoints used by SSR hosts.
 /// </summary>
@@ -14,6 +16,12 @@ public static class RgfProxyEndpoints
 {
     private const string DownstreamApiName = "RgfApi";
 
+    /// <summary>Maps resource, grid, API, capability and Recroby routes to the named RgfApi downstream target.</summary>
+    /// <param name="endpoints">The host endpoint route builder.</param>
+    /// <returns>The supplied route builder.</returns>
+    /// <remarks>Grid/API and Recroby routes require authorization; resource and capability requests are forwarded without a user token.
+    /// Progress transport forwards the current principal but does not add RequireAuthorization metadata here.
+    /// Install authentication and proxy transport middleware separately or use the host endpoint helper.</remarks>
     public static IEndpointRouteBuilder MapRgfProxyEndpoints(this IEndpointRouteBuilder endpoints)
     {
         endpoints.MapGet("/rgf/api/RGFSriptReferences/{**suffix}", ProxyAnonymousGetAsync)
@@ -121,6 +129,10 @@ public static class RgfProxyEndpoints
         await DownstreamProxyEndpointExecutor.ProxyHttpAsync(context, httpProxyClient, DownstreamApiName, context.User, cancellationToken);
     }
 
+    /// <summary>Adds forwarding metadata for RGF package-version and session headers.</summary>
+    /// <typeparam name="TBuilder">Endpoint convention builder type.</typeparam>
+    /// <param name="builder">Proxy endpoint builder.</param>
+    /// <returns>The supplied builder.</returns>
     public static TBuilder WithForwardedRgfHeaders<TBuilder>(this TBuilder builder)
         where TBuilder : IEndpointConventionBuilder
     {

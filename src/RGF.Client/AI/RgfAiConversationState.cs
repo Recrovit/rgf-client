@@ -8,17 +8,22 @@ public sealed class RgfAiConversationState
 {
     private readonly List<RgfAiMessage> messages = [];
 
+    /// <summary>Creates empty presentation history with no conversation identity or execution overrides.</summary>
     public RgfAiConversationState()
     {
         Messages = messages.AsReadOnly();
     }
 
+    /// <summary>Backend-issued identity from the last successful response; null before the first turn or after reset.</summary>
     public string? ConversationId { get; private set; }
 
+    /// <summary>Opaque continuation token from the last successful response; the backend owns validation.</summary>
     public string? ConversationToken { get; private set; }
 
+    /// <summary>Optional host-interpreted model alias retained across reset; state does not validate catalog membership.</summary>
     public string? AiModelOverride { get; set; }
 
+    /// <summary>Optional effort token retained across reset; null preserves configured behavior.</summary>
     public string? AiReasoningEffortOverride { get; set; }
 
     /// <summary>Indicates whether the conversation is waiting to resume an existing workflow run.</summary>

@@ -5,6 +5,8 @@ using Recrovit.RecroGridFramework.Client.Services;
 
 namespace Recrovit.RecroGridFramework.Client.Blazor.SessionAuth.Authentication.Session;
 
+// RGF-DOC: rgf.client.blazor-sessionauth.configuration
+
 internal sealed class RgfAuthenticationSessionMonitor(
     IHttpClientFactory httpClientFactory,
     NavigationManager navigationManager,

@@ -2,6 +2,7 @@
 
 namespace Recrovit.RecroGridFramework.Abstraction.Contracts.AI.Server;
 
+// RGF-DOC: rgf.client.abstraction.ai-credit-access
 // RGF-DOC: rgf.client.abstraction.ai-contracts
 /// <summary>An immutable server-side AI Credit access decision.</summary>
 /// <param name="DenialReason">The stable denial reason, or null when access is allowed.</param>

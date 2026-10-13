@@ -19,12 +19,28 @@ using Recrovit.RecroGridFramework.Client.Services;
 
 namespace Recrovit.RecroGridFramework.Client.Blazor.SessionAuth;
 
+// RGF-DOC: rgf.client.blazor-sessionauth.configuration
+// RGF-DOC: rgf.client.get-started.server-side.configure-client
+// RGF-DOC: rgf.client.blazor-host-openidconnect.server-side-proxy
+
+/// <summary>Registers host-session authentication adapters for interactive clients and SSR hosts.</summary>
 public static class RgfBlazorSessionAuthConfigurationExtensions
 {
     private const string SsrProxyClientName = "Recrovit.RGF.Blazor.SessionAuth.ServerProxy";
+    /// <summary>Named HTTP client used for requests to the current host API.</summary>
     public const string HostApiClientName = "Recrovit.RGF.Blazor.SessionAuth.HostApi";
+    /// <summary>Named HTTP client used for downstream API requests through the host proxy.</summary>
     public const string DownstreamProxyClientName = "Recrovit.RGF.Blazor.SessionAuth.DownstreamProxy";
 
+    /// <summary>Registers host-proxy clients, session monitoring, principal synchronization and Client route authorization wrapping.</summary>
+    /// <param name="services">The interactive client service collection.</param>
+    /// <param name="configuration">RGF proxy settings and principal name-claim fallback configuration.</param>
+    /// <param name="apiBaseAddressOverride">Optional host base address, taking precedence over API:ProxyBaseAddress.</param>
+    /// <param name="logger">Optional registration logger.</param>
+    /// <returns>The supplied service collection.</returns>
+    /// <remarks>Uses ServerProxy mode. Authentication-state deserialization is decorated with session-aware state.
+    /// The route wrapper is supplied only when Client FoundContent is not already configured. Use RecrovitRoutes for it to apply.</remarks>
+    /// <exception cref="InvalidOperationException">Neither a proxy address nor an override is configured.</exception>
     public static IServiceCollection AddRgfBlazorSessionAuthClientServices(this IServiceCollection services, IConfiguration configuration, string? apiBaseAddressOverride = null, ILogger? logger = null)
     {
         logger = ResolveRegistrationLogger(services, logger);
@@ -43,6 +59,14 @@ public static class RgfBlazorSessionAuthConfigurationExtensions
         return services;
     }
 
+    /// <summary>Registers SSR host-proxy clients and cookie-forwarding HTTP handlers.</summary>
+    /// <param name="services">The SSR host service collection.</param>
+    /// <param name="configuration">RGF settings containing API:ProxyBaseAddress.</param>
+    /// <param name="logger">Optional registration logger.</param>
+    /// <returns>The supplied service collection.</returns>
+    /// <remarks>Uses ServerProxySsr mode. The default cookie accessor and session monitor are no-ops;
+    /// the OIDC host integration supplies an HTTP-context cookie accessor. This method does not register OIDC or Razor Components.</remarks>
+    /// <exception cref="InvalidOperationException">The proxy base address is missing.</exception>
     public static IServiceCollection AddRgfBlazorSessionAuthSsrServices(this IServiceCollection services, IConfiguration configuration, ILogger? logger = null)
     {
         logger = ResolveRegistrationLogger(services, logger);

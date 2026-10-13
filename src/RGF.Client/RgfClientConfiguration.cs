@@ -9,29 +9,54 @@ using System.Reflection;
 
 namespace Recrovit.RecroGridFramework.Client;
 
+// RGF-DOC: rgf.client.blazor.direct-api-access
+// RGF-DOC: rgf.client.blazor-sessionauth.configuration
+// RGF-DOC: rgf.client.get-started.wasm.create-application
+
+/// <summary>Process-wide client settings populated during service registration and initialization.</summary>
 public class RgfClientConfiguration
 {
+    /// <summary>Whether client initialization has completed; registration alone does not set this flag.</summary>
     public static bool IsInitialized { get; internal set; } = false;
 
+    /// <summary>Application path prefix for static client resources, without a trailing slash; empty at the site root.</summary>
     public static string AppRootPath { get; internal set; } = string.Empty;
 
+    /// <summary>Configured backend API base address, without a trailing slash.</summary>
     public static string ExternalApiBaseAddress { get; internal set; } = string.Empty;
 
+    /// <summary>Effective HTTP client address after applying override, proxy configuration and auth-mode fallback.</summary>
     public static string ProxyApiBaseAddress { get; internal set; } = string.Empty;
 
+    /// <summary>Authentication mode chosen at registration; defaults to no built-in authentication.</summary>
     public static RgfApiAuthMode ApiAuthMode { get; internal set; } = RgfApiAuthMode.None;
 
+    /// <summary>File version of the client assembly.</summary>
     public static string Version => _version.Value;
 
     private static readonly Lazy<string> _version = new Lazy<string>(() => Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyFileVersionAttribute>()!.Version);
 
+    /// <summary>Version headers contributed by the registered client packages.</summary>
     public static Dictionary<string, string> ClientVersions { get; } = [];
 
+    /// <summary>Minimum compatible Core version; higher-level integrations may raise this requirement.</summary>
     public static Version MinimumRgfCoreVersion = new Version(10, 3, 0);//RGF.Core MinVersion
 }
 
+/// <summary>Registers shared client services and initializes dictionary and logging support.</summary>
 public static class RgfClientConfigurationExtension
 {
+    /// <summary>Registers API clients, dictionary, security, menu, events, progress and Recroby capability services.</summary>
+    /// <param name="services">The application service collection.</param>
+    /// <param name="configuration">Configuration containing Recrovit:RecroGridFramework settings.</param>
+    /// <param name="logger">Optional registration logger; resolved without creating a service provider when omitted.</param>
+    /// <param name="authMode">Authentication integration selected by the calling host adapter.</param>
+    /// <param name="proxyBaseAddressOverride">First-choice HTTP base address; takes precedence over configured proxy and external addresses.</param>
+    /// <returns>The supplied service collection.</returns>
+    /// <remarks>Proxy modes require an override or API:ProxyBaseAddress. Other modes fall back to API:BaseAddress.
+    /// Registration populates process-wide settings; do not use it for independent tenants with different endpoints in one process.
+    /// Authentication adapters replace the default no-op token and failure services.</remarks>
+    /// <exception cref="InvalidOperationException">The effective API base address is empty.</exception>
     public static IServiceCollection AddRgfServices(this IServiceCollection services, IConfiguration configuration, ILogger? logger = null,
         RgfApiAuthMode authMode = RgfApiAuthMode.None, string? proxyBaseAddressOverride = null)
     {
@@ -104,6 +129,11 @@ public static class RgfClientConfigurationExtension
             : externalBaseAddress;
     }
 
+    /// <summary>Initializes client logging and, for browser rendering, the resource dictionary once per process.</summary>
+    /// <param name="serviceProvider">The built provider containing registered client and logging services.</param>
+    /// <param name="clientSideRendering">Whether to load the dictionary; false for SSR startup.</param>
+    /// <returns>A task completing after initialization.</returns>
+    /// <remarks>WASM bearer mode uses the security service's current user language when available.</remarks>
     public static async Task InitializeRgfClientAsync(this IServiceProvider serviceProvider, bool clientSideRendering = true)
     {
         if (!RgfClientConfiguration.IsInitialized)

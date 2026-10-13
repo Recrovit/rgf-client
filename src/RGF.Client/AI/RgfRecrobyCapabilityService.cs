@@ -9,6 +9,10 @@ public sealed class RgfRecrobyCapabilityService(IRgfApiService api)
 {
     private bool? enabled;
 
+    /// <summary>Gets backend enablement, retaining successful state for this service instance.</summary>
+    /// <param name="cancellationToken">Cancellation for the capability request.</param>
+    /// <returns>Successful backend state, or true when no successful state is available.</returns>
+    /// <remarks>Failed lookups may retry on later calls; no polling or cross-scope cache is provided.</remarks>
     public async Task<bool> GetEnabledAsync(CancellationToken cancellationToken = default)
     {
         if (enabled.HasValue) return enabled.Value;

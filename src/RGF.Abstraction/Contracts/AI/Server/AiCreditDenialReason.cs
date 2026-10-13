@@ -2,6 +2,8 @@
 
 namespace Recrovit.RecroGridFramework.Abstraction.Contracts.AI.Server;
 
+// RGF-DOC: rgf.client.abstraction.ai-credit-access
+
 /// <summary>Stable machine-readable reasons for denying server-side AI Credit access.</summary>
 public enum AiCreditDenialReason
 {

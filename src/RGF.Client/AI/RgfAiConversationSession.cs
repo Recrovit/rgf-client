@@ -10,6 +10,9 @@ public sealed class RgfAiConversationSession
     private readonly IRgfAiTransport transport;
     private int processing;
 
+    /// <summary>Creates an independent turn coordinator over the supplied transport.</summary>
+    /// <param name="transport">Backend invocation adapter; must not be null.</param>
+    /// <param name="conversation">Existing state to retain, or null for new empty state.</param>
     public RgfAiConversationSession(IRgfAiTransport transport, RgfAiConversationState? conversation = null)
     {
         ArgumentNullException.ThrowIfNull(transport);
@@ -17,12 +20,26 @@ public sealed class RgfAiConversationSession
         Conversation = conversation ?? new();
     }
 
+    /// <summary>Identity, selections and presentation history owned by this session.</summary>
     public RgfAiConversationState Conversation { get; }
 
+    /// <summary>Whether this session currently owns an in-flight turn.</summary>
     public bool IsProcessing => Volatile.Read(ref processing) != 0;
 
+    /// <summary>Synchronous notification at processing start, response application and completion; handlers should be short and marshal UI work.</summary>
     public event Action? StateChanged;
 
+    /// <summary>Sends one turn and applies a successful response to the conversation state.</summary>
+    /// <param name="instruction">Nonblank current instruction; it is forwarded without trimming.</param>
+    /// <param name="addToPresentationHistory">Whether to append the user instruction before sending; defaults to true.</param>
+    /// <param name="cancellationToken">Cancellation delegated to the transport.</param>
+    /// <returns>The original response, including unsuccessful workflow responses.</returns>
+    /// <remarks>Only one turn may run per session. Transport and notification exceptions propagate;
+    /// processing is cleared in finally. A displayed user message remains after failure or cancellation.
+    /// Do not reset or mutate conversation state while sending.</remarks>
+    /// <exception cref="ArgumentException">The instruction is empty or whitespace.</exception>
+    /// <exception cref="ArgumentNullException">The instruction is null.</exception>
+    /// <exception cref="InvalidOperationException">A turn is already running in this session.</exception>
     public async Task<RgfAiResponse> SendAsync(string instruction, bool addToPresentationHistory = true,
         CancellationToken cancellationToken = default)
     {

@@ -1,4 +1,5 @@
-﻿@if (_initialized && Manager != null)
+﻿@* RGF-DOC: rgf.client.blazor-ui.entity-ui *@
+@if (_initialized && Manager != null)
 {
     <RgfComponentWrapper @key="Manager.EntityDomId">
         @if (!EntityParameters.FormOnly)
@@ -65,33 +66,43 @@ else if (!EntityParameters.DeferredInitialization)
 
 @code {
 
+    /// <summary>Required settings retained for this entity instance.</summary>
     [Parameter, EditorRequired]
     public RgfEntityParameters EntityParameters { get; set; } = null!;
 
+    /// <summary>Toolbar rendering with the entity settings.</summary>
     [Parameter, EditorRequired]
     public RenderFragment<RgfEntityParameters> ToolbarTemplate { get; set; } = null!;
 
+    /// <summary>Grid rendering with the entity settings.</summary>
     [Parameter, EditorRequired]
     public RenderFragment<RgfEntityParameters> GridTemplate { get; set; } = null!;
 
+    /// <summary>Optional tree rendering; the base entity falls back to grid when absent.</summary>
     [Parameter]
     public RenderFragment<RgfEntityParameters>? TreeTemplate { get; set; }
 
+    /// <summary>Filter rendering with the entity settings.</summary>
     [Parameter, EditorRequired]
     public RenderFragment<RgfEntityParameters> FilterTemplate { get; set; } = null!;
 
+    /// <summary>Pager rendering with the entity settings.</summary>
     [Parameter, EditorRequired]
     public RenderFragment<RgfEntityParameters> PagerTemplate { get; set; } = null!;
 
+    /// <summary>Form rendering with the entity settings.</summary>
     [Parameter, EditorRequired]
     public RenderFragment<RgfEntityParameters> FormTemplate { get; set; } = null!;
 
+    /// <summary>Optional chart rendering with the entity settings.</summary>
     [Parameter]
     public RenderFragment<RgfEntityParameters>? ChartTemplate { get; set; }
 
+    /// <summary>Optional loading fragment shown before automatic initialization completes.</summary>
     [Parameter]
     public RenderFragment? LoadingIndicator { get; set; }
 
+    /// <summary>Settings for the registered loading indicator when no fragment is supplied.</summary>
     [Parameter]
     public RgfLoadingIndicatorParameters? LoadingIndicatorParameters { get; set; }
 }

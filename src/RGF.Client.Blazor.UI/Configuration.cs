@@ -11,11 +11,17 @@ using System.Reflection;
 
 namespace Recrovit.RecroGridFramework.Client.Blazor.UI;
 
+// RGF-DOC: rgf.client.get-started.server-side.create-application
+// RGF-DOC: rgf.client.get-started.wasm.create-application
+// RGF-DOC: rgf.client.blazor-ui.entity-ui
+
+/// <summary>Resource loading and version information for the standard Bootstrap-based RGF UI.</summary>
 public class RGFClientBlazorUIConfiguration
 {
     private static readonly string _rgfClientBlazorAssemblyName = typeof(RgfBlazorConfiguration).Assembly.GetName().Name!;
     private static readonly string _uiAssemblyName = Assembly.GetExecutingAssembly().GetName().Name!;
 
+    /// <summary>Loads UI scripts, backend resource references and styles; requires browser JS interop and prior base Blazor resource initialization.</summary>
     public static async Task LoadResourcesAsync(IServiceProvider serviceProvider, string? themeName = null)
     {
         var jsRuntime = serviceProvider.GetRequiredService<IJSRuntime>();
@@ -73,6 +79,7 @@ public class RGFClientBlazorUIConfiguration
         await jsRuntime.InvokeVoidAsync("eval", $"document.getElementsByTagName('html')[0].setAttribute('data-bs-theme', '{themeName}');");
     }
 
+    /// <summary>Removes UI styles and unregisters shared UI/chart slots; does not unload executed JavaScript.</summary>
     public static async Task UnloadResourcesAsync(IJSRuntime jsRuntime)
     {
         await jsRuntime.InvokeVoidAsync("eval", $"document.getElementById('{JqueryUiCssId}')?.remove();");
@@ -98,8 +105,10 @@ public class RGFClientBlazorUIConfiguration
     internal const string BlazorUICssLib = "rgf-client-blazor-ui-lib";
     internal const string BootstrapSubmenuCssId = "rgf-bootstrap-submenu";
 
+    /// <summary>Returns the bundled Bootstrap stylesheet URL beneath AppRootPath.</summary>
     public static string GetBootstrapCssHref() => $"{RgfClientConfiguration.AppRootPath}/_content/{_uiAssemblyName}/lib/bootstrap/dist/css/bootstrap.min.css";
 
+    /// <summary>Returns the bundled Bootstrap Icons stylesheet URL beneath AppRootPath.</summary>
     public static string GetBootstrapIconsCssHref() => $"{RgfClientConfiguration.AppRootPath}/_content/{_uiAssemblyName}/lib/bootstrap-icons/font/bootstrap-icons.min.css";
 
     internal static string GetStylesCssHref() => $"{RgfClientConfiguration.AppRootPath}/_content/{_uiAssemblyName}/css/styles.css";
@@ -110,8 +119,10 @@ public class RGFClientBlazorUIConfiguration
 
     private static bool _scriptsLoaded;
 
+    /// <summary>JavaScript namespace used by the standard UI interop helpers.</summary>
     public const string JsBlazorUiNamespace = "Recrovit.RGF.Blazor.UI";
 
+    /// <summary>File version of the UI assembly.</summary>
     public static string Version => _version.Value;
 
     internal static string ThemeName { get; private set; } = "light";
@@ -119,8 +130,16 @@ public class RGFClientBlazorUIConfiguration
     private static readonly Lazy<string> _version = new Lazy<string>(() => Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyFileVersionAttribute>()!.Version);
 }
 
+/// <summary>Initializes standard UI component registrations and optional browser assets.</summary>
 public static class RGFClientBlazorUIConfigurationExtension
 {
+    /// <summary>Registers standard menu, dialog, dashboard, loading, entity and chart implementations.</summary>
+    /// <param name="serviceProvider">The built provider with RGF client and logging services.</param>
+    /// <param name="themeName">Browser theme name; defaults to light.</param>
+    /// <param name="loadResources">Whether to load browser assets. Pass false during SSR host startup.</param>
+    /// <returns>A task completing after registration and optional UI/chart resource loading.</returns>
+    /// <remarks>Call after Blazor initialization. Register application component overrides afterwards;
+    /// this method replaces the shared UI slots and the fallback entity component.</remarks>
     public static async Task InitializeRgfUIAsync(this IServiceProvider serviceProvider, string themeName = "light", bool loadResources = true)
     {
         RgfBlazorConfiguration.RegisterComponent<MenuComponent>(RgfBlazorConfiguration.ComponentType.Menu);

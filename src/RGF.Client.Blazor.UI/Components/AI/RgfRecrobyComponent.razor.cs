@@ -9,13 +9,18 @@ using System.Runtime.CompilerServices;
 
 namespace Recrovit.RecroGridFramework.Client.Blazor.UI.Components.AI;
 
+// RGF-DOC: rgf.client.blazor-ui.ai-chat
 // RGF-DOC: rgf.client.recroby.integration
+
+/// <summary>Recroby chat with optional catalog selectors and an external or lazily created API conversation session.</summary>
 public partial class RgfRecrobyComponent : IAsyncDisposable
 {
     private static readonly ConditionalWeakTable<IServiceProvider, RgfRecrobyCatalogCache> Catalogs = new();
     [Inject] private IServiceProvider Services { get; set; } = null!;
     [Inject] private IJSRuntime JS { get; set; } = null!;
+    /// <summary>Optional callback forwarded unchanged for manual chat send exceptions.</summary>
     [Parameter] public EventCallback<Exception> SendFailed { get; set; }
+    /// <summary>External session to retain; when null the component creates its own API-backed session.</summary>
     [Parameter] public RgfAiConversationSession? Session { get; set; }
 
     private RgfAiConversationSession? _session;

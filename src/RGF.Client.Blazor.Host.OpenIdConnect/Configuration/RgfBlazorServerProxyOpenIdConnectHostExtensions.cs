@@ -12,6 +12,9 @@ using System.Reflection;
 
 namespace Recrovit.RecroGridFramework.Client.Blazor.Host.OpenIdConnect.Configuration;
 
+// RGF-DOC: rgf.client.get-started.server-side.create-application
+// RGF-DOC: rgf.client.blazor-host-openidconnect.server-side-proxy
+
 /// <summary>
 /// High-level ASP.NET Core host setup for RGF SSR server-proxy and Recrovit OpenID Connect.
 /// </summary>
@@ -23,6 +26,8 @@ public static class RgfBlazorServerProxyOpenIdConnectHostExtensions
     /// Registers the Razor Components services required by RGF hosts.
     /// </summary>
     /// <exception cref="InvalidOperationException">Thrown when Razor Components were already registered by the host.</exception>
+    /// <param name="builder">The host builder before any AddRazorComponents registration.</param>
+    /// <returns>The Razor Components builder with server/WASM modes and authentication-state serialization.</returns>
     public static IRazorComponentsBuilder AddRgfBlazorServerProxyOpenIdConnectRazorComponents(this WebApplicationBuilder builder)
     {
         if (builder.Services.Any(static descriptor => descriptor.ServiceType.FullName == RazorComponentsMarkerServiceTypeName))
@@ -40,6 +45,9 @@ public static class RgfBlazorServerProxyOpenIdConnectHostExtensions
     /// <summary>
     /// Registers the Recrovit OpenID Connect infrastructure together with the RGF SSR server-proxy host services.
     /// </summary>
+    /// <param name="builder">The host builder with OIDC and RGF proxy settings.</param>
+    /// <returns>The supplied builder.</returns>
+    /// <remarks>Register Razor Components separately. SSR proxy clients require API:ProxyBaseAddress.</remarks>
     public static WebApplicationBuilder AddRgfBlazorServerProxyOpenIdConnectHost(this WebApplicationBuilder builder)
     {
         builder.AddRecrovitOpenIdConnectInfrastructure();
@@ -57,6 +65,9 @@ public static class RgfBlazorServerProxyOpenIdConnectHostExtensions
     /// Recrovit OpenID Connect authentication endpoints and the generic downstream proxy endpoints provided by the
     /// underlying host package.
     /// </remarks>
+    /// <param name="app">The built host application.</param>
+    /// <param name="notFoundPath">Status-code re-execution path; defaults to /not-found.</param>
+    /// <returns>The supplied application.</returns>
     public static WebApplication MapRgfBlazorServerProxyOpenIdConnectEndpoints(this WebApplication app, string notFoundPath = "/not-found")
     {
         app.UseRecrovitOpenIdConnectForwardedHeaders();
@@ -73,6 +84,10 @@ public static class RgfBlazorServerProxyOpenIdConnectHostExtensions
     /// <summary>
     /// Maps the standard static assets and interactive Razor component render modes required by RGF hosts.
     /// </summary>
+    /// <typeparam name="TRootComponent">The host root Razor component.</typeparam>
+    /// <param name="app">The built host application.</param>
+    /// <param name="additionalAssemblies">Assemblies containing additional routable components, normally including the Client assembly.</param>
+    /// <returns>The mapped component endpoints with both interactive render modes.</returns>
     public static RazorComponentsEndpointConventionBuilder MapRgfBlazorServerProxyOpenIdConnectComponents<TRootComponent>(
         this WebApplication app,
         params Assembly[] additionalAssemblies)

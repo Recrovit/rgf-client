@@ -8,6 +8,9 @@ using System.Net;
 
 namespace Recrovit.RecroGridFramework.Client.Blazor.Handlers;
 
+// RGF-DOC: rgf.client.blazor.wasm-authentication
+// RGF-DOC: rgf.client.blazor.direct-api-access
+
 public class RgfAuthorizationMessageHandler : AuthorizationMessageHandler
 {
     private static string? _authorizedUrls;

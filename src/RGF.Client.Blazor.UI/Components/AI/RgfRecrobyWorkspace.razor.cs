@@ -9,27 +9,42 @@ using Recrovit.RecroGridFramework.Client.AI.Transport;
 namespace Recrovit.RecroGridFramework.Client.Blazor.UI.Components.AI;
 
 // RGF-DOC: rgf.client.recroby.integration
+
+/// <summary>Desktop placement preference; mobile presentation uses the visible viewport independently.</summary>
 public enum RgfRecrobyWindowMode
 {
+    /// <summary>Movable viewport panel without reserved host space.</summary>
     Floating,
+    /// <summary>Panel fixed to the left edge with reserved work-area overlap.</summary>
     DockLeft,
+    /// <summary>Panel fixed to the right edge with reserved work-area overlap.</summary>
     DockRight,
+    /// <summary>Panel fixed to the bottom with an independently scrolling desktop work area.</summary>
     DockBottom
 }
 
 /// <summary>Browser UI preferences only; contains no conversation data.</summary>
 public sealed class RgfRecrobyLayoutSettings
 {
+    /// <summary>Requested desktop window mode, normalized by the browser module.</summary>
     public RgfRecrobyWindowMode Mode { get; set; }
+    /// <summary>Whether only the edge tab is visible; defaults to true.</summary>
     public bool IsCollapsed { get; set; } = true;
+    /// <summary>Floating horizontal position in CSS pixels; defaults to 48.</summary>
     public double X { get; set; } = 48;
+    /// <summary>Floating vertical position in CSS pixels; defaults to 80.</summary>
     public double Y { get; set; } = 80;
+    /// <summary>Floating width in CSS pixels; defaults to 440 before viewport normalization.</summary>
     public double Width { get; set; } = 440;
+    /// <summary>Floating height in CSS pixels; defaults to 560 before viewport normalization.</summary>
     public double Height { get; set; } = 560;
+    /// <summary>Side-dock width in CSS pixels; defaults to 400 before bounds are applied.</summary>
     public double DockWidth { get; set; } = 400;
+    /// <summary>Bottom-dock height in CSS pixels; defaults to 320 before bounds are applied.</summary>
     public double DockHeight { get; set; } = 320;
 }
 
+/// <summary>Owns in-memory conversation sessions and browser layout preferences around the application work area.</summary>
 public partial class RgfRecrobyWorkspace : IAsyncDisposable
 {
     [Inject]
@@ -38,6 +53,7 @@ public partial class RgfRecrobyWorkspace : IAsyncDisposable
     [Inject]
     private IJSRuntime JS { get; set; } = null!;
 
+    /// <summary>Application content that shares available space with the docked desktop panel.</summary>
     [Parameter]
     public RenderFragment? ChildContent { get; set; }
 

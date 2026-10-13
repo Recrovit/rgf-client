@@ -12,12 +12,19 @@ public sealed class RgfAiApiTransport : IRgfAiTransport
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private readonly IRgfApiService api;
 
+    /// <summary>Creates an API transport over the registered authenticated RGF API service.</summary>
     public RgfAiApiTransport(IRgfApiService api)
     {
         ArgumentNullException.ThrowIfNull(api);
         this.api = api;
     }
 
+    /// <summary>Posts a Recroby turn to /api/rgf/ai/recroby with web JSON conventions.</summary>
+    /// <param name="request">Current instruction and optional protected continuation identity.</param>
+    /// <param name="cancellationToken">Cancellation checked before and after the API call.</param>
+    /// <returns>The original response, including Success=false workflow responses.</returns>
+    /// <exception cref="HttpRequestException">The HTTP envelope reports failure.</exception>
+    /// <exception cref="InvalidOperationException">The API supplies no response payload.</exception>
     public async Task<RgfAiResponse> SendAsync(RgfAiRequest request, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);

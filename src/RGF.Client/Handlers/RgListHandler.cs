@@ -12,6 +12,8 @@ using System.Data;
 
 namespace Recrovit.RecroGridFramework.Client.Handlers;
 
+// RGF-DOC: rgf.client.ai.conversation-state
+
 public interface IRgListHandler
 {
     bool Initialized { get; }

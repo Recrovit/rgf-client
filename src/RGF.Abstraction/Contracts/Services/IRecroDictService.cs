@@ -2,25 +2,35 @@
 
 namespace Recrovit.RecroGridFramework.Abstraction.Contracts.Services;
 
+/// <summary>Loads backend resource dictionaries and formats standard UI translations.</summary>
 public interface IRecroDictService
 {
+    /// <summary>Whether the standard UI dictionary has been initialized.</summary>
     bool IsInitialized { get; }
 
+    /// <summary>Initializes standard UI resources for the requested language or configured default.</summary>
     Task InitializeAsync(string language = null);
 
+    /// <summary>Available language identifiers and labels loaded during initialization.</summary>
     Dictionary<string, string> Languages { get; }
 
+    /// <summary>Backend default language used when no user language is selected.</summary>
     string DefaultLanguage { get; }
 
+    /// <summary>Gets a scope/language dictionary through the selected API client; the default implementation caches it briefly.</summary>
     Task<ConcurrentDictionary<string, string>> GetDictionaryAsync(string scope, string language = null, bool authClient = true);
 
+    /// <summary>Gets a standard UI translation; missing resources retain an identifying fallback in the default implementation.</summary>
     string GetRgfUiString(string resourceKey);
 
+    /// <summary>Gets and formats a standard UI translation with the supplied arguments.</summary>
     string GetRgfUiString(string resourceKey, params object[] args);
 }
 
+/// <summary>Optional formatting adapter used by resource lookup extensions.</summary>
 public interface IRecroDictFormatter
 {
+    /// <summary>Formats a resource value and its arguments with scope/key context available for diagnostics.</summary>
     string FormatResource(string scope, string resourceKey, string value, params object[] args);
 }
 

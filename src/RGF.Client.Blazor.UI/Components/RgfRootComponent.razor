@@ -1,6 +1,7 @@
 @using Recrovit.RecroGridFramework.Client.Blazor.UI.Components.AI
 
 @* RGF-DOC: rgf.client.recroby.integration *@
+
 @if (EnableRecroby && _recrobyEnabled)
 {
     <RgfRecrobyWorkspace>@ChildContent</RgfRecrobyWorkspace>
@@ -13,9 +14,11 @@ else
 <ToastComponent />
 
 @code {
+    /// <summary>Application work area wrapped by the enabled Recroby Workspace; Toast is rendered separately.</summary>
     [Parameter]
     public RenderFragment? ChildContent { get; set; }
 
+    /// <summary>Enables Workspace display when the backend capability also permits it; defaults to true and does not configure the backend.</summary>
     [Parameter]
     public bool EnableRecroby { get; set; } = true;
 }

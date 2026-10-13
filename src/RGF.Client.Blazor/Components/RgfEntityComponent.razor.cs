@@ -14,6 +14,8 @@ using Recrovit.RecroGridFramework.Client.Services;
 
 namespace Recrovit.RecroGridFramework.Client.Blazor.Components;
 
+// RGF-DOC: rgf.client.blazor-ui.entity-ui
+
 public partial class RgfEntityComponent : ComponentBase, IDisposable
 {
     public static RenderFragment Create(RgfEntityParameters entityParameters, ILogger? logger = null)
