@@ -28,6 +28,14 @@ public class RgfAiResponse : RgfAiMessage
     /// <summary>Reported usage, or null when the host does not supply usage information.</summary>
     public RgfAiUsage? Usage { get; set; }
 
+    /// <summary>Optional Credit usage for this request, available on successful or failed responses.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public RgfAiCreditUsage? CreditUsage { get; set; }
+
+    /// <summary>Optional current user Credit state, available on successful or failed responses.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public RgfAiCreditState? CreditState { get; set; }
+
     /// <summary>Optional backend workflow run identifier; omitted from JSON when null.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? WorkflowRunId { get; set; }

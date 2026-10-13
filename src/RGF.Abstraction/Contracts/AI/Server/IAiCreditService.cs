@@ -39,8 +39,10 @@ public interface IAiCreditService
     /// <param name="userId">RGF Identity identifier whose usage is being settled.</param>
     /// <param name="usage">One provider call with a nonblank request identifier and nonnegative reported counts; null counts mean unknown.</param>
     /// <param name="cancellationToken">Cancels this accounting operation.</param>
-    /// <returns>Settlement completion; no cost or access decision is returned.</returns>
+    /// <returns>The finalized Credit rounded to eight decimal places and whether this is a new settlement.
+    /// An already settled RequestId returns the original charge with IsNewSettlement false; no new access decision is made.</returns>
     /// <remarks>Do not synthesize totals or replace unknown usage with zero. Missing pricing must not silently settle as free usage.
-    /// Disabled and unlimited modes do not modify balances. Failures and cancellation propagate.</remarks>
-    Task ApplyUsageAsync(string userId, AiCreditUsage usage, CancellationToken cancellationToken = default);
+    /// Disabled and unlimited modes do not modify balances. Invalid or unfinalized settlements retain existing exception behavior;
+    /// failures and cancellation propagate instead of returning a result.</remarks>
+    Task<AiCreditUsageResult> ApplyUsageAsync(string userId, AiCreditUsage usage, CancellationToken cancellationToken = default);
 }
