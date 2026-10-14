@@ -30,8 +30,12 @@ public partial class RgfRecrobyComponent : IAsyncDisposable
     private readonly CancellationTokenSource _lifetime = new();
     private ElementReference _element;
     private IJSObjectReference? _module;
+    private Task<IJSObjectReference>? _moduleImport;
     private bool _sessionChanged;
     private bool _disposed;
+    private RgfAiChatComponent? _chat;
+    private readonly object _disposalSync = new();
+    private Task? _disposal;
     private bool _catalogLoading;
     private RgfAiConversationSession ActiveSession => Session ?? _session!;
     private bool SelectionDisabled => ActiveSession.IsProcessing || ActiveSession.Conversation.IsPendingWorkflow;
@@ -137,20 +141,46 @@ public partial class RgfRecrobyComponent : IAsyncDisposable
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (_disposed || _catalog?.Providers.Count is not > 0) return;
-        _module ??= await JS.InvokeAsync<IJSObjectReference>("import",
-            $"{RgfClientConfiguration.AppRootPath}/_content/Recrovit.RecroGridFramework.Client.Blazor.UI/Components/AI/RgfRecrobyComponent.razor.js");
+        _moduleImport ??= JS.InvokeAsync<IJSObjectReference>("import",
+            $"{RgfClientConfiguration.AppRootPath}/_content/Recrovit.RecroGridFramework.Client.Blazor.UI/Components/AI/RgfRecrobyComponent.razor.js").AsTask();
+        _module = await _moduleImport;
         if (_module is null || _disposed) return;
         await _module.InvokeVoidAsync("sync", _element, SelectionDisabled || _sessionChanged);
         _sessionChanged = false;
     }
 
-    public async ValueTask DisposeAsync()
+    public ValueTask DisposeAsync()
+    {
+        TaskCompletionSource completion;
+        lock (_disposalSync)
+        {
+            if (_disposal is not null) return new(_disposal);
+            completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+            _disposal = completion.Task;
+        }
+        return new(CompleteDisposalAsync(completion));
+    }
+
+    private async Task CompleteDisposalAsync(TaskCompletionSource completion)
+    {
+        try
+        {
+            await DisposeCoreAsync();
+            completion.SetResult();
+        }
+        catch (Exception exception) { completion.SetException(exception); }
+        await completion.Task;
+    }
+
+    private async Task DisposeCoreAsync()
     {
         _disposed = true;
+        _chat?.Dispose();
         _lifetime.Cancel();
         if (_subscribed is not null) _subscribed.StateChanged -= SessionChanged;
         try
         {
+            if (_moduleImport is not null) _module = await _moduleImport;
             if (_module is not null)
             {
                 await _module.InvokeVoidAsync("dispose", _element);
@@ -158,6 +188,6 @@ public partial class RgfRecrobyComponent : IAsyncDisposable
             }
         }
         catch (JSDisconnectedException) { }
-        _lifetime.Dispose();
+        finally { _lifetime.Dispose(); }
     }
 }

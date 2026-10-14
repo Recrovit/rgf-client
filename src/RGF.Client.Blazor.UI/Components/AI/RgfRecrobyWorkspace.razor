@@ -71,7 +71,7 @@
         @foreach (var conversation in _conversations)
         {
             <div @key="conversation.Id" id="@($"recroby-panel-{conversation.Id:N}")" class="rgf-recroby-conversation" hidden="@(conversation != _active)" role="region" aria-label="@ConversationLabel(conversation)">
-                <RgfRecrobyComponent Session="conversation.Session" />
+                <RgfRecrobyComponent @ref="conversation.Component" Session="conversation.Session" />
             </div>
         }
         <div class="rgf-recroby-resize" data-resize-handle role="separator" aria-label="Resize Recroby" tabindex="0"></div>

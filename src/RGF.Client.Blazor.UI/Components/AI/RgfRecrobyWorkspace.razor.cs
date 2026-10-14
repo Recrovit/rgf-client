@@ -117,8 +117,12 @@ public partial class RgfRecrobyWorkspace : IAsyncDisposable
     private readonly string _selectorId = $"recroby-{Guid.NewGuid():N}";
     private ElementReference _element;
     private IJSObjectReference? _module;
+    private Task<IJSObjectReference>? _moduleImport;
     private DotNetObjectReference<RgfRecrobyWorkspace>? _reference;
     private bool _disposed;
+    private IDisposable? _workspaceRegistration;
+    private readonly object _disposalSync = new();
+    private Task? _disposal;
 
     private void SetMode(RgfRecrobyWindowMode mode) => _layout.Mode = mode;
 
@@ -178,10 +182,12 @@ public partial class RgfRecrobyWorkspace : IAsyncDisposable
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        if (_disposed) return;
         if (firstRender)
         {
-            _module = await JS.InvokeAsync<IJSObjectReference>("import",
-                $"{RgfClientConfiguration.AppRootPath}/_content/Recrovit.RecroGridFramework.Client.Blazor.UI/Components/AI/RgfRecrobyWorkspace.razor.js");
+            _moduleImport = JS.InvokeAsync<IJSObjectReference>("import",
+                $"{RgfClientConfiguration.AppRootPath}/_content/Recrovit.RecroGridFramework.Client.Blazor.UI/Components/AI/RgfRecrobyWorkspace.razor.js").AsTask();
+            _module = await _moduleImport;
             if (_module != null && !_disposed)
             {
                 _reference = DotNetObjectReference.Create(this);
@@ -204,12 +210,48 @@ public partial class RgfRecrobyWorkspace : IAsyncDisposable
         }
     }
 
-    public async ValueTask DisposeAsync()
+    /// <summary>Detaches owners and awaits all conversation component and browser cleanup.</summary>
+    public ValueTask DisposeAsync()
     {
-        _disposed = true;
-        foreach (var conversation in _conversations) conversation.Session.StateChanged -= conversation.StateChangedHandler;
+        TaskCompletionSource completion;
+        lock (_disposalSync)
+        {
+            if (_disposal is not null) return new(_disposal);
+            completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+            _disposal = completion.Task;
+        }
+        return new(CompleteDisposalAsync(completion));
+    }
+
+    private async Task CompleteDisposalAsync(TaskCompletionSource completion)
+    {
         try
         {
+            await DisposeCoreAsync();
+            completion.SetResult();
+        }
+        catch (Exception exception) { completion.SetException(exception); }
+        await completion.Task;
+    }
+
+    private async Task DisposeCoreAsync()
+    {
+        _disposed = true;
+        _workspaceRegistration?.Dispose();
+        await InvokeAsync(async () =>
+        {
+            foreach (var conversation in _conversations.ToArray())
+            {
+                conversation.Session.StateChanged -= conversation.StateChangedHandler;
+                if (conversation.Component is not null) await conversation.Component.DisposeAsync();
+            }
+            _conversations.Clear();
+            _active = null;
+            CancelRename();
+        });
+        try
+        {
+            if (_moduleImport is not null) _module = await _moduleImport;
             if (_module != null)
             {
                 await _module.InvokeVoidAsync("dispose", _element);
@@ -220,7 +262,53 @@ public partial class RgfRecrobyWorkspace : IAsyncDisposable
         finally { _reference?.Dispose(); }
     }
 
-    protected override void OnInitialized() => NewConversation();
+    protected override void OnInitialized()
+    {
+        NewConversation();
+        _workspaceRegistration = Services.GetService<RgfRecrobyWorkspaceService>()?.RegisterWorkspace(
+            async operation =>
+            {
+                var result = false;
+                await InvokeAsync(() => result = operation());
+                return result;
+            }, OpenExternalConversation, CloseOwnerAsync);
+    }
+
+    private bool OpenExternalConversation(object owner, string type, string contextKey, string title,
+        Func<RgfAiConversationSession> sessionFactory)
+    {
+        if (_disposed) return false;
+        var conversation = _conversations.FirstOrDefault(c => !c.Closing && ReferenceEquals(c.Owner, owner)
+            && c.RecrobyType == type && c.ContextKey == contextKey);
+        if (conversation is null)
+        {
+            var session = sessionFactory() ?? throw new InvalidOperationException("The session factory returned null.");
+            conversation = new Conversation(session) { Owner = owner, ContextKey = contextKey,
+                RecrobyType = type, Title = title, NeedsAutomaticTitle = false };
+            _conversations.Add(conversation);
+        }
+        SelectConversation(conversation);
+        _layout.IsCollapsed = false;
+        StateHasChanged();
+        return true;
+    }
+
+    private async Task CloseOwnerAsync(object owner)
+    {
+        if (_disposed)
+        {
+            if (_disposal is not null) await _disposal;
+            return;
+        }
+        await InvokeAsync(async () =>
+        {
+            if (_disposed) return;
+            foreach (var conversation in _conversations.Where(c => ReferenceEquals(c.Owner, owner)).ToArray())
+                await CloseConversation(conversation);
+            if (!_disposed) StateHasChanged();
+        });
+        if (_disposed && _disposal is not null) await _disposal;
+    }
 
     private void NewConversation()
     {
@@ -234,13 +322,16 @@ public partial class RgfRecrobyWorkspace : IAsyncDisposable
         _conversations.Add(_active);
     }
 
-    private void CloseConversation(Conversation conversation)
+    private async Task CloseConversation(Conversation conversation)
     {
+        conversation.Closing = true;
         conversation.Session.StateChanged -= conversation.StateChangedHandler;
+        if (conversation.Component is not null) await conversation.Component.DisposeAsync();
+        if (!_conversations.Contains(conversation)) return;
         if (_editing == conversation) CancelRename();
         _conversations.Remove(conversation);
         if (_active == conversation) _active = _conversations.LastOrDefault();
-        if (_conversations.Count == 0) NewConversation();
+        if (!_disposed && _conversations.Count == 0) NewConversation();
     }
 
     // The type identifies the general Recroby independently of its displayed title.
@@ -251,7 +342,11 @@ public partial class RgfRecrobyWorkspace : IAsyncDisposable
         public RgfAiConversationSession Session { get; } = session;
         public Action? StateChangedHandler { get; set; }
         public Guid Id { get; } = Guid.NewGuid();
-        public string RecrobyType { get; } = "general";
+        public string RecrobyType { get; init; } = "general";
+        public bool Closing { get; set; }
+        public RgfRecrobyComponent? Component { get; set; }
+        public object? Owner { get; init; }
+        public string? ContextKey { get; init; }
     }
 
     private sealed class LazyTransport(IServiceProvider services) : IRgfAiTransport

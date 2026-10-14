@@ -38,6 +38,8 @@ public sealed class RgfRecrobyWorkspaceTests
     {
         var context = new BunitContext();
         context.JSInterop.Mode = JSRuntimeMode.Loose;
+        context.Services.AddScoped<RgfRecrobyWorkspaceService>();
+        context.Services.AddScoped<IRgfRecrobyWorkspaceService>(p => p.GetRequiredService<RgfRecrobyWorkspaceService>());
         context.Services.AddSingleton<IRecroDictService, FakeDashboardRecroDictService>();
         return context;
     }
@@ -483,6 +485,261 @@ public sealed class RgfRecrobyWorkspaceTests
         Assert.Equal("custom", cut.Find(".rgf-recroby-type").TextContent);
     }
 
+    [Fact]
+    public async Task ExternalConversationsReuseOnlyTheirOwnerKeyAndExpandWorkspace()
+    {
+        using var context = Context();
+        var cut = context.Render<RgfRecrobyWorkspace>();
+        var service = context.Services.GetRequiredService<IRgfRecrobyWorkspaceService>();
+        await using var first = service.CreateOwner();
+        await using var second = service.CreateOwner();
+        var created = 0;
+        var transport = new PendingTransport();
+        var session = new RgfAiConversationSession(transport);
+        Assert.True(await first.OpenOrActivateAsync("custom", "entity/1", "Initial title", () => { created++; return session; }));
+        Assert.Equal("false", cut.Find(".rgf-recroby-workspace").GetAttribute("data-collapsed"));
+        Assert.Same(session, cut.FindComponents<RgfAiChatComponent>().Last().Instance.Session);
+        Assert.Equal("Initial title", cut.Find(".rgf-recroby-title").TextContent);
+        Assert.Equal(2, cut.FindAll("[data-conversation-type]").Count);
+        cut.Find("[aria-label='Collapse Recroby']").Click();
+        Assert.True(await first.OpenOrActivateAsync("custom", "entity/1", "Ignored", () => throw new Exception("Must reuse")));
+        Assert.Equal(1, created);
+        Assert.Equal("false", cut.Find(".rgf-recroby-workspace").GetAttribute("data-collapsed"));
+        Rename(cut, "Manual title");
+        var send = session.SendAsync("Must not replace the title", cancellationToken: Xunit.TestContext.Current.CancellationToken);
+        transport.Complete("Reply");
+        await send;
+        Assert.True(await first.OpenOrActivateAsync("custom", "entity/1", "Ignored", () => throw new Exception()));
+        Assert.Equal("Manual title", cut.Find(".rgf-recroby-title").TextContent);
+        Assert.True(await second.OpenOrActivateAsync("custom", "entity/1", "Independent", () => new(new PendingTransport())));
+        Assert.Equal(3, cut.FindComponents<RgfAiChatComponent>().Count);
+        Assert.NotSame(session, cut.FindComponents<RgfAiChatComponent>().Last().Instance.Session);
+        cut.Find("[data-action=new]").Click();
+        Assert.Equal("General chat", cut.Find(".rgf-recroby-type").TextContent);
+        cut.Find("[aria-label='Close Manual title']").Click();
+        Assert.True(await first.OpenOrActivateAsync("custom", "entity/1", "Reopened", () => { created++; return new(new PendingTransport()); }));
+        Assert.Equal(2, created);
+    }
+    [Fact]
+    public async Task OwnerDisposalClosesAllOwnedConversationsAndPreservesOtherOwners()
+    {
+        using var context = Context();
+        var cut = context.Render<RgfRecrobyWorkspace>();
+        var service = context.Services.GetRequiredService<IRgfRecrobyWorkspaceService>();
+        var owner = service.CreateOwner();
+        await using var other = service.CreateOwner();
+        foreach (var key in new[] { "a", "b" })
+            await owner.OpenOrActivateAsync("custom", key, key, () => new(new PendingTransport()));
+        await other.OpenOrActivateAsync("custom", "a", "Other", () => new(new PendingTransport()));
+        var disposedChats = cut.FindComponents<RgfAiChatComponent>().Skip(1).Take(2).Select(c => c.Instance).ToArray();
+        await Task.WhenAll(owner.DisposeAsync().AsTask(), owner.DisposeAsync().AsTask());
+        Assert.Equal(2, cut.FindComponents<RgfAiChatComponent>().Count);
+        Assert.DoesNotContain("Close a", cut.Markup);
+        Assert.Contains("Other", cut.Markup);
+        foreach (var chat in disposedChats)
+        {
+            chat.Session.Conversation.AddUserMessage("Detached");
+            Assert.DoesNotContain("Detached", cut.Markup);
+        }
+        await Assert.ThrowsAsync<ObjectDisposedException>(() => owner.OpenOrActivateAsync("custom", "a", "a", () => throw new Exception()));
+    }
+
+    [Fact]
+    public async Task ConcurrentOpensCreateOnlyOneSessionAndDisposePreventsLaterOpens()
+    {
+        using var context = Context();
+        var cut = context.Render<RgfRecrobyWorkspace>();
+        var owner = context.Services.GetRequiredService<IRgfRecrobyWorkspaceService>().CreateOwner();
+        var created = 0;
+        var opens = Enumerable.Range(0, 20).Select(_ => Task.Run(() => owner.OpenOrActivateAsync("custom", "a", "a",
+            () => { Interlocked.Increment(ref created); return new(new PendingTransport()); }))).ToArray();
+        Assert.All(await Task.WhenAll(opens), Assert.True);
+        Assert.Equal(1, created);
+        var racing = Enumerable.Range(0, 20).Select(i => Task.Run(async () =>
+        {
+            try { await owner.OpenOrActivateAsync("custom", i.ToString(), "Race", () => new(new PendingTransport())); }
+            catch (ObjectDisposedException) { }
+        })).ToArray();
+        await owner.DisposeAsync();
+        await Task.WhenAll(racing);
+        Assert.Single(cut.FindComponents<RgfAiChatComponent>());
+        await owner.DisposeAsync();
+    }
+
+    [Fact]
+    public async Task MissingDisabledAndAmbiguousWorkspacesDoNotCallFactory()
+    {
+        using var context = Context();
+        context.ComponentFactories.AddStub<Recrovit.RecroGridFramework.Client.Blazor.UI.Components.ToastComponent>();
+        var service = context.Services.GetRequiredService<IRgfRecrobyWorkspaceService>();
+        await using var owner = service.CreateOwner();
+        RgfAiConversationSession Factory() => throw new Exception("Factory must not be called");
+        Assert.False(await owner.OpenOrActivateAsync("custom", "a", "a", Factory));
+        context.Render<RootWithoutResourceLoading>(p => p.Add(c => c.EnableRecroby, false));
+        Assert.False(await owner.OpenOrActivateAsync("custom", "a", "a", Factory));
+        var first = context.Render<RgfRecrobyWorkspace>();
+        var second = context.Render<RgfRecrobyWorkspace>();
+        Assert.False(await owner.OpenOrActivateAsync("custom", "a", "a", Factory));
+        await second.InvokeAsync(() => second.Instance.DisposeAsync().AsTask());
+        Assert.True(await owner.OpenOrActivateAsync("custom", "a", "a", () => new(new PendingTransport())));
+        Assert.Equal(2, first.FindComponents<RgfAiChatComponent>().Count);
+    }
+
+    [Theory]
+    [InlineData("", "key", "Title")]
+    [InlineData("general", "key", "Title")]
+    [InlineData(" GENERAL ", "key", "Title")]
+    [InlineData("custom", " ", "Title")]
+    [InlineData("custom", "key", " ")]
+    public async Task ExternalKeysAreValidatedEvenWithoutWorkspace(string type, string key, string title)
+    {
+        using var context = Context();
+        await using var owner = context.Services.GetRequiredService<IRgfRecrobyWorkspaceService>().CreateOwner();
+        await Assert.ThrowsAsync<ArgumentException>(() => owner.OpenOrActivateAsync(type, key, title, () => throw new Exception()));
+        await Assert.ThrowsAsync<ArgumentException>(() => owner.OpenOrActivateAsync("custom", "key", new string('x', 101), () => throw new Exception()));
+        await owner.DisposeAsync();
+        await Assert.ThrowsAsync<ObjectDisposedException>(() => owner.OpenOrActivateAsync("", "", "", null!));
+    }
+
+    [Fact]
+    public async Task QueuedOpenCannotCreateSessionAfterOwnerDisposal()
+    {
+        var service = new RgfRecrobyWorkspaceService();
+        Func<bool>? queued = null;
+        var release = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var registration = service.RegisterWorkspace(async action =>
+        {
+            queued = action;
+            await release.Task;
+            return action();
+        }, (_, _, _, _, factory) => { factory(); return true; }, _ => Task.CompletedTask);
+        var owner = service.CreateOwner();
+        var pending = owner.OpenOrActivateAsync("custom", "a", "a", () => throw new Exception("Must never create"));
+        Assert.NotNull(queued);
+        await owner.DisposeAsync();
+        release.SetResult(true);
+        await Assert.ThrowsAsync<ObjectDisposedException>(() => pending);
+    }
+
+    [Fact]
+    public async Task OwnerDisposalAwaitsAdapterCleanupAndSharesCompletion()
+    {
+        var service = new RgfRecrobyWorkspaceService();
+        var closeStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var closeFinished = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var registration = service.RegisterWorkspace(action => Task.FromResult(action()),
+            (_, _, _, _, _) => true, async _ => { closeStarted.SetResult(); await closeFinished.Task; });
+        var owner = service.CreateOwner();
+        Assert.True(await owner.OpenOrActivateAsync("custom", "a", "a", () => throw new Exception()));
+        var first = owner.DisposeAsync().AsTask();
+        await closeStarted.Task;
+        var second = owner.DisposeAsync().AsTask();
+        Assert.False(first.IsCompleted);
+        Assert.False(second.IsCompleted);
+        closeFinished.SetResult();
+        await Task.WhenAll(first, second);
+    }
+
+    [Fact]
+    public async Task OwnerDisposalAwaitsActualConversationBrowserCleanup()
+    {
+        using var context = Context();
+        context.Services.AddSingleton<IRgfApiService>(new CatalogApi());
+        var module = context.JSInterop.SetupModule(invocation => invocation.Arguments[0]?.ToString()?.EndsWith("RgfRecrobyComponent.razor.js") == true);
+        module.Mode = JSRuntimeMode.Loose;
+        var cleanup = module.SetupVoid("dispose", _ => true);
+        var cut = context.Render<RgfRecrobyWorkspace>();
+        var owner = context.Services.GetRequiredService<IRgfRecrobyWorkspaceService>().CreateOwner();
+        await owner.OpenOrActivateAsync("custom", "a", "External", () => new(new PendingTransport()));
+        var disposal = owner.DisposeAsync().AsTask();
+        cut.WaitForAssertion(() => Assert.NotEmpty(module.Invocations["dispose"]));
+        Assert.False(disposal.IsCompleted);
+        cleanup.SetVoidResult();
+        await disposal;
+        Assert.Single(cut.FindComponents<RgfAiChatComponent>());
+    }
+
+    [Fact]
+    public async Task ReinitializedRootInvalidatesPreviousOwnersAndConversationState()
+    {
+        using var context = Context();
+        context.ComponentFactories.AddStub<Recrovit.RecroGridFramework.Client.Blazor.UI.Components.ToastComponent>();
+        var host = context.Render<ReinitializingHost>();
+        var service = context.Services.GetRequiredService<IRgfRecrobyWorkspaceService>();
+        var owner = service.CreateOwner();
+        await owner.OpenOrActivateAsync("custom", "a", "Old state", () => new(new PendingTransport()));
+        var previous = host.FindComponent<RgfRecrobyWorkspace>().Instance;
+        host.Render(p => p.Add(c => c.Revision, 1));
+        host.WaitForAssertion(() => Assert.NotSame(previous, host.FindComponent<RgfRecrobyWorkspace>().Instance));
+        Assert.Single(host.FindComponents<RgfAiChatComponent>());
+        Assert.DoesNotContain("Old state", host.Markup);
+        await Assert.ThrowsAsync<ObjectDisposedException>(() => owner.OpenOrActivateAsync("custom", "a", "a", () => throw new Exception()));
+        await owner.DisposeAsync();
+        await previous.DisposeAsync();
+        await using var replacement = service.CreateOwner();
+        Assert.True(await replacement.OpenOrActivateAsync("custom", "a", "New state", () => new(new PendingTransport())));
+    }
+
+    [Fact]
+    public async Task WorkspaceAndOwnerDisposalAwaitTheSameCleanup()
+    {
+        using var context = Context();
+        var module = context.JSInterop.SetupModule(invocation => invocation.Arguments[0]?.ToString()?.EndsWith("RgfRecrobyWorkspace.razor.js") == true);
+        module.Mode = JSRuntimeMode.Loose;
+        var cleanup = module.SetupVoid("dispose", _ => true);
+        var cut = context.Render<RgfRecrobyWorkspace>();
+        var owner = context.Services.GetRequiredService<IRgfRecrobyWorkspaceService>().CreateOwner();
+        await owner.OpenOrActivateAsync("custom", "a", "a", () => new(new PendingTransport()));
+        var workspaceDisposal = cut.Instance.DisposeAsync().AsTask();
+        cut.WaitForAssertion(() => Assert.NotEmpty(module.Invocations["dispose"]));
+        var ownerDisposal = owner.DisposeAsync().AsTask();
+        Assert.False(workspaceDisposal.IsCompleted);
+        Assert.False(ownerDisposal.IsCompleted);
+        await Assert.ThrowsAsync<ObjectDisposedException>(() => owner.OpenOrActivateAsync("custom", "b", "b", () => throw new Exception()));
+        cleanup.SetVoidResult();
+        await Task.WhenAll(workspaceDisposal, ownerDisposal);
+        await cut.Instance.DisposeAsync();
+        await owner.DisposeAsync();
+    }
+    [Fact]
+    public async Task LastExternalConversationFallsBackToGeneralWithoutCancellingExternalSend()
+    {
+        using var context = Context();
+        var cut = context.Render<RgfRecrobyWorkspace>();
+        var owner = context.Services.GetRequiredService<IRgfRecrobyWorkspaceService>().CreateOwner();
+        var transport = new PendingTransport();
+        var session = new RgfAiConversationSession(transport);
+        await owner.OpenOrActivateAsync("custom", "a", "External", () => session);
+        cut.Find("[aria-label='Close New chat']").Click();
+        Assert.Single(cut.FindComponents<RgfAiChatComponent>());
+        var send = session.SendAsync("External caller request", cancellationToken: Xunit.TestContext.Current.CancellationToken);
+        await owner.DisposeAsync();
+        Assert.Single(cut.FindComponents<RgfAiChatComponent>());
+        Assert.Equal("New chat", cut.Find(".rgf-recroby-title").TextContent);
+        Assert.NotSame(session, cut.FindComponent<RgfAiChatComponent>().Instance.Session);
+        Assert.False(send.IsCompleted);
+        transport.Complete("External caller response");
+        await send;
+        Assert.DoesNotContain("External caller response", cut.Markup);
+    }
+    private sealed class ReinitializingHost : Microsoft.AspNetCore.Components.ComponentBase
+    {
+        [Microsoft.AspNetCore.Components.Parameter] public int Revision { get; set; }
+        protected override void BuildRenderTree(Microsoft.AspNetCore.Components.Rendering.RenderTreeBuilder builder)
+        {
+            builder.OpenComponent<RootWithoutResourceLoading>(0);
+            builder.SetKey(Revision);
+            builder.CloseComponent();
+        }
+    }
+
+    private sealed class CatalogApi : IRgfApiService
+    {
+        public Task<IRgfApiResponse<T>> GetAsync<T>(IRgfApiRequest request) where T : class =>
+            Task.FromResult((IRgfApiResponse<T>)(object)new ApiResponse<RgfAiCatalogResponse>
+            { Success = true, Result = new("p", [new("p", "m", [new("m", [], [], null, null)])]) });
+        public Task<IRgfApiResponse<T>> PostAsync<T>(IRgfApiRequest request) where T : class => throw new NotSupportedException();
+    }
     private sealed class FailedApi(bool envelopeSuccess) : IRgfApiService
     {
         public Task<IRgfApiResponse<T>> GetAsync<T>(IRgfApiRequest request) where T : class => throw new NotSupportedException();

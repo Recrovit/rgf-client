@@ -73,6 +73,11 @@ public sealed class RgfRecrobyRootRegressionTests : IDisposable
         cut.WaitForAssertion(() => Assert.Contains("Still working", cut.Find(".toast-container").TextContent));
         Assert.DoesNotContain(api.Requests, r => r.Uri == "/api/rgf/ai/recroby");
         if (!effectiveEnabled)
+        {
+            await using var owner = context.Services.GetRequiredService<Recrovit.RecroGridFramework.Client.AI.IRgfRecrobyWorkspaceService>().CreateOwner();
+            Assert.False(await owner.OpenOrActivateAsync("custom", "a", "a", () => throw new Exception("Disabled Workspace must not call the factory")));
+        }
+        if (!effectiveEnabled)
             Assert.DoesNotContain(context.JSInterop.Invocations, call => call.Identifier == "import" && call.Arguments.Any(a => a?.ToString()?.EndsWith("RgfRecrobyWorkspace.razor.js") == true));
     }
 }
