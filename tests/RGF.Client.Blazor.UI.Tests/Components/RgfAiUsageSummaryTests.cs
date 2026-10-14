@@ -24,6 +24,57 @@ public sealed class RgfAiUsageSummaryTests
         Assert.Single(cut.FindAll("[id$=-tokens] dd"));
     }
 
+    [Theory]
+    [InlineData(true, 1250L, 3, "1250", "Total tokens")]
+    [InlineData(false, null, 3, "3", "LLM calls")]
+    [InlineData(true, null, 2, "2", "LLM calls")]
+    [InlineData(false, null, 0, "0", "LLM calls")]
+    [InlineData(true, null, 0, "0", "LLM calls")]
+    [InlineData(true, 0L, 3, "0", "Total tokens")]
+    public void UsageButtonShowsKnownTotalOrLogicalCallCount(bool hasTokens, long? totalTokens, int callCount, string value, string label)
+    {
+        using var context = Context();
+        var cut = context.Render<RgfAiUsageSummary>(p => p.Add(c => c.Response, new()
+        {
+            CreditUsage = new()
+            {
+                LlmCallCount = callCount,
+                Tokens = hasTokens ? new() { TotalTokens = totalTokens, InputTokens = 7 } : null
+            }
+        }));
+
+        var button = cut.Find("button[popovertarget$=-tokens]");
+        Assert.Equal(value, button.TextContent.Trim());
+        Assert.Equal($"{label}: {value}", button.GetAttribute("title"));
+        Assert.Equal($"{label}: {value}", button.GetAttribute("aria-label"));
+        Assert.Equal("bi bi-bar-chart", button.QuerySelector("i")!.ClassName);
+
+        var panel = cut.Find("[id$=-tokens]");
+        Assert.Equal("LLM calls", panel.QuerySelector("dt")!.TextContent);
+        Assert.Equal(callCount.ToString(), panel.QuerySelector("dd")!.TextContent);
+        Assert.Equal(hasTokens ? 2 : 1, panel.QuerySelectorAll("dl").Length);
+        if (hasTokens)
+        {
+            Assert.Equal("Aggregated token statistics", panel.QuerySelector("strong")!.TextContent);
+            Assert.Equal(new[] { callCount.ToString(), "7", "Unknown", totalTokens?.ToString() ?? "Unknown", "Unknown", "Unknown" },
+                panel.QuerySelectorAll("dd").Select(element => element.TextContent));
+        }
+        else
+        {
+            Assert.Empty(panel.QuerySelectorAll("strong"));
+            Assert.Single(panel.QuerySelectorAll("dd"));
+        }
+    }
+
+    [Fact]
+    public void CreditStateWithoutCreditUsageHasNoUsageButton()
+    {
+        using var context = Context();
+        var cut = context.Render<RgfAiUsageSummary>(p => p.Add(c => c.Response, new() { CreditState = new() }));
+        Assert.Empty(cut.FindAll("button[popovertarget$=-tokens], [id$=-tokens]"));
+        Assert.Single(cut.FindAll("button[popovertarget$=-credit]"));
+    }
+
     [Fact]
     public async Task PopoversHaveStableUniqueIdsAccessibleButtonsAndModuleDisposal()
     {

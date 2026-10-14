@@ -14,7 +14,7 @@
             {
                 @Item("models", "cpu", ModelLabel, "Models", ModelsContent)
             }
-            @Item("tokens", "bar-chart", usage.Tokens?.TotalTokens?.ToString() ?? "Usage", "Aggregated token statistics", TokensContent, showHeading: false)
+            @Item("tokens", "bar-chart", usage.Tokens?.TotalTokens?.ToString() ?? usage.LlmCallCount.ToString(), "Aggregated token statistics", TokensContent, showHeading: false, buttonLabel: usage.Tokens?.TotalTokens is not null ? "Total tokens" : "LLM calls")
             @Item("cost", "coin", Credit(usage.ChargedCredit), "Charged credit", CostContent)
         }
         @if (Response.CreditState is { } state)
@@ -25,8 +25,8 @@
 }
 
 @code {
-    private RenderFragment Item(string group, string icon, string value, string label, RenderFragment content, bool showHeading = true) => @<text>
-        <button type="button" class="rgf-ai-usage-item" popovertarget="@PanelId(group)" aria-controls="@PanelId(group)" aria-haspopup="dialog" aria-expanded="false" aria-label="@($"{label}: {value}")" title="@value"><i class="bi bi-@icon" aria-hidden="true"></i> @value</button>
+    private RenderFragment Item(string group, string icon, string value, string label, RenderFragment content, bool showHeading = true, string? buttonLabel = null) => @<text>
+        <button type="button" class="rgf-ai-usage-item" popovertarget="@PanelId(group)" aria-controls="@PanelId(group)" aria-haspopup="dialog" aria-expanded="false" aria-label="@($"{buttonLabel ?? label}: {value}")" title="@(buttonLabel is null ? value : $"{buttonLabel}: {value}")"><i class="bi bi-@icon" aria-hidden="true"></i> @value</button>
         <div class="rgf-ai-usage-panel" id="@PanelId(group)" popover="auto" role="dialog" aria-label="@label" tabindex="-1">
             @if (showHeading) { <strong>@label</strong> }
             @content
