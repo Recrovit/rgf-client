@@ -55,7 +55,7 @@ public sealed class RgfRecrobyWorkspaceTests
         Assert.Single(cut.FindAll(".rgf-recroby-conversation-bar [data-action=new]"));
         Assert.Empty(cut.FindAll("[role=tab], .nav-tabs, select"));
         Assert.Single(cut.FindAll("[data-action=switch]"));
-        Assert.Equal("general: Conversation 1", cut.Find("[data-action=switch]").GetAttribute("title"));
+        Assert.Equal("New chat", cut.Find("[data-action=switch]").GetAttribute("title"));
         Assert.Equal("dialog", cut.Find("[data-action=switch]").GetAttribute("aria-haspopup"));
         Assert.Empty(cut.FindAll("header [data-action=new]"));
         Assert.Single(cut.FindAll(".rgf-recroby-choice > .btn-close"));
@@ -115,7 +115,7 @@ public sealed class RgfRecrobyWorkspaceTests
         chats[1].Find("textarea").Change("Draft two");
         Assert.Equal(2, cut.FindAll("[data-action=select]").Count);
         Assert.Single(cut.FindAll(".rgf-recroby-conversation-bar > [data-action=new]"));
-        Assert.Equal("Conversation 2", cut.Find(".rgf-recroby-title").TextContent);
+        Assert.Equal("New chat", cut.Find(".rgf-recroby-title").TextContent);
         Assert.Empty(cut.FindAll("button button"));
         cut.Find("[data-action=switch]").Click();
         cut.FindAll("[data-action=select]")[0].Click();
@@ -123,9 +123,9 @@ public sealed class RgfRecrobyWorkspaceTests
         Assert.Equal("Draft one", cut.FindAll("textarea")[0].GetAttribute("value") ?? cut.FindAll("textarea")[0].TextContent);
         Assert.Same(first.Instance, cut.FindComponents<RgfAiChatComponent>()[0].Instance);
         Assert.Equal("Draft two", cut.FindComponents<RgfAiChatComponent>()[1].FindComponent<Recrovit.RecroGridFramework.Client.Blazor.UI.Components.Base.RgfInputText>().Instance.Value);
-        Assert.Equal("general: Conversation 1", cut.Find(".rgf-recroby-conversation:not([hidden])").GetAttribute("aria-label"));
+        Assert.Equal("New chat", cut.Find(".rgf-recroby-conversation:not([hidden])").GetAttribute("aria-label"));
         cut.Find("[data-action=switch]").Click();
-        cut.Find("[aria-label='Close Conversation 1']").Click();
+        cut.FindAll(".rgf-recroby-choice > .btn-close")[0].Click();
         Assert.Single(cut.FindComponents<RgfAiChatComponent>());
     }
 
@@ -163,6 +163,7 @@ public sealed class RgfRecrobyWorkspaceTests
         cut.Find("[aria-label='Open Recroby']").Click();
         cut.Find("textarea").Change("Hello");
         await cut.FindComponent<RgfAiChatComponent>().Find("button").ClickAsync(new());
+        Assert.Equal("Hello", cut.Find(".rgf-recroby-title").TextContent);
         Assert.Single(cut.FindAll("[data-error-kind=transport]"));
         Assert.False(cut.FindComponent<RgfAiChatComponent>().Instance.Session.IsProcessing);
     }
@@ -198,13 +199,14 @@ public sealed class RgfRecrobyWorkspaceTests
         second.Find("textarea").Change("Second");
         var secondClick = second.Find("button").ClickAsync(new());
         Assert.Equal(2, api.Requests.Count);
+        Assert.Equal(new[] { "First", "Second" }, cut.FindAll(".rgf-recroby-choice-title").Select(e => e.TextContent));
         cut.Find("[data-action=switch]").Click();
         cut.FindAll("[data-action=select]")[0].Click();
         Assert.Same(first.Instance.Session, cut.FindComponents<RgfAiChatComponent>()[0].Instance.Session);
         Assert.True(first.Instance.Session.IsProcessing);
         Assert.True(second.Instance.Session.IsProcessing);
         cut.Find("[data-dock=DockBottom]").Click();
-        Assert.Equal("Conversation 1", cut.Find(".rgf-recroby-title").TextContent);
+        Assert.Equal("First", cut.Find(".rgf-recroby-title").TextContent);
         cut.Find("[aria-label='Collapse Recroby']").Click();
         Assert.True(first.Instance.Session.IsProcessing);
         Assert.True(second.Instance.Session.IsProcessing);
@@ -217,7 +219,7 @@ public sealed class RgfRecrobyWorkspaceTests
         first.WaitForAssertion(() => Assert.Single(first.FindAll("[data-error-kind=cancelled]")));
         Assert.True(second.Instance.Session.IsProcessing);
         cut.Find("[data-action=switch]").Click();
-        cut.Find("[aria-label='Close Conversation 2']").Click();
+        cut.Find("[aria-label='Close Second']").Click();
         await secondClick;
         Assert.All(api.Requests, request => Assert.True(request.CancellationToken.IsCancellationRequested));
     }
@@ -253,17 +255,15 @@ public sealed class RgfRecrobyWorkspaceTests
         cut.Find("[data-action=new]").Click();
         var active = cut.FindComponents<RgfAiChatComponent>()[2].Instance;
         cut.Find("[data-action=switch]").Click();
-        cut.Find("[aria-label='Close Conversation 2']").Click();
-        Assert.Equal("Conversation 3", cut.Find(".rgf-recroby-title").TextContent);
+        cut.FindAll(".rgf-recroby-choice > .btn-close")[1].Click();
         Assert.Same(active, cut.FindComponents<RgfAiChatComponent>()[1].Instance);
         Assert.Equal("true", cut.Find("[data-action=switch]").GetAttribute("aria-expanded"));
-        cut.Find("[aria-label='Close Conversation 3']").Click();
-        Assert.Equal("Conversation 1", cut.Find(".rgf-recroby-title").TextContent);
+        cut.FindAll(".rgf-recroby-choice > .btn-close")[1].Click();
         Assert.Equal("true", cut.Find("[data-action=select]").GetAttribute("aria-pressed"));
-        cut.Find("[aria-label='Close Conversation 1']").Click();
+        cut.Find(".rgf-recroby-choice > .btn-close").Click();
         Assert.Single(cut.FindComponents<RgfAiChatComponent>());
-        Assert.Equal("Conversation 4", cut.Find(".rgf-recroby-title").TextContent);
-        Assert.Equal("general", cut.Find(".rgf-recroby-type").TextContent);
+        Assert.Equal("New chat", cut.Find(".rgf-recroby-title").TextContent);
+        Assert.Empty(cut.FindAll(".rgf-recroby-type, .rgf-recroby-group-title"));
         Assert.NotSame(active.Session, cut.FindComponent<RgfAiChatComponent>().Instance.Session);
         Assert.True(cut.Find(".rgf-recroby-switcher").HasAttribute("hidden"));
     }
@@ -273,7 +273,12 @@ public sealed class RgfRecrobyWorkspaceTests
     {
         using var context = Context();
         var cut = context.Render<RgfRecrobyWorkspace>();
-        for (var i = 1; i < 8; i++) cut.Find("[data-action=new]").Click();
+        Rename(cut, "Conversation 1");
+        for (var i = 1; i < 8; i++)
+        {
+            cut.Find("[data-action=new]").Click();
+            Rename(cut, $"Conversation {i + 1}");
+        }
         cut.Find("[data-action=switch]").Click();
         Assert.Empty(cut.FindAll("input[type=search]"));
         cut.Find("[data-action=new]").Click();
@@ -283,7 +288,7 @@ public sealed class RgfRecrobyWorkspaceTests
         cut.Find("input[type=search]").Input("cONVERSATION 2");
         Assert.Single(cut.FindAll("[data-action=select]"));
         Assert.Equal("Conversation 2", cut.Find(".rgf-recroby-choice-title").TextContent);
-        Assert.Equal("Conversation 9", cut.Find(".rgf-recroby-title").TextContent);
+        Assert.Equal("New chat", cut.Find(".rgf-recroby-title").TextContent);
         cut.Find("input[type=search]").Input("missing");
         Assert.Empty(cut.FindAll("[data-action=select]"));
         Assert.Equal("No conversations found.", cut.Find("[role=status]").TextContent);
@@ -311,12 +316,171 @@ public sealed class RgfRecrobyWorkspaceTests
         conversation.GetType().GetField("<RecrobyType>k__BackingField", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.SetValue(conversation, "custom");
         cut.Find("[data-action=switch]").Click();
         Assert.Equal(2, cut.FindAll("[role=group]").Count);
+        Assert.Equal("General chat", cut.Find("[data-conversation-type=general]").GetAttribute("aria-label"));
+        Assert.Equal("General chat", cut.Find("[data-conversation-type=general] .rgf-recroby-group-title").TextContent);
         Assert.Single(cut.FindAll("[data-conversation-type=general] [data-action=select]"));
         Assert.Equal(title, cut.Find("[data-conversation-type=custom] [data-action=select]").GetAttribute("title"));
         Assert.Equal("custom: " + title, cut.Find("[data-action=switch]").GetAttribute("title"));
         Assert.Equal(title, cut.Find(".rgf-recroby-title").TextContent);
         Assert.Equal("custom: " + title, cut.Find(".rgf-recroby-conversation:not([hidden])").GetAttribute("aria-label"));
         Assert.Empty(cut.FindAll("[role=tab], [role=tabpanel], select"));
+    }
+
+    private static void Rename(IRenderedComponent<RgfRecrobyWorkspace> cut, string title)
+    {
+        cut.Find("[data-action=rename]").Click();
+        cut.Find(".rgf-recroby-title-editor").Input(title);
+        cut.Find(".rgf-recroby-title-editor").KeyDown("Enter");
+    }
+
+    [Theory]
+    [InlineData("12345678901234567890123456789", "12345678901234567890123456789")]
+    [InlineData("123456789012345678901234567890", "123456789012345678901234567890")]
+    [InlineData("1234567890123456789012345678901", "12345678901234567890123456789…")]
+    [InlineData("  Hello\r\n  world\t again  ", "Hello world again")]
+    [InlineData("1234567890123456789012345678👩🏽‍💻XY", "1234567890123456789012345678👩🏽‍💻…")]
+    [InlineData("1234567890123456789012345678e\u0301XY", "1234567890123456789012345678e\u0301…")]
+    public async Task FirstDisplayedPromptTitlesBeforeCompletionAndSurvivesCancellation(string prompt, string title)
+    {
+        using var context = Context();
+        context.Services.AddSingleton<IRgfApiService>(new QueuedApi());
+        var cut = context.Render<RgfRecrobyWorkspace>();
+        var session = cut.FindComponent<RgfAiChatComponent>().Instance.Session;
+        Assert.Equal("New chat", cut.Find(".rgf-recroby-title").TextContent);
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(Xunit.TestContext.Current.CancellationToken);
+        var send = session.SendAsync(prompt, cancellationToken: cancellation.Token);
+        cut.WaitForAssertion(() => Assert.Equal(title, cut.Find(".rgf-recroby-title").TextContent));
+        Assert.False(send.IsCompleted);
+        Assert.Equal(title, cut.Find("[data-action=switch]").GetAttribute("title"));
+        cancellation.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => send);
+        cut.WaitForAssertion(() => Assert.Equal(title, cut.Find(".rgf-recroby-title").TextContent));
+    }
+
+    [Fact]
+    public async Task HiddenSendsDoNotTitleAndLaterFailuresCannotRetitle()
+    {
+        using var context = Context();
+        context.Services.AddSingleton<IRgfApiService>(new FailedApi(true));
+        var cut = context.Render<RgfRecrobyWorkspace>();
+        var session = cut.FindComponent<RgfAiChatComponent>().Instance.Session;
+        await session.SendAsync("Hidden", false, Xunit.TestContext.Current.CancellationToken);
+        Assert.Equal("New chat", cut.Find(".rgf-recroby-title").TextContent);
+        await session.SendAsync("Visible", cancellationToken: Xunit.TestContext.Current.CancellationToken);
+        cut.WaitForAssertion(() => Assert.Equal("Visible", cut.Find(".rgf-recroby-title").TextContent));
+        await session.SendAsync("Later", cancellationToken: Xunit.TestContext.Current.CancellationToken);
+        cut.WaitForAssertion(() => Assert.Equal("Visible", cut.Find(".rgf-recroby-title").TextContent));
+    }
+
+    [Fact]
+    public async Task RenameSavesOnlyValidEnterAndPreventsAutomaticTitleEvenForNewChat()
+    {
+        using var context = Context();
+        context.Services.AddSingleton<IRgfApiService>(new FailedApi(true));
+        var module = context.JSInterop.SetupModule(invocation => invocation.Arguments[0]?.ToString()?.EndsWith("RgfRecrobyWorkspace.razor.js") == true);
+        module.Mode = JSRuntimeMode.Loose;
+        var cut = context.Render<RgfRecrobyWorkspace>();
+        cut.Find("[data-action=switch]").Click();
+        cut.Find("[data-action=rename]").Click();
+        Assert.Single(module.Invocations["focusTitleEditor"]);
+        Assert.Equal(false, module.Invocations["syncSwitcher"].Last().Arguments[1]);
+        Assert.Equal(false, module.Invocations["syncSwitcher"].Last().Arguments[2]);
+        Assert.Empty(cut.FindAll("[data-action=switch]"));
+        Assert.True(cut.Find(".rgf-recroby-switcher").HasAttribute("hidden"));
+        Assert.Equal("New chat", cut.Find(".rgf-recroby-title-editor").GetAttribute("value"));
+        Assert.Equal("100", cut.Find(".rgf-recroby-title-editor").GetAttribute("maxlength"));
+        cut.Find(".rgf-recroby-title-editor").Input("  ");
+        cut.Find(".rgf-recroby-title-editor").KeyDown("Enter");
+        Assert.Single(cut.FindAll(".rgf-recroby-title-editor"));
+        cut.Find(".rgf-recroby-title-editor").Input(new string('x', 101));
+        cut.Find(".rgf-recroby-title-editor").KeyDown("Enter");
+        Assert.Single(cut.FindAll(".rgf-recroby-title-editor"));
+        cut.Find(".rgf-recroby-title-editor").Input("Discard");
+        cut.Find(".rgf-recroby-title-editor").KeyDown("Escape");
+        Assert.Equal("New chat", cut.Find(".rgf-recroby-title").TextContent);
+        cut.Find("[data-action=rename]").Click();
+        cut.Find(".rgf-recroby-title-editor").Input("Discard on blur");
+        cut.Find(".rgf-recroby-title-editor").Blur();
+        Assert.Equal("New chat", cut.Find(".rgf-recroby-title").TextContent);
+        var longTitle = new string('x', 100);
+        Rename(cut, longTitle);
+        Assert.Equal(longTitle, cut.Find(".rgf-recroby-choice-title").TextContent);
+        Assert.Equal(longTitle, cut.Find("[data-action=switch]").GetAttribute("title"));
+        Assert.Equal("Rename " + longTitle, cut.Find("[data-action=rename]").GetAttribute("aria-label"));
+        Rename(cut, "New chat");
+        await cut.FindComponent<RgfAiChatComponent>().Instance.Session.SendAsync("Must not replace manual title", cancellationToken: Xunit.TestContext.Current.CancellationToken);
+        Assert.Equal("New chat", cut.Find(".rgf-recroby-title").TextContent);
+    }
+
+    [Fact]
+    public async Task PendingCompletionCannotReplaceManualTitleAndClosedSessionsAreIgnored()
+    {
+        using var context = Context();
+        context.Services.AddSingleton<IRgfApiService>(new QueuedApi());
+        var cut = context.Render<RgfRecrobyWorkspace>();
+        var session = cut.FindComponent<RgfAiChatComponent>().Instance.Session;
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(Xunit.TestContext.Current.CancellationToken);
+        var send = session.SendAsync("Automatic", cancellationToken: cancellation.Token);
+        cut.WaitForAssertion(() => Assert.Equal("Automatic", cut.Find(".rgf-recroby-title").TextContent));
+        Rename(cut, "Manual");
+        var stateChanged = typeof(RgfAiConversationSession).GetField("StateChanged", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!;
+        var handler = ((Action)stateChanged.GetValue(session)!).GetInvocationList()
+            .Single(d => d.Target?.GetType().DeclaringType == typeof(RgfRecrobyWorkspace));
+        cancellation.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => send);
+        Assert.Equal("Manual", cut.Find(".rgf-recroby-title").TextContent);
+        cut.Find("[data-action=switch]").Click();
+        cut.Find(".rgf-recroby-choice > .btn-close").Click();
+        Assert.DoesNotContain(handler, ((Action?)stateChanged.GetValue(session))?.GetInvocationList() ?? []);
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => session.SendAsync("Closed", cancellationToken: cancellation.Token));
+        Assert.Equal("New chat", cut.Find(".rgf-recroby-title").TextContent);
+        var remaining = cut.FindComponent<RgfAiChatComponent>().Instance.Session;
+        var remainingHandler = ((Action)stateChanged.GetValue(remaining)!).GetInvocationList()
+            .Single(d => d.Target?.GetType().DeclaringType == typeof(RgfRecrobyWorkspace));
+        await cut.InvokeAsync(() => cut.Instance.DisposeAsync().AsTask());
+        Assert.DoesNotContain(remainingHandler, ((Action?)stateChanged.GetValue(remaining))?.GetInvocationList() ?? []);
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => remaining.SendAsync("Disposed", cancellationToken: cancellation.Token));
+    }
+
+    [Fact]
+    public async Task QueuedStateChangeRechecksManualTitleOnDispatcher()
+    {
+        using var context = Context();
+        var cut = context.Render<RgfRecrobyWorkspace>();
+        var session = cut.FindComponent<RgfAiChatComponent>().Instance.Session;
+        var stateChanged = typeof(RgfAiConversationSession).GetField("StateChanged", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!;
+        var handler = (Action)((Action)stateChanged.GetValue(session)!).GetInvocationList()
+            .Single(d => d.Target?.GetType().DeclaringType == typeof(RgfRecrobyWorkspace));
+        await cut.InvokeAsync(() =>
+        {
+            session.Conversation.AddUserMessage("Automatic title waiting for dispatcher");
+            // Queue the event behind the current dispatcher operation, then save the manual title.
+            Task.Run(handler, Xunit.TestContext.Current.CancellationToken).GetAwaiter().GetResult();
+            Rename(cut, "New chat");
+        });
+        await cut.InvokeAsync(() => { });
+        Assert.Equal("New chat", cut.Find(".rgf-recroby-title").TextContent);
+    }
+
+    [Fact]
+    public void SearchDoesNotChangeTheFullCollectionTypeCount()
+    {
+        using var context = Context();
+        var cut = context.Render<RgfRecrobyWorkspace>();
+        for (var i = 1; i < 9; i++) cut.Find("[data-action=new]").Click();
+        Rename(cut, "Unique title");
+        var conversations = (System.Collections.IEnumerable)typeof(RgfRecrobyWorkspace)
+            .GetField("_conversations", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.GetValue(cut.Instance)!;
+        var conversation = conversations.Cast<object>().Last();
+        conversation.GetType().GetField("<RecrobyType>k__BackingField", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.SetValue(conversation, "custom");
+        cut.Find("[data-action=switch]").Click();
+        cut.Find("input[type=search]").Input("Unique");
+        Assert.Single(cut.FindAll("[data-action=select]"));
+        Assert.Equal("custom", cut.Find(".rgf-recroby-group-title").TextContent);
+        cut.Find("input[type=search]").Input("New chat");
+        Assert.Equal("General chat", cut.Find(".rgf-recroby-group-title").TextContent);
+        Assert.DoesNotContain("general:", cut.Markup);
+        Assert.Equal("custom", cut.Find(".rgf-recroby-type").TextContent);
     }
 
     private sealed class FailedApi(bool envelopeSuccess) : IRgfApiService

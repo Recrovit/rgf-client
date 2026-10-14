@@ -40,10 +40,11 @@ const html = `<!doctype html><html><head><meta charset="utf-8"><link rel="styles
 <button class="rgf-recroby-launcher btn btn-primary">Recroby</button><section class="rgf-recroby-panel card" hidden>
 <header class="card-header" data-drag-handle><strong>Recroby</strong><button id="collapse">Collapse</button></header>
 <div class="card-header rgf-recroby-conversation-bar">
-<button id="conversation-selector" class="btn btn-sm btn-outline-secondary rgf-recroby-selector" data-action="switch" aria-haspopup="dialog" aria-expanded="false" aria-controls="conversation-list" title="general: Conversation 1"><span class="rgf-recroby-type">general</span><span class="rgf-recroby-title">Conversation 1</span><i aria-hidden="true">&#x2304;</i></button>
+<button id="conversation-selector" class="btn btn-sm btn-outline-secondary rgf-recroby-selector" data-action="switch" aria-haspopup="dialog" aria-expanded="false" aria-controls="conversation-list" title="New chat"><span class="rgf-recroby-title">New chat</span><i aria-hidden="true">&#x2304;</i></button>
+<button class="btn btn-sm btn-outline-secondary" data-action="rename" aria-label="Rename conversation"><i class="bi bi-pencil-square" aria-hidden="true"></i></button>
 <button class="btn btn-sm btn-outline-secondary" data-action="new" aria-label="New conversation">+</button>
 <div id="conversation-list" class="rgf-recroby-switcher" popover="manual" hidden role="dialog" aria-label="Conversations">
-<div class="rgf-recroby-switcher-list"><div role="group" aria-label="general" data-conversation-type="general"><div class="rgf-recroby-group-title">general</div>
+<div class="rgf-recroby-switcher-list"><div role="group" aria-label="Conversations" data-conversation-type="general">
 <div class="rgf-recroby-choice active"><button class="rgf-recroby-choice-select" data-action="select" aria-pressed="true"><span class="rgf-recroby-choice-title">Conversation 1</span><i aria-hidden="true">&#x2713;</i></button><button class="btn-close" aria-label="Close Conversation 1"></button></div>
 </div></div></div></div>
 <div class="rgf-recroby-conversation"><div class="container mt-4">
@@ -93,6 +94,23 @@ window.switcherOpen = false;
 window.setSwitcher = open => {window.switcherOpen = open; element.querySelector('.rgf-recroby-switcher').hidden = !open; element.querySelector('[data-action=switch]').setAttribute('aria-expanded', String(open)); workspace.syncSwitcher(element, open, !open);};
 window.sync = () => {element.querySelector('section').hidden = settings.isCollapsed; element.querySelector('.rgf-recroby-launcher').hidden = !settings.isCollapsed; if (settings.isCollapsed && switcherOpen) setSwitcher(false);};
 element.querySelector('[data-action=switch]').onclick = () => setSwitcher(!switcherOpen);
+// Mirror Blazor replacing the selector after rendering the editor.
+window.beginRename = () => {
+    window.switcherOpen = false;
+    element.querySelector('.rgf-recroby-switcher').hidden = true;
+    workspace.syncSwitcher(element, false, false);
+    const selector = element.querySelector('[data-action=switch]');
+    const input = document.createElement('input');
+    input.className = 'form-control form-control-sm rgf-recroby-title-editor';
+    input.maxLength = 100;
+    input.value = selector.querySelector('.rgf-recroby-title').textContent;
+    const cancel = () => {if (input.isConnected) input.replaceWith(selector);};
+    input.onkeydown = event => {if (event.key === 'Escape') cancel();};
+    input.onblur = cancel;
+    selector.replaceWith(input);
+    workspace.focusTitleEditor(element);
+};
+element.querySelector('[data-action=rename]').onclick = beginRename;
 window.setLayout = patch => {Object.assign(settings, patch); workspace.update(element, settings); sync();};
 window.reference = {invokeMethodAsync: async (method, value) => {
     if (method === 'DismissSwitcher') {window.switcherOpen=false; element.querySelector('.rgf-recroby-switcher').hidden=true; element.querySelector('[data-action=switch]').setAttribute('aria-expanded', 'false'); workspace.syncSwitcher(element, false, value);}
@@ -230,9 +248,38 @@ try {
     }
     await layout({ mode: 0, isCollapsed: false });
     const selectorShape = await rect('[data-action=switch]');
-    assert.ok((await rect('[data-action=new]')).right < (await rect('.rgf-recroby-conversation-bar')).right - 20, 'short conversation title keeps the selector at content width');
+    assert.ok((await rect('[data-action=new]')).right <= (await rect('.rgf-recroby-conversation-bar')).right, 'selector and actions fit the bar');
     assert.equal(await evaluate("document.querySelector('.rgf-recroby-title').scrollWidth > document.querySelector('.rgf-recroby-title').clientWidth"), false, 'short conversation title remains fully visible');
     assert.ok((await rect('[data-action=new]')).x >= selectorShape.right, 'new conversation button follows the flexible selector');
+    for (const [width, mode, panelWidth] of [[1200, 1, 400], [1200, 0, 320], [390, 0, 320], [320, 0, 320]]) {
+        await viewport(width, 700);
+        await layout({mode, isCollapsed:false, width:panelWidth, dockWidth:panelWidth});
+        await evaluate("document.querySelector('.rgf-recroby-title').textContent='W'.repeat(100)");
+        const bar = await rect('.rgf-recroby-conversation-bar');
+        const rename = await rect('[data-action=rename]'), add = await rect('[data-action=new]');
+        assert.ok(rename.width > 20 && add.width > 20 && add.right <= bar.right && rename.y === add.y, '100-character title keeps both actions visible in dock, small floating and mobile layouts');
+        assert.ok(await evaluate("document.querySelector('.rgf-recroby-conversation-bar').scrollWidth <= document.querySelector('.rgf-recroby-conversation-bar').clientWidth"), 'long title never overflows the bar');
+        await click('[data-action=switch]');
+        await evaluate('beginRename()');
+        assert.equal(await evaluate("document.querySelector('.rgf-recroby-switcher').matches(':popover-open')"), false, 'editing closes the switcher');
+        assert.equal(await evaluate("document.activeElement.classList.contains('rgf-recroby-title-editor')"), true, 'post-render editor receives focus without switcher restoration');
+        assert.equal(await evaluate("document.activeElement.selectionEnd - document.activeElement.selectionStart"), 100, 'current title is selected');
+        assert.ok((await rect('.rgf-recroby-title-editor')).right <= (await rect('[data-action=rename]')).x, 'editor fits beside fixed actions');
+        await layout({height:300});
+        await cdp('Input.dispatchKeyEvent', {type:'keyDown', key:'Escape'});
+        assert.equal(await evaluate("document.querySelector('.rgf-recroby-title-editor') === null"), true, 'Escape cancels editing');
+        await click('[data-action=switch]');
+        const popup = await rect('.rgf-recroby-switcher');
+        assert.ok(popup.x >= 7 && popup.right <= width - 7 && popup.bottom <= 693, 'switcher positioning survives editing and resizing');
+        await cdp('Input.dispatchKeyEvent', {type:'keyDown', key:'Escape'});
+        assert.equal(await evaluate("document.activeElement === document.querySelector('[data-action=switch]')"), true, 'switcher Escape still restores focus after editing');
+        await click('[data-action=rename]');
+        await evaluate("document.querySelector('textarea').focus()");
+        assert.equal(await evaluate("document.querySelector('.rgf-recroby-title-editor') === null"), true, 'blur cancels editing');
+        assert.equal(await evaluate("document.activeElement.tagName"), 'TEXTAREA', 'blur preserves destination focus');
+    }
+    await viewport(1200,800);
+    await evaluate("document.querySelector('.rgf-recroby-title').textContent='New chat'");
     await layout({ mode: 1 });
     await evaluate("document.querySelector('.navbar').style.height='72px'");
     await delay(150);

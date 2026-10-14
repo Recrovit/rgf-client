@@ -24,13 +24,22 @@
             <button type="button" class="btn btn-sm btn-outline-secondary" aria-label="Collapse Recroby" @onclick="Collapse">−</button>
         </header>
         <div class="card-header rgf-recroby-conversation-bar" @onkeydown="SwitcherKeyDown">
-            <button id="@_selectorId" type="button" class="btn btn-sm btn-outline-secondary rgf-recroby-selector" data-action="switch"
-                    aria-label="Choose conversation" aria-haspopup="dialog" aria-expanded="@_switcherOpen.ToString().ToLowerInvariant()" aria-controls="@(_selectorId + "-list")"
-                    title="@($"{_active?.RecrobyType}: {_active?.Title}")" @onclick="ToggleSwitcher">
-                <span class="rgf-recroby-type">@_active?.RecrobyType</span>
-                <span class="rgf-recroby-title">@_active?.Title</span>
-                <i class="bi bi-chevron-down" aria-hidden="true"></i>
-            </button>
+            @if (_editing != null)
+            {
+                <input type="text" class="form-control form-control-sm rgf-recroby-title-editor" aria-label="Conversation title" maxlength="100"
+                       @bind="_editTitle" @bind:event="oninput" @onkeydown="RenameKeyDown" @onblur="CancelRename" />
+            }
+            else
+            {
+                <button id="@_selectorId" type="button" class="btn btn-sm btn-outline-secondary rgf-recroby-selector" data-action="switch"
+                        aria-label="@($"Choose conversation: {(_active == null ? string.Empty : ConversationLabel(_active))}")" aria-haspopup="dialog" aria-expanded="@_switcherOpen.ToString().ToLowerInvariant()" aria-controls="@(_selectorId + "-list")"
+                        title="@(_active == null ? string.Empty : ConversationLabel(_active))" @onclick="ToggleSwitcher">
+                    @if (HasMultipleTypes && _active != null) { <span class="rgf-recroby-type">@TypeLabel(_active.RecrobyType)</span> }
+                    <span class="rgf-recroby-title">@_active?.Title</span>
+                    <i class="bi bi-chevron-down" aria-hidden="true"></i>
+                </button>
+            }
+            <button type="button" class="btn btn-sm btn-outline-secondary" data-action="rename" title="Rename conversation" aria-label="@($"Rename {_active?.Title}")" @onclick="BeginRename"><i class="bi bi-pencil-square" aria-hidden="true"></i></button>
             <button type="button" class="btn btn-sm btn-outline-secondary" data-action="new" title="New conversation" aria-label="New conversation" @onclick="NewConversation"><i class="bi bi-plus-lg" aria-hidden="true"></i></button>
             <div id="@(_selectorId + "-list")" class="rgf-recroby-switcher" popover="manual" hidden="@(!_switcherOpen)" role="dialog" aria-label="Conversations">
                 @if (_conversations.Count > 8)
@@ -40,8 +49,8 @@
                 <div class="rgf-recroby-switcher-list">
                     @foreach (var group in FilteredConversations.GroupBy(c => c.RecrobyType))
                     {
-                        <div role="group" aria-label="@group.Key" data-conversation-type="@group.Key">
-                            <div class="rgf-recroby-group-title">@group.Key</div>
+                        <div role="group" aria-label="@(HasMultipleTypes ? TypeLabel(group.Key) : "Conversations")" data-conversation-type="@group.Key">
+                            @if (HasMultipleTypes) { <div class="rgf-recroby-group-title">@TypeLabel(group.Key)</div> }
                             @foreach (var conversation in group)
                             {
                                 <div class="rgf-recroby-choice @(conversation == _active ? "active" : "")" @key="conversation.Id">
@@ -61,7 +70,7 @@
         </div>
         @foreach (var conversation in _conversations)
         {
-            <div @key="conversation.Id" id="@($"recroby-panel-{conversation.Id:N}")" class="rgf-recroby-conversation" hidden="@(conversation != _active)" role="region" aria-label="@($"{conversation.RecrobyType}: {conversation.Title}")">
+            <div @key="conversation.Id" id="@($"recroby-panel-{conversation.Id:N}")" class="rgf-recroby-conversation" hidden="@(conversation != _active)" role="region" aria-label="@ConversationLabel(conversation)">
                 <RgfRecrobyComponent Session="conversation.Session" />
             </div>
         }

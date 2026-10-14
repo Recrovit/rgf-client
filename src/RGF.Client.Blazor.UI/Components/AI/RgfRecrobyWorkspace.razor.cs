@@ -2,9 +2,12 @@ using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.JSInterop;
+using Recrovit.RecroGridFramework.Abstraction.Contracts.AI;
 using Recrovit.RecroGridFramework.Abstraction.Contracts.Services;
 using Recrovit.RecroGridFramework.Client.AI;
 using Recrovit.RecroGridFramework.Client.AI.Transport;
+using System.Globalization;
+using System.Text.RegularExpressions;
 
 namespace Recrovit.RecroGridFramework.Client.Blazor.UI.Components.AI;
 
@@ -59,7 +62,57 @@ public partial class RgfRecrobyWorkspace : IAsyncDisposable
 
     private readonly List<Conversation> _conversations = [];
     private Conversation? _active;
-    private int _nextTitle;
+    private Conversation? _editing;
+    private string _editTitle = string.Empty;
+    private bool _focusTitleEditor;
+    private bool HasMultipleTypes => _conversations.Select(c => c.RecrobyType).Distinct().Skip(1).Any();
+    private static string TypeLabel(string type) => type == "general" ? "General chat" : type;
+    private string ConversationLabel(Conversation conversation) => HasMultipleTypes
+        ? $"{TypeLabel(conversation.RecrobyType)}: {conversation.Title}" : conversation.Title;
+
+    private void BeginRename()
+    {
+        if (_active == null) return;
+        CloseSwitcher(false);
+        _editing = _active;
+        _editTitle = _active.Title;
+        _focusTitleEditor = true;
+    }
+
+    private void CancelRename()
+    {
+        _editing = null;
+        _focusTitleEditor = false;
+    }
+
+    private void RenameKeyDown(KeyboardEventArgs args)
+    {
+        if (args.Key == "Escape") CancelRename();
+        else if (args.Key == "Enter" && _editing != null && !string.IsNullOrWhiteSpace(_editTitle))
+        {
+            var title = _editTitle.Trim();
+            if (StringInfo.ParseCombiningCharacters(title).Length > 100) return;
+            _editing.Title = title;
+            _editing.NeedsAutomaticTitle = false;
+            CancelRename();
+        }
+    }
+
+    private void ConversationStateChanged(Conversation conversation)
+    {
+        if (_disposed) return;
+        _ = InvokeAsync(() =>
+        {
+            if (_disposed || !_conversations.Contains(conversation) || !conversation.NeedsAutomaticTitle) return;
+            var prompt = conversation.Session.Conversation.Messages.FirstOrDefault(m => m.Role == RgfAiMessageRole.User)?.Message;
+            if (prompt == null) return;
+            var title = Regex.Replace(prompt, @"\s+", " ").Trim();
+            var characters = StringInfo.ParseCombiningCharacters(title);
+            conversation.Title = characters.Length > 30 ? title[..characters[29]] + "…" : title;
+            conversation.NeedsAutomaticTitle = false;
+            StateHasChanged();
+        });
+    }
     private RgfRecrobyLayoutSettings _layout = new();
     private readonly string _selectorId = $"recroby-{Guid.NewGuid():N}";
     private ElementReference _element;
@@ -96,11 +149,13 @@ public partial class RgfRecrobyWorkspace : IAsyncDisposable
     private void Collapse()
     {
         CloseSwitcher(false);
+        CancelRename();
         _layout.IsCollapsed = true;
     }
 
     private void SelectConversation(Conversation conversation)
     {
+        CancelRename();
         _active = conversation;
         CloseSwitcher();
     }
@@ -117,7 +172,7 @@ public partial class RgfRecrobyWorkspace : IAsyncDisposable
     {
         if (_disposed || !Enum.IsDefined(settings.Mode)) return Task.CompletedTask;
         _layout = settings;
-        if (settings.IsCollapsed) CloseSwitcher(false);
+        if (settings.IsCollapsed) { CloseSwitcher(false); CancelRename(); }
         return InvokeAsync(StateHasChanged);
     }
 
@@ -141,12 +196,18 @@ public partial class RgfRecrobyWorkspace : IAsyncDisposable
         {
             await _module.InvokeVoidAsync("syncSwitcher", _element, _switcherOpen, _restoreSwitcherFocus);
             _restoreSwitcherFocus = false;
+            if (_focusTitleEditor && _editing != null)
+            {
+                _focusTitleEditor = false;
+                await _module.InvokeVoidAsync("focusTitleEditor", _element);
+            }
         }
     }
 
     public async ValueTask DisposeAsync()
     {
         _disposed = true;
+        foreach (var conversation in _conversations) conversation.Session.StateChanged -= conversation.StateChangedHandler;
         try
         {
             if (_module != null)
@@ -163,22 +224,32 @@ public partial class RgfRecrobyWorkspace : IAsyncDisposable
 
     private void NewConversation()
     {
+        CancelRename();
         CloseSwitcher(_switcherOpen);
         // Resolve the API only when sending a turn, so an unconfigured backend cannot break startup.
-        _active = new Conversation($"Conversation {++_nextTitle}", new RgfAiConversationSession(new LazyTransport(Services)));
+        _active = new Conversation(new RgfAiConversationSession(new LazyTransport(Services)));
+        var conversation = _active;
+        conversation.StateChangedHandler = () => ConversationStateChanged(conversation);
+        conversation.Session.StateChanged += conversation.StateChangedHandler;
         _conversations.Add(_active);
     }
 
     private void CloseConversation(Conversation conversation)
     {
+        conversation.Session.StateChanged -= conversation.StateChangedHandler;
+        if (_editing == conversation) CancelRename();
         _conversations.Remove(conversation);
         if (_active == conversation) _active = _conversations.LastOrDefault();
         if (_conversations.Count == 0) NewConversation();
     }
 
     // The type identifies the general Recroby independently of its displayed title.
-    private sealed record Conversation(string Title, RgfAiConversationSession Session)
+    private sealed class Conversation(RgfAiConversationSession session)
     {
+        public string Title { get; set; } = "New chat";
+        public bool NeedsAutomaticTitle { get; set; } = true;
+        public RgfAiConversationSession Session { get; } = session;
+        public Action? StateChangedHandler { get; set; }
         public Guid Id { get; } = Guid.NewGuid();
         public string RecrobyType { get; } = "general";
     }

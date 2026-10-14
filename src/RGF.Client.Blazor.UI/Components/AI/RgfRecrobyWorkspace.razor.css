@@ -44,10 +44,10 @@
 .rgf-recroby-conversation ::deep .chat-box { flex: 1 1 auto; width: 100%; min-height: 0; margin: 0; overscroll-behavior: contain; }
 .rgf-recroby-conversation ::deep .input-group { flex-shrink: 0; }
 .rgf-recroby-conversation-bar { display: flex; align-items: center; gap: .5rem; min-width: 0; }
-.rgf-recroby-selector { display: flex; align-items: center; gap: .5rem; flex: 0 1 auto; min-width: 0; text-align: left; }
-.rgf-recroby-type { flex: 0 1 auto; max-width: 30%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.rgf-recroby-title { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.rgf-recroby-selector > i, .rgf-recroby-conversation-bar > [data-action=new] { flex-shrink: 0; }
+.rgf-recroby-selector { display: flex; align-items: center; gap: .5rem; flex: 1 1 0; min-width: 0; text-align: left; }
+.rgf-recroby-type { min-width: 0; flex: 0 1 auto; max-width: 30%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rgf-recroby-title { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rgf-recroby-selector > i, .rgf-recroby-conversation-bar > [data-action=new], .rgf-recroby-conversation-bar > [data-action=rename] { flex-shrink: 0; }
 /* The top layer escapes the panel's overflow without moving Blazor-owned nodes. */
 .rgf-recroby-switcher { position: fixed; inset: auto; margin: 0; padding: .5rem; border: 1px solid var(--bs-border-color, #ccc); border-radius: .375rem; background: var(--bs-body-bg, white); color: var(--bs-body-color, #212529); box-shadow: 0 .5rem 1.5rem rgba(0,0,0,.2); box-sizing: border-box; }
 .rgf-recroby-switcher[hidden] { display: none; }
@@ -107,3 +107,5 @@
     .rgf-recroby-desktop-controls, .rgf-recroby-resize { display: none; }
     .rgf-recroby-panel .card-header { touch-action: auto; cursor: default; }
 }
+
+.rgf-recroby-title-editor { flex: 1 1 0; min-width: 0; width: 0; }

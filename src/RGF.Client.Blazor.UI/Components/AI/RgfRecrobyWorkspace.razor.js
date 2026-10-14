@@ -233,7 +233,9 @@ function apply(element, state) {
 function positionSwitcher(element) {
     const popup = element.querySelector(".rgf-recroby-switcher");
     if (!popup?.matches(":popover-open")) return;
-    const anchor = element.querySelector("[data-action=switch]").getBoundingClientRect();
+    const selector = element.querySelector("[data-action=switch]");
+    if (!selector) return;
+    const anchor = selector.getBoundingClientRect();
     const v = window.visualViewport;
     const left = (v?.offsetLeft ?? 0) + 8, top = (v?.offsetTop ?? 0) + 8;
     const width = (v?.width ?? window.innerWidth) - 16;
@@ -279,4 +281,10 @@ export function dispose(element) {
     const state = instances.get(element);
     if (!state) return;
     state.controller.abort(); state.observer.disconnect(); state.mutations.disconnect(); instances.delete(element);
+}
+
+export function focusTitleEditor(element) {
+    const input = element.querySelector(".rgf-recroby-title-editor");
+    input?.focus({ preventScroll: true });
+    input?.select();
 }
