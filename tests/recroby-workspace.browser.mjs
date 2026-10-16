@@ -1,4 +1,4 @@
-// Runs the production workspace CSS/module in Edge, with a host confined to a subregion.
+// Runs production CSS/modules in Chromium; Firefox runs the Toast geometry subset via WebDriver BiDi.
 // dotnet/bUnit covers component lifetimes and transport; this covers browser geometry/events.
 import assert from "node:assert/strict";
 import { readFile, writeFile, mkdtemp, rm } from "node:fs/promises";
@@ -12,6 +12,7 @@ const base = new URL("../src/RGF.Client.Blazor.UI/", import.meta.url);
 const appRoot = "/recroby-test";
 const moduleRoot = "/_content/Recrovit.RecroGridFramework.Client.Blazor.UI/Components/AI/";
 const assets = {
+    "/styles.css": ["text/css", await readFile(new URL("wwwroot/css/styles.css", base), "utf8")],
     "/icons.css": ["text/css", await readFile(new URL("wwwroot/lib/bootstrap-icons/font/bootstrap-icons.css", base), "utf8")],
     "/fonts/bootstrap-icons.woff2": ["font/woff2", await readFile(new URL("wwwroot/lib/bootstrap-icons/font/fonts/bootstrap-icons.woff2", base))],
     "/fonts/bootstrap-icons.woff": ["font/woff", await readFile(new URL("wwwroot/lib/bootstrap-icons/font/fonts/bootstrap-icons.woff", base))],
@@ -30,12 +31,12 @@ assets['/ui.js'] = ['text/javascript', await readFile(new URL('wwwroot/scripts/r
 assets['/components.css'] = ['text/css', (await Promise.all(['Dashboard/DashboardPageComponent', 'GridComponent', 'NavbarComponent', 'DialogComponent'].map(name => readFile(new URL(`Components/${name}.razor.css`, base), 'utf8')))).join('\n').replaceAll('::deep', '')];
 assets[moduleRoot + 'RgfRecrobyComponent.razor.js'] = assets['/selection.js'];
 assets[moduleRoot + 'RgfRecrobyWorkspace.razor.js'] = assets['/module.js'];
-const html = `<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="/bootstrap.css"><link rel="stylesheet" href="/style.css">
+const html = `<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="/bootstrap.css"><link rel="stylesheet" href="/style.css"><link rel="stylesheet" href="/styles.css">
 <link rel="stylesheet" href="/icons.css"><link rel="stylesheet" href="/usage.css"><link rel="stylesheet" href="/components.css"><link rel="stylesheet" href="/selection.css"><link rel="stylesheet" href="/chat.css"><script src="/jquery.js"></script><script src="/bootstrap.js"></script><script src="/ui.js"></script>
 <style>body {margin:0} #outside {height:60px} #host {margin-left:120px; width:calc(100% - 160px)}
 .chat-box {overflow-y:auto} .message {padding:10px} .navbar {height:56px} main {flex:1;min-height:0}
-.grid {width:100%} .modal {z-index:1055} .toast-container {z-index:1080}</style></head><body>
-<div id="outside">Unrelated application header</div><div id="host"><div class="rgf-recroby-workspace">
+.grid {width:100%} .modal {z-index:1055}</style></head><body>
+<div id="outside">Unrelated application header</div><div id="host"><div class="rgf-recroby-workspace" style="--rgf-toast-anchor: --rgf-toast-fixture;">
 <div class="rgf-recroby-content"><nav class="navbar bg-light">Host navbar</nav><main><div class="grid">Grid/Dashboard content</div></main></div>
 <button class="rgf-recroby-launcher btn btn-primary">Recroby</button><section class="rgf-recroby-panel card" hidden>
 <header class="card-header" data-drag-handle><strong>Recroby</strong><button id="collapse">Collapse</button></header>
@@ -56,8 +57,8 @@ const html = `<!doctype html><html><head><meta charset="utf-8"><link rel="styles
 <div id="model-panel" class="rgf-recroby-selection-panel" popover="auto" role="dialog"><label>Provider</label><select class="form-select"><option>Provider</option></select><label>Model</label><select class="form-select" data-close-popover><option>Model</option></select></div>
 <div id="effort-panel" class="rgf-recroby-selection-panel" popover="auto" role="dialog"><label>Reasoning effort</label><select class="form-select" data-close-popover><option>Default</option><option>High</option></select></div>
 </div></div></div></div>
-<div class="rgf-recroby-resize" data-resize-handle tabindex="0"></div></section></div></div>
-<div class="toast-container position-fixed bottom-0 end-0 p-3" hidden><div class="toast show" role="alert"><div class="toast-header"><strong class="me-auto">Host toast</strong><button id="toast-close" class="btn-close"></button></div><div class="toast-body">Still working</div></div></div>
+<div class="rgf-recroby-resize" data-resize-handle tabindex="0"></div></section></div>
+<div class="toast-container rgf-toast-container position-fixed bottom-0 p-3" style="--rgf-toast-anchor: --rgf-toast-fixture;" hidden><div class="toast show" role="alert"><div class="toast-header"><strong class="me-auto">Host toast</strong><button id="toast-close" class="btn-close"></button></div><div class="toast-body">Still working</div></div></div></div>
 <div id="form-reference" class="card" style="position:fixed;left:-1000px;width:360px"><div class="dialog-header card-header"><ul class="nav nav-tabs card-header-tabs"><li class="nav-item"><button class="nav-link active">Form tab</button></li></ul></div></div>
 <script type="module">import * as workspace from '${appRoot}${moduleRoot}RgfRecrobyWorkspace.razor.js';
 import * as selection from '${appRoot}${moduleRoot}RgfRecrobyComponent.razor.js';
@@ -134,28 +135,65 @@ const server = createServer((req, res) => {
 await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
 const profile = await mkdtemp(join(tmpdir(), "rgf-recroby-edge-"));
 const executable = process.env.RGF_TEST_BROWSER ?? "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe";
-const child = spawn(executable, ["--headless", "--disable-gpu", "--no-first-run", "--no-default-browser-check",
+const firefox = /firefox/i.test(executable);
+let firefoxPort;
+if (firefox) {
+    const reservation = createServer();
+    await new Promise(resolve => reservation.listen(0, '127.0.0.1', resolve));
+    firefoxPort = reservation.address().port;
+    await new Promise(resolve => reservation.close(resolve));
+}
+const child = spawn(executable, firefox ? ['--headless', '--no-remote', '--profile', profile, '--remote-debugging-port', String(firefoxPort), 'about:blank'] : ["--headless", "--disable-gpu", "--no-first-run", "--no-default-browser-check",
     "--remote-debugging-port=0", `--user-data-dir=${profile}`, "about:blank"], { windowsHide: true, stdio: "ignore" });
 let socket;
 try {
-    let port;
-    for (let i = 0; i < 100 && !port; i++) {
-        try { port = (await readFile(join(profile, "DevToolsActivePort"), "utf8")).split("\n")[0]; } catch { await delay(100); }
+    let endpoint;
+    if (firefox) {
+        endpoint = `ws://127.0.0.1:${firefoxPort}/session`;
+        for (let i = 0; i < 100; i++) {
+            try { await fetch(`http://127.0.0.1:${firefoxPort}/`); break; } catch { await delay(100); }
+        }
+    } else {
+        let port;
+        for (let i = 0; i < 100 && !port; i++) {
+            try { port = (await readFile(join(profile, "DevToolsActivePort"), "utf8")).split("\n")[0]; } catch { await delay(100); }
+        }
+        assert.ok(port, "Chromium debugging endpoint started");
+        const targets = await (await fetch(`http://127.0.0.1:${port}/json`)).json();
+        endpoint = targets.find(t => t.type === "page").webSocketDebuggerUrl;
     }
-    assert.ok(port, "Edge debugging endpoint started");
-    const targets = await (await fetch(`http://127.0.0.1:${port}/json`)).json();
-    socket = new WebSocket(targets.find(t => t.type === "page").webSocketDebuggerUrl);
-    await new Promise(resolve => socket.addEventListener("open", resolve, { once: true }));
+    socket = new WebSocket(endpoint);
+    await new Promise((resolve, reject) => {socket.addEventListener("open", resolve, {once:true}); socket.addEventListener("error", reject, {once:true});});
     let id = 0; const pending = new Map();
     socket.addEventListener("message", event => {
         const message = JSON.parse(event.data);
         if (pending.has(message.id)) { pending.get(message.id)(message); pending.delete(message.id); }
     });
-    const cdp = (method, params = {}) => new Promise((resolve, reject) => {
+    const protocol = (method, params = {}) => new Promise((resolve, reject) => {
         const next = ++id;
-        pending.set(next, message => message.error ? reject(new Error(JSON.stringify(message.error))) : resolve(message.result));
+        const timeout = setTimeout(() => { pending.delete(next); reject(new Error(`Protocol timeout: ${method}`)); }, 30000);
+        pending.set(next, message => { clearTimeout(timeout); message.error ? reject(new Error(JSON.stringify(message))) : resolve(message.result); });
         socket.send(JSON.stringify({ id: next, method, params }));
     });
+    let firefoxContext;
+    if (firefox) {
+        await protocol('session.new', {capabilities:{}});
+        const tree = await protocol('browsingContext.getTree', {});
+        firefoxContext = tree.contexts[0].context;
+    }
+    const fromBidi = remote => remote.type === 'object' ? Object.fromEntries((remote.value ?? []).map(([key, value]) => [key, fromBidi(value)]))
+        : remote.type === 'array' ? (remote.value ?? []).map(fromBidi) : remote.value;
+    const cdp = async (method, params = {}) => {
+        if (!firefox) return protocol(method, params);
+        if (method === 'Runtime.evaluate') {
+            const result = await protocol('script.evaluate', {expression:params.expression, target:{context:firefoxContext}, awaitPromise:true, resultOwnership:'none', serializationOptions:{maxObjectDepth:10}});
+            if (result.type === 'exception') throw new Error(JSON.stringify(result.exceptionDetails));
+            return {result:{value:fromBidi(result.result)}};
+        }
+        if (method === 'Emulation.setDeviceMetricsOverride') return protocol('browsingContext.setViewport', {context:firefoxContext, viewport:{width:params.width,height:params.height},devicePixelRatio:1});
+        if (method === 'Page.navigate') return protocol('browsingContext.navigate', {context:firefoxContext,url:params.url,wait:'complete'});
+        throw new Error(`Unsupported Firefox command: ${method}`);
+    };
     const evaluate = async expression => {
         const result = await cdp("Runtime.evaluate", { expression, returnByValue: true, awaitPromise: true });
         if (result.exceptionDetails) throw new Error(JSON.stringify(result.exceptionDetails));
@@ -190,6 +228,78 @@ try {
     assert.equal(full.height, 740, 'short host content fills the visible work area');
     assert.equal(await evaluate("getComputedStyle(document.querySelector('.rgf-recroby-content')).overflow"), 'visible');
     assert.equal(await evaluate('document.documentElement.scrollHeight > window.innerHeight'), false, 'short content needs no browser scrollbar');
+    // Real Root siblings, production global CSS, and a host narrower than the viewport.
+    const anchorSupported = await evaluate("CSS.supports('anchor-name: --rgf-test') && CSS.supports('position-anchor: --rgf-test') && CSS.supports('right: anchor(right)')");
+    // Modern installed engines no longer expose a working anchor disable switch.
+    // Simulate a false feature query in CSSOM; keep this distinct from a legacy-browser run.
+    const simulateNoAnchors = !!process.env.RGF_TEST_SIMULATE_NO_ANCHORS;
+    if (simulateNoAnchors) {
+        await evaluate(`(() => {
+            const sheet = [...document.styleSheets].find(s => s.href?.endsWith('/styles.css'));
+            const media = [...sheet.cssRules].find(r => r.conditionText === '(min-width: 768px)');
+            const index = [...media.cssRules].findIndex(r => r instanceof CSSSupportsRule);
+            const rule = media.cssRules[index].cssText.replace(/@supports[^\\{]+/, '@supports (rgf-unsupported-feature: unavailable) ');
+            media.deleteRule(index); media.insertRule(rule, index);
+        })()`);
+    }
+    console.log(`Browser: ${await evaluate('navigator.userAgent')}; CSS anchors: ${anchorSupported}; simulated unsupported feature query: ${simulateNoAnchors}`);
+    const toastRight = async (anchored, selector = '.rgf-toast-container', content = '.rgf-recroby-content') => {
+        const box = await rect(selector);
+        const expected = anchored && anchorSupported && !simulateNoAnchors ? (await rect(content)).right : await evaluate('document.documentElement.clientWidth');
+        assert.ok(Math.abs(box.right - expected) < 1, `Toast right ${box.right} matches ${expected}`);
+        assert.equal(box.bottom, await evaluate('innerHeight'), 'Toast stays at viewport bottom');
+        assert.ok(box.x >= 0, 'Toast remains inside the viewport');
+        assert.equal(await evaluate('document.documentElement.scrollWidth > innerWidth'), false, 'Toast creates no horizontal overflow');
+    };
+    await evaluate("document.querySelector('.rgf-toast-container').hidden=false");
+    assert.equal(await evaluate("getComputedStyle(document.querySelector('.rgf-toast-container')).zIndex"), '1090', 'production Bootstrap Toast stacking remains unchanged');
+    for (const mode of [0, 1, 2, 3]) {
+        await layout({mode, isCollapsed:false});
+        await toastRight(mode === 2);
+        if (mode === 2 && anchorSupported && !simulateNoAnchors) assert.ok((await rect('.rgf-toast-container')).right <= (await rect('section')).x, 'Toast does not cover right-docked Recroby');
+        await layout({isCollapsed:true});
+        await toastRight(false);
+    }
+    await layout({mode:2,isCollapsed:false,dockWidth:360});
+    await toastRight(true);
+    await layout({dockWidth:480});
+    await toastRight(true);
+    if (firefox) {
+        const handle = await rect('.rgf-recroby-resize');
+        const x = Math.round(handle.x + handle.width / 2), y = Math.round(handle.y + handle.height / 2);
+        await protocol('input.performActions', {context:firefoxContext,actions:[{type:'pointer',id:'mouse',parameters:{pointerType:'mouse'},actions:[
+            {type:'pointerMove',x,y},{type:'pointerDown',button:0},{type:'pointerMove',x:x-40,y,duration:100},{type:'pointerUp',button:0}
+        ]}]});
+        await delay(150);
+        assert.equal(await evaluate('settings.dockWidth'), 520, 'Firefox pointer resizing uses the production handler');
+        await toastRight(true);
+    }
+    await viewport(1000,700);
+    await toastRight(true);
+    await viewport(767,700);
+    await toastRight(false);
+    await viewport(390,700);
+    await toastRight(false);
+    await viewport(1200,800);
+    await toastRight(true);
+    await evaluate("document.querySelector('.rgf-toast-container').style.setProperty('--rgf-toast-anchor','--missing-anchor')");
+    await toastRight(false);
+    await evaluate("document.querySelector('.rgf-toast-container').style.setProperty('--rgf-toast-anchor','--rgf-toast-fixture')");
+    // A second Root has an independent anchor even when both workspaces are open.
+    await evaluate(`(() => {
+        const root = document.createElement('div'); root.id='second-root';
+        root.innerHTML='<div class="rgf-recroby-workspace" data-mode="DockRight" data-collapsed="false" style="width:700px;--rgf-reserved-width:200px;--rgf-toast-anchor:--rgf-toast-second"><div class="rgf-recroby-content" style="height:50px"></div></div><div class="toast-container rgf-toast-container position-fixed bottom-0 p-3" style="--rgf-toast-anchor:--rgf-toast-second"><div class="toast show">Second Root</div></div>';
+        document.body.append(root);
+    })()`);
+    await toastRight(true);
+    await toastRight(true, '#second-root .rgf-toast-container', '#second-root .rgf-recroby-content');
+    await evaluate("document.querySelector('#second-root').remove()");
+    await evaluate("document.querySelector('.rgf-recroby-workspace').hidden=true");
+    await toastRight(false);
+    await evaluate("document.querySelector('.rgf-recroby-workspace').hidden=false; document.querySelector('.rgf-toast-container').hidden=true");
+    await layout({mode:0,isCollapsed:true,dockWidth:360});
+    console.log('PASS: Toast anchor geometry, resize, collapse, all modes, mobile, narrow host, multiple Roots, missing anchor, disabled Workspace, overflow and stacking');
+    if (!firefox && !process.env.RGF_TEST_TOAST_ONLY && !simulateNoAnchors) {
     for (const mode of [0, 1, 2, 3]) {
         await layout({ mode, isCollapsed: false });
         const preferences = await evaluate('JSON.stringify(settings)');
@@ -394,6 +504,11 @@ try {
         const start = { x: handle.x + handle.width / 2, y: handle.y + handle.height / 2 };
         await movePointer(start, { x: start.x + (mode === 2 ? -40 : 40), y: start.y + (mode === 3 ? -40 : 40) });
         assert.equal(await evaluate(`settings.${mode === 0 ? "width" : mode === 3 ? "dockHeight" : "dockWidth"}`), mode === 0 ? 480 : mode === 3 ? 280 : 400);
+        if (mode === 2) {
+            await evaluate("document.querySelector('.rgf-toast-container').hidden=false");
+            await toastRight(true);
+            await evaluate("document.querySelector('.rgf-toast-container').hidden=true");
+        }
         if (mode === 3) assert.equal((await rect('.rgf-recroby-content')).bottom, (await rect('section')).y, 'pointer resizing immediately updates the work-area boundary');
     }
     await layout({ mode: 3 });
@@ -706,6 +821,7 @@ try {
     await evaluate("document.querySelector('#usage-row-0').remove(); usage.dispose('usage-row-0')");
     assert.equal(await evaluate('usageListeners'), 0, 'disposal by stable ID also works after Blazor removes the DOM node');
     console.log("PASS: usage/selector top layer, viewport bounds, focus, Escape, outside click, collapse/switch/dispose, long history resources, local dates, all dock/mobile modes, host isolation, persistence, dialog/toast stacking");
+    }
 } finally {
     socket?.close(); child.kill();
     await new Promise(resolve => server.close(resolve));

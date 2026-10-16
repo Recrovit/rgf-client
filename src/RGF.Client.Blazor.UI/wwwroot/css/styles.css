@@ -75,3 +75,21 @@ div.rgf-tree-tooltip .rgf-tooltip-data {
     min-width: 250px;
     padding: 0px 5px 0px 0px;
 }
+
+/* RGF-DOC: rgf.client.recroby.integration */
+.rgf-toast-container {
+    right: 0;
+}
+
+@media (min-width: 768px) {
+    @supports (anchor-name: --rgf-test) and (position-anchor: --rgf-test) and (right: anchor(right)) {
+        .rgf-recroby-workspace[data-mode="DockRight"][data-collapsed="false"] > .rgf-recroby-content {
+            anchor-name: var(--rgf-toast-anchor);
+        }
+
+        .rgf-recroby-workspace[data-mode="DockRight"][data-collapsed="false"] + .rgf-toast-container {
+            position-anchor: var(--rgf-toast-anchor);
+            right: anchor(right, 0px);
+        }
+    }
+}

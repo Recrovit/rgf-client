@@ -1,6 +1,7 @@
 using Bunit;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.Configuration;
+using Recrovit.RecroGridFramework.Abstraction.Models;
 using Microsoft.Extensions.DependencyInjection;
 using Recrovit.RecroGridFramework.Abstraction.Contracts.Services;
 using Recrovit.RecroGridFramework.Client.Blazor.Parameters;
@@ -53,8 +54,13 @@ public sealed class RgfRecrobyRootRegressionTests : IDisposable
         var dashboard = cut.FindComponent<DashboardPageComponent>().Instance;
         var dialog = cut.FindComponent<DialogComponent>().Instance;
         var toast = cut.FindComponent<ToastComponent>().Instance;
+        var anchorStyle = cut.Find(".rgf-toast-container").GetAttribute("style");
+        Assert.Matches(@"^--rgf-toast-anchor: --rgf-toast-[0-9a-f]{32};$", anchorStyle!);
+        Assert.DoesNotContain("end-0", cut.Find(".rgf-toast-container").ClassList);
         if (effectiveEnabled)
         {
+            Assert.Equal(anchorStyle, cut.Find(".rgf-recroby-workspace").GetAttribute("style"));
+            Assert.Equal(cut.Find(".rgf-toast-container"), cut.Find(".rgf-recroby-workspace").NextElementSibling);
             cut.Find("[aria-label='Open Recroby']").Click();
             foreach (var mode in new[] { "DockLeft", "DockRight", "DockBottom", "Floating" })
             {
@@ -63,14 +69,39 @@ public sealed class RgfRecrobyRootRegressionTests : IDisposable
                 Assert.Same(dashboard, cut.FindComponent<DashboardPageComponent>().Instance);
                 Assert.Same(dialog, cut.FindComponent<DialogComponent>().Instance);
                 Assert.Same(toast, cut.FindComponent<ToastComponent>().Instance);
+                Assert.Equal(anchorStyle, cut.Find(".rgf-toast-container").GetAttribute("style"));
             }
             var session = cut.FindComponent<RgfAiChatComponent>().Instance.Session;
             cut.Render(p => p.Add(c => c.ChildContent, "<main>Next page</main>"));
             Assert.Same(session, cut.FindComponent<RgfAiChatComponent>().Instance.Session);
         }
+        Assert.Equal(anchorStyle, cut.Find(".rgf-toast-container").GetAttribute("style"));
+        // A separately rendered Root shares services, but never its CSS anchor identity.
+        var second = context.Render<RgfRootComponent>(p => p.Add(c => c.EnableRecroby, enabled));
+        var secondStyle = second.Find(".rgf-toast-container").GetAttribute("style");
+        Assert.NotEqual(anchorStyle, secondStyle);
+        if (effectiveEnabled) Assert.Equal(secondStyle, second.Find(".rgf-recroby-workspace").GetAttribute("style"));
+        second.Dispose();
         var manager = context.Services.GetRequiredService<IRgfEventNotificationService>().GetNotificationManager(RgfToastEventArgs.NotificationManagerScope);
         await cut.InvokeAsync(() => manager.RaiseEventAsync(new RgfToastEventArgs("Toast", "Still working", delay: 0), this));
         cut.WaitForAssertion(() => Assert.Contains("Still working", cut.Find(".toast-container").TextContent));
+        cut.Find(".toast .btn-close").Click();
+        Assert.Empty(cut.FindAll(".toast"));
+        var progress = new RgfProgressArgs(25m, "Processing") { IsBackgroundTaskCompleted = false, Footer = "Progress footer" };
+        var progressToast = new RgfToastEventArgs("Progress", "Task", delay: 0, progressArgs: progress);
+        await cut.InvokeAsync(() => manager.RaiseEventAsync(progressToast, this));
+        cut.WaitForAssertion(() => Assert.Contains("25%", cut.Find(".toast-header").TextContent));
+        Assert.Contains("Processing", cut.Find(".progress-message").TextContent);
+        Assert.Contains("Progress footer", cut.Find(".toast-footer").TextContent);
+        Assert.NotEmpty(cut.FindAll(".toast-body .spinner-border"));
+        progress.Percentage = 75;
+        cut.WaitForAssertion(() => Assert.Contains("75%", cut.Find(".toast-header").TextContent), TimeSpan.FromSeconds(3));
+        progressToast.Delay = -1;
+        await cut.InvokeAsync(() => manager.RaiseEventAsync(progressToast, this));
+        cut.WaitForAssertion(() => Assert.Empty(cut.FindAll(".toast")));
+        await cut.InvokeAsync(() => manager.RaiseEventAsync(new RgfToastEventArgs("Timed", "Expires", delay: 1000), this));
+        cut.WaitForAssertion(() => Assert.Single(cut.FindAll(".toast")));
+        cut.WaitForAssertion(() => Assert.Empty(cut.FindAll(".toast")), TimeSpan.FromSeconds(3));
         Assert.DoesNotContain(api.Requests, r => r.Uri == "/api/rgf/ai/recroby");
         if (!effectiveEnabled)
         {

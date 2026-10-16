@@ -1,6 +1,6 @@
 ﻿@using System.Globalization
 
-<div class="toast-container position-fixed bottom-0 end-0 p-3">
+<div class="toast-container rgf-toast-container position-fixed bottom-0 p-3" style="--rgf-toast-anchor: @ToastAnchorName;">
     @foreach (var toast in _toasts.OrderByDescending(t => t.TriggeredAt).ToArray())
     {
         if (toast.Delay < 0)
@@ -37,6 +37,9 @@
 @inject IRecroDictService _recroDict
 @implements IDisposable
 @code {
+    /// <summary>CSS anchor name shared with the preceding Recroby Workspace by the owning Root.</summary>
+    [Parameter]
+    public string? ToastAnchorName { get; set; }
 
     private List<RgfToastEventArgs> _toasts = [];
     private IDisposable _toastManager = default!;

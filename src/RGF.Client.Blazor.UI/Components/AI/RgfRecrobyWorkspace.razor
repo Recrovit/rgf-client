@@ -1,5 +1,5 @@
 @* RGF-DOC: rgf.client.recroby.integration *@
-<div @ref="_element" class="rgf-recroby-workspace" data-mode="@_layout.Mode" data-collapsed="@_layout.IsCollapsed.ToString().ToLowerInvariant()">
+<div @ref="_element" class="rgf-recroby-workspace" style="--rgf-toast-anchor: @ToastAnchorName;" data-mode="@_layout.Mode" data-collapsed="@_layout.IsCollapsed.ToString().ToLowerInvariant()">
     <div class="rgf-recroby-content">@ChildContent</div>
     <button type="button" class="rgf-recroby-launcher btn btn-primary" hidden="@(!_layout.IsCollapsed)" aria-label="Open Recroby" aria-expanded="false" @onclick="() => _layout.IsCollapsed = false"><i class="bi bi-robot" aria-hidden="true"></i> Recroby</button>
     <section class="rgf-recroby-panel card" aria-label="Recroby" hidden="@_layout.IsCollapsed">
@@ -77,3 +77,9 @@
         <div class="rgf-recroby-resize" data-resize-handle role="separator" aria-label="Resize Recroby" tabindex="0"></div>
     </section>
 </div>
+
+@code {
+    /// <summary>CSS anchor name shared with the adjacent Toast container by the owning Root.</summary>
+    [Parameter]
+    public string? ToastAnchorName { get; set; }
+}
