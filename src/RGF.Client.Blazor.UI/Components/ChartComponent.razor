@@ -1,5 +1,6 @@
 ﻿@using ApexCharts
 @using Recrovit.RecroGridFramework.Blazor.RgfApexCharts.Components
+@* RGF-DOC: rgf.client.blazor-ui.entity-ui *@
 
 <RgfChartComponent @ref="RgfChartRef" EntityParameters="EntityParameters" Embedded="Embedded">
     <ContentTemplate Context="RgfCharComp">
@@ -259,7 +260,9 @@
                             }
                         </div>
                         <div id="@($"{_tabsId}-tab-{RecroChartTab.Chart}-pane")" class="@ApexChartComponentClass" role="tabpanel" tabindex="0">
-                            <ApexChartComponent @ref=ApexChartRef ChartSettings="@ApexChartSettings" />
+                            <div style="visibility:@(RgfCharComp.ChartStatus == RgfProcessingStatus.Valid ? "visible" : "hidden")">
+                                <ApexChartComponent @ref=ApexChartRef ChartSettings="@ApexChartSettings" />
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -309,10 +312,13 @@
                         <RgfButton CssClass="btn-primary" MinWidth="5rem" Label="@RgfCharComp.GetRecroDictChart("DataSet")" Disabled="RgfCharComp.DataStatus != RgfProcessingStatus.Invalid"
                                    OnClick="(arg) => OnGetData()" />
                     </div>
-                    <div class="p-1">
-                        <RgfButton CssClass="btn-secondary" MinWidth="5rem" Label="@RecroDict.GetRgfUiString("Close")"
-                                   OnClick="RgfCharComp.OnClose" />
-                    </div>
+                    @if (!IsWorkspace)
+                    {
+                        <div class="p-1">
+                            <RgfButton CssClass="btn-secondary" MinWidth="5rem" Label="@RecroDict.GetRgfUiString("Close")"
+                                       OnClick="RgfCharComp.OnClose" />
+                        </div>
+                    }
                 </div>
             </div>
         }
@@ -324,15 +330,57 @@
 @code {
     private readonly string _tabsId = RgfBaseComponent.GetNextId();
     private readonly string _panelId = RgfBaseComponent.GetNextId();
+    private bool IsWorkspace => !Embedded && EntityParameters.ChartParameters.PresentationMode == RgfChartPresentationMode.Workspace;
+    private bool _workspaceActivationPending;
+    private bool _workspaceDisposed;
+    private Task<IJSObjectReference>? _workspaceModuleTask;
 
     protected override void OnInitialized()
     {
         base.OnInitialized();
         EntityParameters.ChartParameters.EventDispatcher.Subscribe(RgfChartEventKind.LayoutCommitted, OnLayoutCommittedAsync, this);
+        EntityParameters.ChartParameters.EventDispatcher.Subscribe(RgfChartEventKind.WorkspaceActivated, OnWorkspaceActivatedAsync, this);
+        EntityParameters.ChartParameters.EventDispatcher.Subscribe(RgfChartEventKind.Initialized, OnWorkspaceActivatedAsync, this);
+    }
+
+    private Task OnWorkspaceActivatedAsync(IRgfEventArgs<RgfChartEventArgs> args)
+    {
+        if (!IsWorkspace || _workspaceDisposed) return Task.CompletedTask;
+        _workspaceActivationPending = true;
+        return InvokeAsync(StateHasChanged);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await base.OnAfterRenderAsync(firstRender);
+        if (IsWorkspace && !_workspaceDisposed && _workspaceActivationPending &&
+            EntityParameters.DisplayMode == RfgDisplayMode.Chart && RgfChartRef != null)
+        {
+            _workspaceActivationPending = false;
+            await OnInitSizeAsync();
+        }
+    }
+
+    protected override void OnTabActivated(RecroChartTab tab)
+    {
+        base.OnTabActivated(tab);
+        if (IsWorkspace && tab == RecroChartTab.Chart) _workspaceActivationPending = true;
     }
 
     protected override async Task OnInitSizeAsync(bool recreate = false)
     {
+        if (IsWorkspace)
+        {
+            if (_workspaceDisposed || EntityParameters.DisplayMode != RfgDisplayMode.Chart) return;
+            _selfRef ??= DotNetObjectReference.Create<BaseChartComponent>(this);
+            // Import the same standalone asset in Debug and Release.
+            _workspaceModuleTask ??= _jsRuntime.InvokeAsync<IJSObjectReference>("import",
+                $"{RgfClientConfiguration.AppRootPath}/_content/Recrovit.RecroGridFramework.Client.Blazor.UI/Components/ChartWorkspace.js").AsTask();
+            var module = await _workspaceModuleTask;
+            if (!_workspaceDisposed && module != null)
+                await module.InvokeVoidAsync("activate", ContainerId, _selfRef);
+            return;
+        }
         if (Embedded && !DataOnly)
         {
             if (recreate)
@@ -383,6 +431,21 @@
 
     protected override async Task ApplyResize(int width, int height, bool redraw)
     {
+        if (IsWorkspace)
+        {
+            if (_workspaceDisposed || EntityParameters.DisplayMode != RfgDisplayMode.Chart ||
+                width <= 0 || height <= 0 || ActiveTabIndex != RecroChartTab.Chart || RgfChartRef == null) return;
+            ApexChartSettings.Width = _chartSettings.Width ?? Math.Max(width - 2, 100);
+            ApexChartSettings.Height = _chartSettings.Height ?? Math.Max(height - 50, 100);
+            StateHasChanged();
+            if (redraw && RgfChartRef.ChartStatus == RgfProcessingStatus.Valid && _workspaceModuleTask != null)
+            {
+                var module = await _workspaceModuleTask;
+                if (!_workspaceDisposed && module != null)
+                    await module.InvokeVoidAsync("resize", ApexChartSettings.Options.Chart.Id, ApexChartSettings.Width, ApexChartSettings.Height);
+            }
+            return;
+        }
         if (Embedded && !DataOnly)
         {
             if (ActiveTabIndex != RecroChartTab.Chart || RgfChartRef == null)
@@ -433,6 +496,20 @@
 
     public override async ValueTask DisposeAsync()
     {
+        _workspaceDisposed = true;
+        if (_workspaceModuleTask != null)
+        {
+            try
+            {
+                var module = await _workspaceModuleTask;
+                if (module != null)
+                {
+                    await module.InvokeVoidAsync("destroy", ContainerId);
+                    await module.DisposeAsync();
+                }
+            }
+            catch (JSDisconnectedException) { }
+        }
         if (Embedded && !DataOnly)
         {
             await _jsRuntime.InvokeVoidAsync(

@@ -146,6 +146,10 @@ public partial class RgfToolbarComponent : ComponentBase, IDisposable
 
     private async Task OnMenuCommand(RgfMenu menu)
     {
+        if (EntityParameters.DisplayMode == RfgDisplayMode.Chart && menu.MenuType == RgfMenuType.FunctionForRec)
+        {
+            return;
+        }
         _logger.LogDebug("OnMenuCommand | {type}:{command}", menu.MenuType, menu.Command);
         RgfDynamicDictionary? data = null;
         RgfEntityKey? entityKey = null;

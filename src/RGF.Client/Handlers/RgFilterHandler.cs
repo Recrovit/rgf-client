@@ -438,7 +438,7 @@ internal class RgFilterHandler : IRgFilterHandler
     public async Task SetFilterAsync(IEnumerable<RgfFilter.Condition>? conditions, int? sqlTimeout)
     {
         ApplyFilterState(conditions, sqlTimeout);
-        await _manager.ListHandler.RefreshDataAsync();
+        await _manager.ListHandler.RefreshDataAsync(null, invalidateAggregates: false);
     }
 
     public RgfFilterSettings? SelectPredefinedFilter(int? filterSettingsId)

@@ -1,6 +1,7 @@
 ﻿@* RGF-DOC: rgf.client.blazor-ui.entity-ui *@
 @if (_initialized && Manager != null)
 {
+    <CascadingValue Value="this" IsFixed="true">
     <RgfComponentWrapper @key="Manager.EntityDomId">
         @if (!EntityParameters.FormOnly)
         {
@@ -10,20 +11,35 @@
             }
             <div id="@Manager.EntityDomId"
                  class="@($"recro-grid recro-grid-base{(EntityParameters.DisplayMode == RfgDisplayMode.Tree ? " rg-tree" : "")} rg-ent-{Manager.EntityDesc.EntityId}")"
-                 style="width:fit-content">
+                 style="@(EntityParameters.DisplayMode == RfgDisplayMode.Chart ? "width:100%;min-width:0" : "width:fit-content")">
                 @if (!string.IsNullOrEmpty(Manager.EntityDesc.CRUD))
                 {
                     @ToolbarTemplate(EntityParameters)
-                    if (EntityParameters.DisplayMode == RfgDisplayMode.Tree && TreeTemplate != null)
+                    <div class="rgf-entity-grid" style="@(EntityParameters.DisplayMode == RfgDisplayMode.Grid ? null : "display:none")">
+                        @if (IsChartWorkspace || EntityParameters.DisplayMode == RfgDisplayMode.Grid)
+                        {
+                            @GridTemplate(EntityParameters)
+                        }
+                    </div>
+                    if (_isTreeInitialized && TreeTemplate != null)
                     {
-                        @TreeTemplate(EntityParameters)
+                        <div class="rgf-entity-tree" style="@(EntityParameters.DisplayMode == RfgDisplayMode.Tree ? null : "display:none")">
+                            @if (IsChartWorkspace || EntityParameters.DisplayMode == RfgDisplayMode.Tree)
+                            {
+                                @TreeTemplate(EntityParameters)
+                            }
+                        </div>
                     }
-                    else
+                    <div class="rgf-entity-chart" style="@(EntityParameters.DisplayMode == RfgDisplayMode.Chart ? "width:100%;min-height:400px" : "display:none")">
+                        @if (IsChartWorkspace && _isChartInitialized && ChartTemplate != null)
+                        {
+                            @ChartTemplate(EntityParameters)
+                        }
+                    </div>
+                    if (EntityParameters.DisplayMode != RfgDisplayMode.Chart)
                     {
-                        EntityParameters.DisplayMode = RfgDisplayMode.Grid;
-                        @GridTemplate(EntityParameters)
+                        @PagerTemplate(EntityParameters)
                     }
-                    @PagerTemplate(EntityParameters)
                     @FilterTemplate(EntityParameters)
                 }
                 else
@@ -36,7 +52,7 @@
         {
             @FormTemplate(EntityParameters)
         }
-        @if (_isChartInitialized && ChartTemplate != null)
+        @if (!IsChartWorkspace && _isChartInitialized && ChartTemplate != null)
         {
             @ChartTemplate(EntityParameters)
         }
@@ -45,6 +61,7 @@
             @_entityEditor
         }
     </RgfComponentWrapper>
+    </CascadingValue>
 }
 else if (!EntityParameters.DeferredInitialization)
 {

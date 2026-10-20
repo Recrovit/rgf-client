@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Forms;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.Logging;
@@ -19,6 +19,10 @@ namespace Recrovit.RecroGridFramework.Client.Blazor.Components;
 
 public partial class RgfChartComponent : ComponentBase, IDisposable
 {
+    // RGF-DOC: rgf.client.blazor-ui.entity-ui
+    /// <summary>Whether the entity selected the explicitly supported workspace presentation, independently of dashboard Embedded rendering.</summary>
+    public bool IsWorkspace => !Embedded && ChartParameters.PresentationMode == RgfChartPresentationMode.Workspace;
+
     [Inject]
     private ILogger<RgfChartComponent> _logger { get; set; } = null!;
 
@@ -72,12 +76,20 @@ public partial class RgfChartComponent : ComponentBase, IDisposable
     private RenderFragment? _chartDialog { get; set; }
 
     private bool _pendingParentRefresh;
+    private bool _applyingChartSettingFilter;
+    private IRgListHandler? _aggregateSource;
+    private bool _sourceChangedDuringLoad;
+    private bool _chartDataLoading;
+    private bool _disposed;
+    private bool _contentReady;
+    private long _dataVersion;
 
     protected override async Task OnInitializedAsync()
     {
         await base.OnInitializedAsync();
 
         _recroDictChart = await _recroDict.GetDictionaryAsync("RGF.UI.Chart", _recroSec.UserLanguage);
+        if (_disposed) return;
 
         RebuildAllowedProperties();
 
@@ -85,35 +97,49 @@ public partial class RgfChartComponent : ComponentBase, IDisposable
 
         ResetEditContext();
 
-        EntityParameters.ToolbarParameters.MenuEventDispatcher.Subscribe(Menu.RecroChart, OnShowChart);
-        EntityParameters.ToolbarParameters.EventDispatcher.Subscribe(RgfToolbarEventKind.RecroChart, OnShowChart);
-
-        ChartParameters.DialogParameters.Title = "RecroChart - " + Manager.EntityDesc.MenuTitle;
-        ChartParameters.DialogParameters.UniqueName = "chart-" + Manager.EntityDesc.NameVersion.ToLower();
-        ChartParameters.DialogParameters.EventDispatcher.Subscribe(RgfDialogEventKind.Close, OnDialogCloseAsync, true);
-        ChartParameters.DialogParameters.IsInline = Embedded;
-        ChartParameters.DialogParameters.NoHeader = Embedded;
-        ChartParameters.DialogParameters.ShowCloseButton = !Embedded;
-        ChartParameters.DialogParameters.ContentTemplate = ContentTemplate(this);
-        ChartParameters.DialogParameters.FooterTemplate = Embedded ? null : FooterTemplate(this);
-        ChartParameters.DialogParameters.PredefinedButtons = Embedded ? [] : null;
-        ChartParameters.DialogParameters.Resizable ??= !Embedded;
-        ChartParameters.DialogParameters.Height ??= Embedded ? "100%" : "700px";
-        ChartParameters.DialogParameters.Width ??= Embedded ? "100%" : "1020px";
-        ChartParameters.DialogParameters.MinWidth ??= Embedded ? null : "920px";
-
-        if (EntityParameters.DialogTemplate != null)
+        if (IsWorkspace)
         {
-            _chartDialog = EntityParameters.DialogTemplate(ChartParameters.DialogParameters);
+            _aggregateSource = Manager.ListHandler;
+            _aggregateSource.AggregateSourceChanged += OnAggregateSourceChanged;
         }
-        else
+
+        if (!IsWorkspace)
         {
-            _chartDialog = RgfDynamicDialog.Create(ChartParameters.DialogParameters, _logger);
+            EntityParameters.ToolbarParameters.MenuEventDispatcher.Subscribe(Menu.RecroChart, OnShowChart);
+            EntityParameters.ToolbarParameters.EventDispatcher.Subscribe(RgfToolbarEventKind.RecroChart, OnShowChart);
+        }
+
+        if (!IsWorkspace)
+        {
+            ChartParameters.DialogParameters.Title = "RecroChart - " + Manager.EntityDesc.MenuTitle;
+            ChartParameters.DialogParameters.UniqueName = "chart-" + Manager.EntityDesc.NameVersion.ToLower();
+            ChartParameters.DialogParameters.EventDispatcher.Subscribe(RgfDialogEventKind.Close, OnDialogCloseAsync, true);
+            ChartParameters.DialogParameters.IsInline = Embedded;
+            ChartParameters.DialogParameters.NoHeader = Embedded;
+            ChartParameters.DialogParameters.ShowCloseButton = !Embedded;
+            ChartParameters.DialogParameters.ContentTemplate = ContentTemplate(this);
+            ChartParameters.DialogParameters.FooterTemplate = Embedded ? null : FooterTemplate(this);
+            ChartParameters.DialogParameters.PredefinedButtons = Embedded ? [] : null;
+            ChartParameters.DialogParameters.Resizable ??= !Embedded;
+            ChartParameters.DialogParameters.Height ??= Embedded ? "100%" : "700px";
+            ChartParameters.DialogParameters.Width ??= Embedded ? "100%" : "1020px";
+            ChartParameters.DialogParameters.MinWidth ??= Embedded ? null : "920px";
+
+            if (EntityParameters.DialogTemplate != null)
+            {
+                _chartDialog = EntityParameters.DialogTemplate(ChartParameters.DialogParameters);
+            }
+            else
+            {
+                _chartDialog = RgfDynamicDialog.Create(ChartParameters.DialogParameters, _logger);
+            }
         }
 
         ChartSettingList = await Manager.GetChartSettingsListAsync();
-        ChartDataGridEntityParameters = new RgfEntityParameters("RGRecroChart", Manager.SessionParams) { DeferredInitialization = true, ParentEntityParameters = EntityParameters };
+        if (_disposed) return;
+        ChartDataGridEntityParameters = new RgfEntityParameters("RGRecroChart", Manager.SessionParams) { IsEmbeddedEntity = true, DeferredInitialization = true, ParentEntityParameters = EntityParameters };
         ChartDataGrid = RgfEntityComponent.Create(ChartDataGridEntityParameters);
+        _contentReady = true;
 
         _logger.LogDebug("RgfChartComponentInitialized | EntityName:{EntityName}", EntityParameters.EntityName);
         var eventArg = new RgfEventArgs<RgfChartEventArgs>(this, new RgfChartEventArgs(RgfChartEventKind.Initialized));
@@ -190,9 +216,31 @@ public partial class RgfChartComponent : ComponentBase, IDisposable
             .ToArray();
     }
 
+    private void OnAggregateSourceChanged()
+    {
+        // Capture the origin while ApplyFilterState is still on the stack.
+        var isChartSettingsChange = _applyingChartSettingFilter;
+        _sourceChangedDuringLoad = true;
+        _ = InvokeAsync(async () =>
+        {
+            if (_disposed) return;
+            SetDataStatus(RgfProcessingStatus.Invalid);
+            // InitFilter raises the source event before ApplyFilterState sets the timeout.
+            await Task.Yield();
+            if (!_disposed)
+            {
+                var eventArgs = new RgfChartEventArgs(RgfChartEventKind.AggregateSourceChanged) { IsChartSettingsChange = isChartSettingsChange };
+                await ChartParameters.EventDispatcher.DispatchEventAsync(eventArgs.EventKind, new RgfEventArgs<RgfChartEventArgs>(this, eventArgs));
+            }
+        });
+    }
+
     public virtual async Task<bool> CreateChartDataAsyc()
     {
+        if (_chartDataLoading || _disposed) return false;
+        _sourceChangedDuringLoad = false;
         SetDataStatus(RgfProcessingStatus.InProgress);
+        var dataVersion = _dataVersion;
 
         ChartData = [];
         DataColumns = [];
@@ -208,6 +256,7 @@ public partial class RgfChartComponent : ComponentBase, IDisposable
             _chartManagerInited = true;
         }
 
+        _chartDataLoading = true;
         try
         {
             bool res = await chartManager.RecreateAsync();
@@ -308,13 +357,22 @@ public partial class RgfChartComponent : ComponentBase, IDisposable
                 }
             }
             ChartData = ordered?.ToList() ?? dataList;
+            if (_disposed || dataVersion != _dataVersion || (IsWorkspace && _sourceChangedDuringLoad))
+            {
+                if (!_disposed) SetDataStatus(RgfProcessingStatus.Invalid);
+                return false;
+            }
             DataStatus = RgfProcessingStatus.Valid;
             return true;
         }
         catch
         {
-            SetDataStatus(RgfProcessingStatus.Invalid);
+            if (!_disposed) SetDataStatus(RgfProcessingStatus.Invalid);
             return false;
+        }
+        finally
+        {
+            _chartDataLoading = false;
         }
     }
 
@@ -393,8 +451,13 @@ public partial class RgfChartComponent : ComponentBase, IDisposable
 
     public void SetDataStatus(RgfProcessingStatus status)
     {
+        if (status == RgfProcessingStatus.Invalid)
+        {
+            _dataVersion++;
+        }
         DataStatus = status;
         ChartStatus = RgfProcessingStatus.Invalid;
+        _ = ChartParameters.EventDispatcher.RaiseEventAsync(RgfChartEventKind.DataInvalidated, this);
         StateHasChanged();
     }
 
@@ -481,6 +544,12 @@ public partial class RgfChartComponent : ComponentBase, IDisposable
 
     public void Dispose()
     {
+        _disposed = true;
+        if (_aggregateSource != null)
+        {
+            _aggregateSource.AggregateSourceChanged -= OnAggregateSourceChanged;
+            _aggregateSource = null;
+        }
         EditContext.OnValidationRequested -= HandleValidationRequested;
         EntityParameters?.UnsubscribeFromAll(this);
     }
@@ -499,8 +568,20 @@ public partial class RgfChartComponent : ComponentBase, IDisposable
                 var parentGridSettings = ChartSettings.ParentGridSettings ?? new RgfGridSettings();
                 var conditions = parentGridSettings.Conditions ?? [];
                 var filterHandler = await Manager.GetFilterHandlerAsync();
-                filterHandler.ApplyFilterState(conditions, parentGridSettings.SQLTimeout);
+                _applyingChartSettingFilter = true;
+                try
+                {
+                    filterHandler.ApplyFilterState(conditions, parentGridSettings.SQLTimeout);
+                }
+                finally
+                {
+                    _applyingChartSettingFilter = false;
+                }
                 _pendingParentRefresh = !Embedded;
+                if (IsWorkspace && ConsumePendingParentRefresh())
+                {
+                    await Manager.ListHandler.RefreshDataAsync(null, invalidateAggregates: false);
+                }
                 if (!EntityParameters.ChartParameters.SuppressAutomaticChartToast)
                 {
                     await Manager.ToastManager.RaiseEventAsync(new RgfToastEventArgs(Manager.EntityDesc.MenuTitle, RgfToastEventArgs.ActionTemplate(_recroDict.GetRgfUiString("Settings"), ChartSettings.SettingsName), delay: 2000), this);

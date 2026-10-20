@@ -16,7 +16,9 @@ namespace Recrovit.RecroGridFramework.Client.Handlers;
 public enum RfgDisplayMode
 {
     Grid = 1,
-    Tree = 2
+    Tree = 2,
+    /// <summary>Displays the chart in the standalone entity workspace.</summary>
+    Chart = 3
 }
 
 public interface IRgManager : IDisposable
@@ -557,6 +559,11 @@ public class RgManager : IRgManager
     {
         request.UserColumns = ListHandler.UserColumns.ToArray();
         var res = await _rgfService.UpdateDataAsync(request);
+        if (res.Success && res.Result.Success && ListHandler is RgListHandler handler)
+        {
+            // Successful writes can change aggregates even when no updated Grid row is returned.
+            handler.InvalidateAggregateSource();
+        }
         if (!res.Success)
         {
             await NotificationManager.RaiseEventAsync(new RgfUserMessageEventArgs(_recroDict, UserMessageType.Error, res.ErrorMessage), this);

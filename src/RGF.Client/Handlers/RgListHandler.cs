@@ -9,6 +9,7 @@ using Recrovit.RecroGridFramework.Client.Events;
 using Recrovit.RecroGridFramework.Client.Models;
 using Recrovit.RecroGridFramework.Client.Services;
 using System.Data;
+using System.Text.Json;
 
 namespace Recrovit.RecroGridFramework.Client.Handlers;
 
@@ -58,7 +59,13 @@ public interface IRgListHandler
 
     void ApplyFilterState(RgfFilter.Condition[] conditions, int? queryTimeout);
 
+    /// <summary>Raised when aggregate source conditions or underlying data may have changed.</summary>
+    event Action AggregateSourceChanged;
+
     Task RefreshDataAsync(int? gridSettingsId = null);
+
+    /// <summary>Reloads the grid, optionally invalidating aggregate data. Use false only for presentation changes.</summary>
+    Task RefreshDataAsync(int? gridSettingsId, bool invalidateAggregates);
 
     Task RefreshRowAsync(RgfDynamicDictionary rowData);
 
@@ -378,8 +385,19 @@ internal class RgListHandler : IDisposable, IRgListHandler
         return list;
     }
 
-    public async Task RefreshDataAsync(int? gridSettingsId = null)
+    // RGF-DOC: rgf.client.blazor-ui.entity-ui
+    public event Action? AggregateSourceChanged;
+
+    internal void InvalidateAggregateSource() => AggregateSourceChanged?.Invoke();
+
+    public Task RefreshDataAsync(int? gridSettingsId = null) => RefreshDataAsync(gridSettingsId, invalidateAggregates: true);
+
+    public async Task RefreshDataAsync(int? gridSettingsId, bool invalidateAggregates)
     {
+        if (invalidateAggregates && gridSettingsId == null)
+        {
+            AggregateSourceChanged?.Invoke();
+        }
         await _manager.ToastManager.RaiseEventAsync(new RgfToastEventArgs(EntityDesc.MenuTitle, _recroDict.GetRgfUiString("Refresh"), delay: 2000), this);
         ClearCache();
         if (ActivePage.Value == 1)
@@ -388,7 +406,7 @@ internal class RgListHandler : IDisposable, IRgListHandler
         }
         else if (gridSettingsId == null)
         {
-            ActivePage.Value = 1;
+            await ActivePage.SetValueAsync(1);
         }
         else
         {
@@ -552,7 +570,7 @@ internal class RgListHandler : IDisposable, IRgListHandler
         }
         if (changed)
         {
-            await RefreshDataAsync();
+            await RefreshDataAsync(null, invalidateAggregates: false);
         }
         return changed;
     }
@@ -633,7 +651,7 @@ internal class RgListHandler : IDisposable, IRgListHandler
 
         if (reload)
         {
-            await RefreshDataAsync();
+            await RefreshDataAsync(null, invalidateAggregates: false);
             return true;
         }
 
@@ -736,9 +754,18 @@ internal class RgListHandler : IDisposable, IRgListHandler
         }
     }
 
+    private string _aggregateFilter = "[]";
+
     public void InitFilter(RgfFilter.Condition[] conditions)
     {
+        // Keep a value snapshot: filter editors can mutate the existing condition objects.
+        var filter = JsonSerializer.Serialize(conditions);
         ListParam.UserFilter = conditions;
+        if (_aggregateFilter != filter)
+        {
+            _aggregateFilter = filter;
+            AggregateSourceChanged?.Invoke();
+        }
     }
 
     public void ApplyFilterState(RgfFilter.Condition[] conditions, int? queryTimeout)
@@ -750,7 +777,7 @@ internal class RgListHandler : IDisposable, IRgListHandler
     public async Task SetFilterAsync(RgfFilter.Condition[] conditions, int? queryTimeout)
     {
         ApplyFilterState(conditions, queryTimeout);
-        await RefreshDataAsync();
+        await RefreshDataAsync(null, invalidateAggregates: false);
     }
 
     public RgfDynamicDictionary GetEKey(RgfDynamicDictionary data)
@@ -869,6 +896,7 @@ internal class RgListHandler : IDisposable, IRgListHandler
 
     public async Task AddRowAsync(RgfDynamicDictionary rowData)
     {
+        AggregateSourceChanged?.Invoke();
         RgfDynamicDictionary ekey = GetEKey(rowData);
         if (ekey.Count == 0 || !_dataCache.TryGetData(0, out var pageData) || pageData == null)
         {
@@ -897,6 +925,7 @@ internal class RgListHandler : IDisposable, IRgListHandler
 
     public async Task RefreshRowAsync(RgfDynamicDictionary rowData)
     {
+        AggregateSourceChanged?.Invoke();
         RgfDynamicDictionary ekey = GetEKey(rowData);
         if (ekey.Count == 0)
         {
@@ -933,6 +962,7 @@ internal class RgListHandler : IDisposable, IRgListHandler
 
     public async Task DeleteRowAsync(RgfEntityKey entityKey)
     {
+        AggregateSourceChanged?.Invoke();
         if (entityKey.IsEmpty)
         {
             return;

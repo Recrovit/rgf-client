@@ -53,10 +53,10 @@ public class MenuRenderer
 
     private Task MenuRender(RgfMenu menu)
     {
-        menu.Disabled = _entityParameters.DisplayMode == RfgDisplayMode.Tree && new string[] { Menu.ColumnSettings, Menu.SaveSettings, Menu.ResetSettings }.Contains(menu.Command);
+        menu.Disabled = _entityParameters.DisplayMode is RfgDisplayMode.Tree or RfgDisplayMode.Chart && new string[] { Menu.ColumnSettings, Menu.SaveSettings, Menu.ResetSettings }.Contains(menu.Command);
         if (menu.MenuType == RgfMenuType.FunctionForRec)
         {
-            menu.Disabled = Manager.SelectedItems.Value.Count == 0 || (_entityParameters.GridParameters.EnableMultiRowSelection != true && Manager.SelectedItems.Value.Count > 1);
+            menu.Disabled = _entityParameters.DisplayMode == RfgDisplayMode.Chart || Manager.SelectedItems.Value.Count == 0 || (_entityParameters.GridParameters.EnableMultiRowSelection != true && Manager.SelectedItems.Value.Count > 1);
         }
         return Task.CompletedTask;
     }

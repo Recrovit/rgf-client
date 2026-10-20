@@ -6,6 +6,7 @@ This file contains the consolidated release history for the `rgf-client` solutio
 
 ### Features Added
 
+- Added persistent Chart Workspace presentation for standalone entities using the standard Blazor UI registration, retaining settings, data and active tabs across Grid/Tree switches with automatic container sizing. Embedded entities remain modal. The standalone ApexCharts package retains Dialog and Dashboard Embedded presentation without Recroby integration. Invalid charts, including Cards, disappear while retaining configuration. Previously generated charts automatically refresh when their visible Workspace source changes, using the latest Grid filter; hidden charts are only invalidated, and paging and presentation changes preserve validity.
 - Added compact per-response AI usage summaries with accounting aliases, sent reasoning effort, logical LLM call counts for every user, total tokens when known or logical LLM calls otherwise in the usage button, and model, charged Credit, historical Credit state and administrator token panels with adjacent field names and values, including usage beside visible failed-response warnings.
 - Added server-side AI Credit queries and access checks, finalized settlement results, and optional Recroby response contracts for request/model Credit usage using configured provider/model aliases and current balances.
 - Added a Recroby Workspace with multiple conversations, automatic prompt-based titles, manual renaming, a responsive conversation bar, type grouping when needed, floating and docked layouts, mobile support, backend-controlled enablement, missing-provider feedback and content-aligned desktop Toast notifications beside an expanded right-docked panel in supporting browsers. External components can open and reactivate their own sessions through private owner handles with awaited asynchronous cleanup.
@@ -13,6 +14,11 @@ This file contains the consolidated release history for the `rgf-client` solutio
 - Added shared, provider-independent RGF AI conversation contracts with message history, thread continuation, model selection, extension parameters and token, timing and currency-aware cost metadata.
 - Added UI-independent AI conversation state with read-only presentation history, conversation continuation and model selection. Programmatic requests can be created without adding displayed chat messages; backend history remains authoritative.
 - Added independent AI conversation sessions with turn lifecycle, cancellation and configurable transports. Grid hosts can adapt existing CustomFunctions and final progress responses without taking ownership of progress connections.
+
+### Breaking Changes
+
+- Custom `IRgListHandler` implementations must implement the `AggregateSourceChanged` event and the `RefreshDataAsync(int?, bool)` overload, distinguishing source changes from presentation reloads. The original refresh overload remains available.
+- Custom Chart templates and direct base entity consumers must explicitly declare workspace support through `ChartParameters.SupportsWorkspace` before entity initialization; the standard UI entity enables it automatically for its registered UI Chart. The standalone ApexCharts provider supports Dialog/Embedded only; subclasses must remove references to the removed protected `BaseChartComponent.IsWorkspace` hook. Custom embedded hosts can set `IsEmbeddedEntity` to keep charts modal even with a workspace-capable implementation.
 
 ## [10.3.0] - 2026-08-14
 

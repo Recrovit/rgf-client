@@ -62,6 +62,15 @@ public partial class RgfEntityComponent : ComponentBase, IDisposable
 
     private bool _isChartInitialized;
 
+    [CascadingParameter]
+    private RgfEntityComponent? ParentEntityComponent { get; set; }
+
+    private RgfChartPresentationMode _chartPresentationMode;
+    private bool IsChartWorkspace => _chartPresentationMode == RgfChartPresentationMode.Workspace;
+    private bool _isTreeInitialized;
+    private bool _pendingChartActivation;
+    private RfgDisplayMode _previousDisplayMode = RfgDisplayMode.Grid;
+
     private string? EntityName { get; set; }
 
     private RenderFragment? _entityEditor { get; set; }
@@ -73,6 +82,10 @@ public partial class RgfEntityComponent : ComponentBase, IDisposable
         await base.OnInitializedAsync();
 
         EntityName = EntityParameters.EntityName;
+        _chartPresentationMode = !EntityParameters.ChartParameters.SupportsWorkspace || EntityParameters.IsEmbeddedEntity ||
+            EntityParameters.ParentEntityParameters != null || ParentEntityComponent != null
+            ? RgfChartPresentationMode.Dialog : RgfChartPresentationMode.Workspace;
+        EntityParameters.ChartParameters.PresentationMode = _chartPresentationMode;
 
         try
         {
@@ -91,6 +104,7 @@ public partial class RgfEntityComponent : ComponentBase, IDisposable
         _logger.LogDebug("OnParametersSet | EntityName:{EntityName}", EntityParameters.EntityName);
 
         base.OnParametersSet();
+        EntityParameters.ChartParameters.PresentationMode = _chartPresentationMode;
 
         if (EntityName != EntityParameters.EntityName)
         {
@@ -130,7 +144,7 @@ public partial class RgfEntityComponent : ComponentBase, IDisposable
         Disposables.Add(Manager.NotificationManager.Subscribe<RgfUserMessageEventArgs>(OnUserMessage));
         EntityParameters.ToolbarParameters.EventDispatcher.Subscribe(
             [RgfToolbarEventKind.Refresh, RgfToolbarEventKind.Add, RgfToolbarEventKind.Edit, RgfToolbarEventKind.Read, RgfToolbarEventKind.Delete, RgfToolbarEventKind.Select],
-            Manager.OnToolbarCommandAsync, true);
+            OnGridToolbarCommandAsync, true);
         EntityParameters.ToolbarParameters.EventDispatcher.Subscribe(RgfToolbarEventKind.ToggleDisplayMode, OnToggleDisplayModeAsync, true);
         EntityParameters.ToolbarParameters.MenuEventDispatcher.Subscribe(Menu.RecroChart, OnShowChart, true);
         EntityParameters.ToolbarParameters.EventDispatcher.Subscribe(RgfToolbarEventKind.RecroChart, OnShowChart, true);
@@ -168,7 +182,7 @@ public partial class RgfEntityComponent : ComponentBase, IDisposable
                         cancellationToken.ThrowIfCancellationRequested();
                     }
                 }
-                EntityParameters.DisplayMode ??= Enum.TryParse(Manager.EntityDesc.Options.GetStringValue("RGO_DisplayMode"), out RfgDisplayMode mode) ? mode : RfgDisplayMode.Grid;
+                NormalizeDisplayMode();
                 await InitResourcesAsync();
                 cancellationToken.ThrowIfCancellationRequested();
                 _initialized = true;
@@ -196,14 +210,57 @@ public partial class RgfEntityComponent : ComponentBase, IDisposable
             {
                 return Task.CompletedTask;
             }
+            if (displayMode == RfgDisplayMode.Chart)
+            {
+                return OnShowChart(args);
+            }
+            _isTreeInitialized |= displayMode == RfgDisplayMode.Tree;
             EntityParameters.DisplayMode = displayMode;
             StateHasChanged();
         }
         return Task.CompletedTask;
     }
 
+    private Task OnGridToolbarCommandAsync(IRgfEventArgs<RgfToolbarEventArgs> args)
+    {
+        if (EntityParameters.DisplayMode == RfgDisplayMode.Chart && args.Args.EventKind != RgfToolbarEventKind.Refresh)
+        {
+            return Task.CompletedTask;
+        }
+        return Manager!.OnToolbarCommandAsync(args);
+    }
+
     private Task OnShowChart(IRgfEventArgs args)
     {
+        args.Handled = true;
+        if (IsChartWorkspace && EntityParameters.DisplayMode == RfgDisplayMode.Chart)
+        {
+            EntityParameters.DisplayMode = _previousDisplayMode == RfgDisplayMode.Tree && TreeTemplate != null
+                ? RfgDisplayMode.Tree : RfgDisplayMode.Grid;
+            StateHasChanged();
+            return Task.CompletedTask;
+        }
+        EnsureChartTemplate();
+        if (ChartTemplate != null)
+        {
+            _isChartInitialized = true;
+            if (IsChartWorkspace)
+            {
+                _previousDisplayMode = EntityParameters.DisplayMode == RfgDisplayMode.Tree ? RfgDisplayMode.Tree : RfgDisplayMode.Grid;
+                EntityParameters.DisplayMode = RfgDisplayMode.Chart;
+                _pendingChartActivation = true;
+            }
+        }
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
+
+    private void EnsureChartTemplate()
+    {
+        if (Manager?.EntityDesc.Options.GetBoolValue("RGO_ClientMode") == true)
+        {
+            return;
+        }
         if (ChartTemplate == null && RgfBlazorConfiguration.TryGetComponentType(RgfBlazorConfiguration.ComponentType.Chart, out var chartType))
         {
             ChartTemplate = (par) => builder =>
@@ -214,12 +271,35 @@ public partial class RgfEntityComponent : ComponentBase, IDisposable
                 builder.CloseComponent();
             };
         }
-        if (ChartTemplate != null)
+    }
+
+    private void NormalizeDisplayMode()
+    {
+        EntityParameters.DisplayMode ??= Enum.TryParse(Manager!.EntityDesc.Options.GetStringValue("RGO_DisplayMode"), out RfgDisplayMode mode)
+            ? mode : RfgDisplayMode.Grid;
+        if (EntityParameters.DisplayMode == RfgDisplayMode.Chart && IsChartWorkspace)
         {
-            _isChartInitialized = true;
+            EnsureChartTemplate();
+            _isChartInitialized = ChartTemplate != null;
+            _pendingChartActivation = _isChartInitialized;
         }
-        StateHasChanged();
-        return Task.CompletedTask;
+        if ((EntityParameters.DisplayMode == RfgDisplayMode.Chart && (!IsChartWorkspace || !_isChartInitialized)) ||
+            (EntityParameters.DisplayMode == RfgDisplayMode.Tree && TreeTemplate == null) ||
+            !Enum.IsDefined(EntityParameters.DisplayMode ?? RfgDisplayMode.Grid))
+        {
+            EntityParameters.DisplayMode = RfgDisplayMode.Grid;
+        }
+        _isTreeInitialized |= EntityParameters.DisplayMode == RfgDisplayMode.Tree;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await base.OnAfterRenderAsync(firstRender);
+        if (_pendingChartActivation && _initialized && EntityParameters.DisplayMode == RfgDisplayMode.Chart)
+        {
+            _pendingChartActivation = false;
+            await EntityParameters.ChartParameters.EventDispatcher.RaiseEventAsync(RgfChartEventKind.WorkspaceActivated, this);
+        }
     }
 
     private async Task InitResourcesAsync()
@@ -241,17 +321,21 @@ public partial class RgfEntityComponent : ComponentBase, IDisposable
 
     private async Task RefreshAsync(bool recreate)
     {
-        _initialized = false;
-        StateHasChanged();
         try
         {
             if (recreate)
             {
+                _initialized = false;
+                _isChartInitialized = false;
+                _isTreeInitialized = false;
+                _pendingChartActivation = false;
+                StateHasChanged();
                 DisposeManager();
                 _createManagerCancellationTokenSource = new CancellationTokenSource();
                 await CreateManagerAsync(_createManagerCancellationTokenSource.Token);
             }
             _initialized = true;
+            NormalizeDisplayMode();
             var eventArgs = new RgfEntityEventArgs(RgfEntityEventKind.Initialized, Manager!);
             await EntityParameters.EventDispatcher.DispatchEventAsync(eventArgs.EventKind, new RgfEventArgs<RgfEntityEventArgs>(this, eventArgs));
             StateHasChanged();
@@ -297,6 +381,7 @@ public partial class RgfEntityComponent : ComponentBase, IDisposable
     {
         if (Manager != null)
         {
+            EntityParameters?.UnsubscribeFromAll(this);
             _logger.LogDebug("Dispose Manager | EntityName:{EntityName} - {HashCode}", this.EntityName, this.GetHashCode());
             EntityParameters?.UnsubscribeFromAll(Manager);
             _createManagerCancellationTokenSource?.Cancel();

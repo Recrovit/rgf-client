@@ -356,6 +356,7 @@ public partial class RgfFormComponent : ComponentBase, IDisposable
         {
             _selectEntityParameters = new RgfEntityParameters(_selectParam.EntityName, Manager.SessionParams)
             {
+                IsEmbeddedEntity = true,
                 SelectParam = _selectParam,
                 DisplayMode = RfgDisplayMode.Grid,
                 AutoOpenForm = arg.Args.EventKind == RgfFormEventKind.EntityDisplay

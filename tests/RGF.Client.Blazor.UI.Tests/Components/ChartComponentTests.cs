@@ -25,6 +25,44 @@ public sealed class ChartComponentTests
 {
     private const string CardRequiresSingleAggregateMessage = "Card charts require exactly one aggregate and do not support additional grouping.";
 
+    [Theory]
+    [InlineData(RgfChartSeriesType.Card, false)]
+    [InlineData(RgfChartSeriesType.Bar, false)]
+    [InlineData(RgfChartSeriesType.Card, true)]
+    [InlineData(RgfChartSeriesType.Bar, true)]
+    public async Task ChartComponent_InvalidationHidesVisualizationAndPreservesSettings(RgfChartSeriesType type, bool embedded)
+    {
+        using var context = CreateTestContext();
+        var entity = CreateEntityParameters();
+        entity.DialogTemplate = parameters => parameters.Content;
+        var cut = context.Render<UiChartComponent>(parameters => parameters
+            .Add(component => component.EntityParameters, entity)
+            .Add(component => component.Embedded, embedded));
+        var chart = cut.FindComponent<RgfChartComponent>().Instance;
+        var visualization = cut.FindComponent<ApexChartComponent>();
+        var settings = visualization.Instance.ChartSettings;
+        await cut.InvokeAsync(() =>
+        {
+            chart.ChartSettings.SeriesType = type;
+            chart.ChartSettings.SettingsName = "Saved configuration";
+            chart.SetDataStatus(RgfProcessingStatus.Valid);
+            chart.ChartStatus = RgfProcessingStatus.Valid;
+            settings.ChartType = type;
+            settings.Card = new() { Title = "Previous result", Value = "42" };
+            settings.Series.Add(new() { Name = "Previous result", Data = [] });
+        });
+        cut.Render();
+        Assert.Single(cut.FindAll(".rgf-apexchart-content [style='visibility:visible']"));
+        await cut.InvokeAsync(() => chart.SetDataStatus(RgfProcessingStatus.Invalid));
+        Assert.Single(cut.FindAll(".rgf-apexchart-content [style='visibility:hidden']"));
+        Assert.Null(settings.Card);
+        Assert.Empty(settings.Series);
+        Assert.Empty(cut.FindAll(".rgf-apexchart-card-view"));
+        Assert.Equal("Saved configuration", chart.ChartSettings.SettingsName);
+        Assert.Equal(type, chart.ChartSettings.SeriesType);
+        Assert.Equal("Count", Assert.Single(chart.ChartSettings.AggregationSettings.Columns).Aggregate);
+    }
+
     [Fact]
     public void ApexChartComponent_RendersCardRemark_WhenCardModeIsActive()
     {

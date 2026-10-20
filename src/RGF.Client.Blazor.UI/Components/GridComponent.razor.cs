@@ -57,7 +57,10 @@ public partial class GridComponent : ComponentBase, IDisposable
         {
             _disposables.Add(_rgfGridRef.GridDataSource.OnAfterChange(this, OnChangedGridData));
         }
-        await _jsRuntime.InvokeVoidAsync(RGFClientBlazorUIConfiguration.JsBlazorUiNamespace + ".Grid.initializeTable", _selfRef, _tableRef);
+        if (EntityParameters.DisplayMode == RfgDisplayMode.Grid)
+        {
+            await _jsRuntime.InvokeVoidAsync(RGFClientBlazorUIConfiguration.JsBlazorUiNamespace + ".Grid.initializeTable", _selfRef, _tableRef);
+        }
     }
 
     public void Dispose()
@@ -262,6 +265,10 @@ public partial class GridComponent : ComponentBase, IDisposable
 
     private async Task OnSetFormItem(IRgfEventArgs<RgfToolbarEventArgs> arg)
     {
+        if (EntityParameters.DisplayMode != RfgDisplayMode.Grid || _rgfGridRef.SelectedItems.Count != 1)
+        {
+            return;
+        }
         var data = _rgfGridRef.SelectedItems.Single();
         int rowIndex = Manager.ListHandler.ToRelativeRowIndex(data.Key);
         if (rowIndex != -1)

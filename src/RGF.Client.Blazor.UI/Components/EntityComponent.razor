@@ -44,6 +44,18 @@
     [Parameter]
     public RenderFragment<RgfEntityParameters>? ChartTemplate { get; set; }
 
+    protected override void OnInitialized()
+    {
+        // Only the registered UI chart supplies workspace behavior automatically.
+        if (ChartTemplate == null)
+        {
+            EntityParameters.ChartParameters.SupportsWorkspace =
+                RgfBlazorConfiguration.TryGetComponentType(RgfBlazorConfiguration.ComponentType.Chart, out var chartType) &&
+                chartType == typeof(ChartComponent);
+        }
+        base.OnInitialized();
+    }
+
     private RgfLoadingIndicatorParameters EffectiveLoadingIndicatorParameters => new()
     {
         Text = "Loading...",

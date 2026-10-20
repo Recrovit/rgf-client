@@ -79,6 +79,7 @@ public partial class RgfTreeComponent : RgfDataComponentBase
             var entityParameters = new RgfEntityParameters(node.Property.BaseEntityNameVersion, Manager.SessionParams)
             {
                 ParentEntityParameters = EntityParameters,
+                IsEmbeddedEntity = true,
                 GridId = null,
                 DisplayMode = RfgDisplayMode.Tree
             };

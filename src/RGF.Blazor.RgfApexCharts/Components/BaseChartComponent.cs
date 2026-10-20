@@ -19,6 +19,7 @@ public enum RecroChartTab
     Grid = 3
 }
 
+// RGF-DOC: rgf.client.blazor-ui.entity-ui
 public abstract class BaseChartComponent : ComponentBase, IAsyncDisposable
 {
     [Parameter, EditorRequired]
@@ -103,6 +104,13 @@ public abstract class BaseChartComponent : ComponentBase, IAsyncDisposable
 
     private static int _id = 0;
     private bool _initialChartSetupHandled;
+    private readonly SemaphoreSlim _chartCreationLock = new(1, 1);
+    private readonly SemaphoreSlim _chartRenderLock = new(1, 1);
+    private bool _hasCreatedChart;
+    private bool _refreshPending;
+    private bool _refreshRunning;
+    private bool _disposed;
+    private long _visualizationVersion;
 
     protected readonly string ContainerId;
 
@@ -123,6 +131,44 @@ public abstract class BaseChartComponent : ComponentBase, IAsyncDisposable
         ApplyValueFormatters();
         EntityParameters.ChartParameters.EventDispatcher.Subscribe(RgfChartEventKind.ShowChart, (arg) => OnInitSizeAsync(true), true, this);
         EntityParameters.ChartParameters.EventDispatcher.Subscribe(RgfChartEventKind.Initialized, OnChartInitializedAsync, this);
+        EntityParameters.ChartParameters.EventDispatcher.Subscribe(RgfChartEventKind.DataInvalidated, OnDataInvalidated, this);
+        EntityParameters.ChartParameters.EventDispatcher.Subscribe(RgfChartEventKind.AggregateSourceChanged, OnAggregateSourceChangedAsync, this);
+    }
+
+    private void OnDataInvalidated(IRgfEventArgs<RgfChartEventArgs> args)
+    {
+        _visualizationVersion++;
+        ApexChartSettings.Card = null;
+        ApexChartSettings.Series.Clear();
+        if (!_disposed) StateHasChanged();
+    }
+
+    private bool CanRefreshAutomatically => !_disposed && _hasCreatedChart && !DataOnly &&
+        RgfChartRef?.IsWorkspace == true && EntityParameters.DisplayMode == RfgDisplayMode.Chart;
+
+    private async Task OnAggregateSourceChangedAsync(IRgfEventArgs<RgfChartEventArgs> args)
+    {
+        if (args.Args.IsChartSettingsChange || !CanRefreshAutomatically) return;
+        _refreshPending = true;
+        if (_refreshRunning) return;
+        _refreshRunning = true;
+        try
+        {
+            while (_refreshPending && CanRefreshAutomatically)
+            {
+                _refreshPending = false;
+                await OnCreateChart();
+            }
+        }
+        catch
+        {
+            if (!_disposed) RgfChartRef.SetDataStatus(RgfProcessingStatus.Invalid);
+        }
+        finally
+        {
+            _refreshRunning = false;
+            _refreshPending = false;
+        }
     }
 
     protected override void OnAfterRender(bool firstRender)
@@ -251,33 +297,56 @@ public abstract class BaseChartComponent : ComponentBase, IAsyncDisposable
 
     protected virtual async Task<bool> OnCreateChart()
     {
-        if (RgfChartRef?.EditContext.Validate() != true)
+        await _chartCreationLock.WaitAsync();
+        try
         {
+            if (_disposed || (_refreshRunning && !CanRefreshAutomatically)) return false;
+            if (RgfChartRef?.EditContext.Validate() != true)
+            {
+                return false;
+            }
+            SettingsAccordionActive = false;
+            ActiveTabIndex = RecroChartTab.Chart;
+            StateHasChanged();
+            await Task.Delay(50);
+            if (_disposed || (_refreshRunning && !CanRefreshAutomatically)) return false;
+            await OnInitSizeAsync();
+            if (_disposed || (_refreshRunning && !CanRefreshAutomatically)) return false;
+            var suppressAutomaticToast = EntityParameters.ChartParameters.SuppressAutomaticChartToast;
+            if (RgfChartRef.DataStatus == RgfProcessingStatus.Valid || await GetData(suppressAutomaticToast))
+            {
+                if (_disposed || RgfChartRef.DataStatus != RgfProcessingStatus.Valid) return false;
+                await UpdateChart(suppressAutomaticToast);
+                var success = RgfChartRef.ChartStatus == RgfProcessingStatus.Valid;
+                _hasCreatedChart |= success;
+                return success;
+            }
             return false;
         }
-        SettingsAccordionActive = false;
-        ActiveTabIndex = RecroChartTab.Chart;
-        StateHasChanged();
-        await Task.Delay(50);
-        await OnInitSizeAsync();
-        var suppressAutomaticToast = EntityParameters.ChartParameters.SuppressAutomaticChartToast;
-        if (RgfChartRef.DataStatus == RgfProcessingStatus.Valid || await GetData(suppressAutomaticToast))
+        finally
         {
-            await UpdateChart(suppressAutomaticToast);
-            return true;
+            _chartCreationLock.Release();
         }
-        return false;
     }
 
     protected virtual async Task<bool> OnGetData()
     {
-        if (RgfChartRef?.EditContext.Validate() != true)
+        await _chartCreationLock.WaitAsync();
+        try
         {
-            return false;
+            if (_disposed) return false;
+            if (RgfChartRef?.EditContext.Validate() != true)
+            {
+                return false;
+            }
+            SettingsAccordionActive = false;
+            ActiveTabIndex = RecroChartTab.Grid;
+            return await GetData(EntityParameters.ChartParameters.SuppressAutomaticChartToast);
         }
-        SettingsAccordionActive = false;
-        ActiveTabIndex = RecroChartTab.Grid;
-        return await GetData(EntityParameters.ChartParameters.SuppressAutomaticChartToast);
+        finally
+        {
+            _chartCreationLock.Release();
+        }
     }
 
     protected async Task<bool> GetData(bool suppressToast = false)
@@ -298,7 +367,7 @@ public abstract class BaseChartComponent : ComponentBase, IAsyncDisposable
         if (!success)
         {
             // Switch to this tab because the error message appears here
-            ActiveTabIndex = RecroChartTab.Grid;
+            if (!_refreshRunning) ActiveTabIndex = RecroChartTab.Grid;
             if (toast != null)
             {
                 await Manager.ToastManager.RaiseEventAsync(toast.Remove(), this);
@@ -316,10 +385,25 @@ public abstract class BaseChartComponent : ComponentBase, IAsyncDisposable
             await ApexChartRef.UpdateChart();
         }
         StateHasChanged();
-        return true;
+        return !_disposed && RgfChartRef.DataStatus == RgfProcessingStatus.Valid;
     }
 
     protected virtual async Task UpdateChart(bool suppressToast = false)
+    {
+        var version = _visualizationVersion;
+        await _chartRenderLock.WaitAsync();
+        try
+        {
+            if (_disposed || version != _visualizationVersion) return;
+            await UpdateChartCore(suppressToast);
+        }
+        finally
+        {
+            _chartRenderLock.Release();
+        }
+    }
+
+    private async Task UpdateChartCore(bool suppressToast)
     {
         var currentStatus = RgfChartRef.ChartStatus;
         if (ApexChartRef == null || currentStatus == RgfProcessingStatus.InProgress)
@@ -334,6 +418,7 @@ public abstract class BaseChartComponent : ComponentBase, IAsyncDisposable
         }
 
         RgfChartRef.ChartStatus = RgfProcessingStatus.InProgress;// Prevents the chart from being redrawn when the data is updated
+        var visualizationVersion = _visualizationVersion;
         try
         {
             RgfToastEventArgs? toast;
@@ -348,7 +433,8 @@ public abstract class BaseChartComponent : ComponentBase, IAsyncDisposable
                     StateHasChanged();
                     await Task.Delay(50);
                 }
-                if (!await RenderCurrentVisualizationAsync(toast))
+                if (visualizationVersion != _visualizationVersion || RgfChartRef.DataStatus != RgfProcessingStatus.Valid ||
+                    !await RenderCurrentVisualizationAsync(toast))
                 {
                     RgfChartRef.ChartStatus = RgfProcessingStatus.Invalid;
                     return;
@@ -363,7 +449,8 @@ public abstract class BaseChartComponent : ComponentBase, IAsyncDisposable
                 {
                     await Manager.ToastManager.RaiseEventAsync(toast, this);
                 }
-                if (!await RenderCurrentVisualizationAsync(toast, redrawOnly: true))
+                if (visualizationVersion != _visualizationVersion || RgfChartRef.DataStatus != RgfProcessingStatus.Valid ||
+                    !await RenderCurrentVisualizationAsync(toast, redrawOnly: true))
                 {
                     RgfChartRef.ChartStatus = RgfProcessingStatus.Invalid;
                     return;
@@ -373,11 +460,16 @@ public abstract class BaseChartComponent : ComponentBase, IAsyncDisposable
             {
                 await Manager.ToastManager.RaiseEventAsync(toast.RecreateAsSuccess(RecroDict.GetRgfUiString("Processed"), delay: 2000), this);
             }
-            RgfChartRef.ChartStatus = RgfProcessingStatus.Valid;
+            RgfChartRef.ChartStatus = visualizationVersion == _visualizationVersion && RgfChartRef.DataStatus == RgfProcessingStatus.Valid
+                ? RgfProcessingStatus.Valid : RgfProcessingStatus.Invalid;
         }
         catch
         {
             RgfChartRef.ChartStatus = RgfProcessingStatus.Invalid;
+        }
+        finally
+        {
+            if (!_disposed) StateHasChanged();
         }
     }
 
@@ -576,6 +668,8 @@ public abstract class BaseChartComponent : ComponentBase, IAsyncDisposable
 
     public virtual ValueTask DisposeAsync()
     {
+        _disposed = true;
+        _visualizationVersion++;
         EntityParameters?.ChartParameters.EventDispatcher.Unsubscribe(this);
         _selfRef?.Dispose();
         _selfRef = null;

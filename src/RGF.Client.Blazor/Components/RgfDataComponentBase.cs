@@ -87,6 +87,16 @@ public class RgfDataComponentBase : ComponentBase, IDisposable
 
     protected async Task OnMenuCommandAsync(IRgfEventArgs<RgfMenuEventArgs> arg)
     {
+        if ((this is RgfTreeComponent) != (EntityParameters.DisplayMode == RfgDisplayMode.Tree))
+        {
+            return;
+        }
+        if (EntityParameters.DisplayMode == RfgDisplayMode.Chart && arg.Args.Command is Menu.QuickWatch or Menu.RecroTrack)
+        {
+            arg.Handled = true;
+            arg.PreventDefault = true;
+            return;
+        }
         switch (arg.Args.Command)
         {
             case Menu.QueryString:
@@ -144,7 +154,7 @@ public class RgfDataComponentBase : ComponentBase, IDisposable
         var entityKey = SelectedItems.FirstOrDefault().Value;
         if (entityKey?.IsEmpty == false)
         {
-            var param = new RgfEntityParameters("QuickWatch", Manager.SessionParams);
+            var param = new RgfEntityParameters("QuickWatch", Manager.SessionParams) { IsEmbeddedEntity = true };
             param.FormParameters.FormViewKey.EntityKey = entityKey;
             RgfDialogParameters dialogParameters = new()
             {
@@ -194,7 +204,7 @@ public class RgfDataComponentBase : ComponentBase, IDisposable
     protected void RecroTrack()
     {
         _logger.LogDebug("RecroTrack");
-        var param = new RgfEntityParameters("RecroTrack", Manager.SessionParams);
+        var param = new RgfEntityParameters("RecroTrack", Manager.SessionParams) { IsEmbeddedEntity = true };
         var entityKey = SelectedItems.FirstOrDefault().Value;
         if (entityKey?.IsEmpty == false)
         {
@@ -297,7 +307,11 @@ public class RgfDataComponentBase : ComponentBase, IDisposable
             var rgo = new string[] { "RGO_CssClass", "RGO_Style", "RGO_JSRowClass", "RGO_JSRowStyle" };
             var prop4RowStyles = entityDesc.Properties.Where(e => e.Options?.Any(e => rgo.Contains(e.Key)) == true).ToArray();
             var prop4ColStyles = Manager.ListHandler.SortedVisibleColumns.Where(e => e.Options?.Any(e => rgo.Contains(e.Key)) == true).ToArray();
-            foreach (var rowData in args.NewData)
+            // Only the active data presenter prepares shared row attributes and dispatches row events.
+            var preparesRows = this is RgfTreeComponent
+                ? EntityParameters.DisplayMode == RfgDisplayMode.Tree
+                : EntityParameters.DisplayMode != RfgDisplayMode.Tree;
+            foreach (var rowData in preparesRows ? args.NewData : [])
             {
                 CreateAttributes(entityDesc, rowData);
                 await RgfGridColumnComponent.InitStylesAsync(_jsRuntime, entityDesc, rowData, prop4RowStyles, prop4ColStyles);
@@ -305,7 +319,8 @@ public class RgfDataComponentBase : ComponentBase, IDisposable
                 await EntityParameters.GridParameters.EventDispatcher.DispatchEventAsync(eventArgs.EventKind, new RgfEventArgs<RgfListEventArgs>(this, eventArgs));
             }
             GridDataSource.Value = args.NewData;
-            if (SelectedItems.Count > 1 && (EntityParameters.DisplayMode == RfgDisplayMode.Tree || EntityParameters.GridParameters.EnableMultiRowSelection != true))
+            if (preparesRows && SelectedItems.Count > 1 && (this is RgfTreeComponent && EntityParameters.DisplayMode == RfgDisplayMode.Tree ||
+                EntityParameters.DisplayMode == RfgDisplayMode.Grid && EntityParameters.GridParameters.EnableMultiRowSelection != true))
             {
                 var first = SelectedItems.First();
                 await Manager.SelectedItems.SetValueAsync(new() { { first.Key, first.Value } });

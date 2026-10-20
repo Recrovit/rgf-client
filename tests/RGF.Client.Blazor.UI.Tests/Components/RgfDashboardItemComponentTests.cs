@@ -39,6 +39,7 @@ public sealed class RgfDashboardItemComponentTests : IDisposable
         Assert.Contains("dashboard-loading-component", cut.Markup);
         Assert.Contains("Loading", cut.Markup);
         Assert.Contains("fake-entity-host", cut.Markup);
+        Assert.True(cut.FindComponent<FakeEntityHostComponent>().Instance.EntityParameters.IsEmbeddedEntity);
 
         FakeEntityHostComponent.DispatchNextInitialized();
 
@@ -64,6 +65,7 @@ public sealed class RgfDashboardItemComponentTests : IDisposable
         {
             Assert.DoesNotContain("dashboard-loading-component", cut.Markup);
             Assert.Contains("fake-chart-component", cut.Markup);
+            Assert.True(cut.FindComponent<FakeChartComponent>().Instance.Embedded);
         });
     }
 

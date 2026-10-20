@@ -2,7 +2,21 @@
 
 @if (_showComponent)
 {
-    @_chartDialog
+    @if (IsWorkspace && !_contentReady)
+    {
+        <p><em>@_recroDict.GetRgfUiString("Loading")</em></p>
+    }
+    else if (IsWorkspace)
+    {
+        <div class="rgf-chart-workspace" style="width:100%;min-width:0">
+            @ContentTemplate(this)
+            @FooterTemplate(this)
+        </div>
+    }
+    else
+    {
+        @_chartDialog
+    }
 }
 
 <RgfDynamicDialog @ref="_dynamicDialog" />

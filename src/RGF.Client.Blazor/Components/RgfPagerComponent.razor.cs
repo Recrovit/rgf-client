@@ -61,7 +61,7 @@ public partial class RgfPagerComponent : ComponentBase, IDisposable
     {
         PageSize = pageSize;
         RecalculateTotalPages(ItemCount);
-        return Manager.ListHandler.RefreshDataAsync();
+        return Manager.ListHandler.RefreshDataAsync(null, invalidateAggregates: false);
     }
 
     public void OnKeyDown(KeyboardEventArgs args)

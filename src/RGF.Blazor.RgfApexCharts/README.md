@@ -4,6 +4,14 @@
 
 Official Website: [RecroGrid Framework](https://RecroGridFramework.com)
 
+## Supported presentation and Recroby boundary
+
+ApexCharts supports **Dialog** charts opened by the Grid toolbar or `Menu.RecroChart`, including top-level entities, and **Embedded** Dashboard Chart/ChartData widgets. Dialogs retain Close/reopen, resizing, saved settings and the chart's own DataSet Grid.
+
+The separate `RGF.Client.Blazor.UI` Chart implementation supports persistent Workspace presentation for top-level entities automatically through `InitializeRgfUIAsync()`, while embedded entities remain modal. Workspace sizing and lifecycle belong to that UI implementation. This standalone ApexCharts provider supports Dialog and Embedded only; leave `ChartParameters.SupportsWorkspace` at its default `false` with this provider. Compatible custom Chart templates can explicitly declare Workspace support before entity initialization.
+
+This package has no Recroby integration: Recroby does not control its charts, and chart state is not published as AI context. General application Recroby Workspace and chat remain available.
+
 ## Overview
 
 [`Recrovit.RecroGridFramework.Blazor.RgfApexCharts`](https://www.nuget.org/packages/Recrovit.RecroGridFramework.Blazor.RgfApexCharts/) is the ApexCharts-based chart integration package of the RecroGrid Framework Blazor stack.

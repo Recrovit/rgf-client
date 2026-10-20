@@ -39,6 +39,10 @@ public class RgfEntityParameters : RgfSessionParams
     /// <summary>Parent entity context for nested UI relationships.</summary>
     public RgfEntityParameters? ParentEntityParameters { get; internal set; }
 
+    /// <summary>Marks an entity hosted inside a form, widget, selector or custom container.
+    /// Set before initialization to keep grid charts modal, even without a parent entity context.</summary>
+    public bool IsEmbeddedEntity { get; set; }
+
     /// <summary>Backend entity name supplied at construction.</summary>
     public string EntityName { get; }
 
@@ -78,7 +82,8 @@ public class RgfEntityParameters : RgfSessionParams
     /// <summary>Attempts to open the read form when initialization yields one selected record.</summary>
     public bool AutoOpenForm { get; set; }
 
-    /// <summary>Requested grid/tree mode; null uses backend options with a grid fallback.</summary>
+    /// <summary>Requested grid, tree or workspace chart mode; null uses backend options with a grid fallback.
+    /// Chart requires standalone workspace presentation and an available chart template or registration.</summary>
     public RfgDisplayMode? DisplayMode { get; set; }
 
     /// <summary>Initial backend list request settings.</summary>
