@@ -166,7 +166,7 @@ public sealed class EntityComponentTests
         await cut.InvokeAsync(() => chart.ChartSettingList.Add(new() { ChartSettingsId = 8, SettingsName = "Other saved chart" }));
         cut.Render();
         var selection = cut.FindComponents<Recrovit.RecroGridFramework.Client.Blazor.UI.Components.Base.RgfComboBox<int?>>()
-            .Single(combo => combo.Instance.Width == "16rem");
+            .Single(combo => combo.Find("select").Id == cut.Find(".rgf-chart-workspace-toolbar select").Id);
         var sourceChanges = 0;
         entity.Manager.ListHandler.AggregateSourceChanged += () => sourceChanges++;
         var forwardedChanges = new List<bool>();
@@ -275,7 +275,7 @@ public sealed class EntityComponentTests
         Assert.Equal(RgfProcessingStatus.Invalid, chart.ChartStatus);
         Assert.Empty(cut.FindAll(".rgf-apexchart-card-view"));
         var selection = cut.FindComponents<Recrovit.RecroGridFramework.Client.Blazor.UI.Components.Base.RgfComboBox<int?>>()
-            .Single(combo => combo.Instance.Width == "16rem");
+            .Single(combo => combo.Find("select").Id == cut.Find(".rgf-chart-workspace-toolbar select").Id);
         Assert.True(selection.Instance.Disabled);
         Assert.True(cut.Find(".rgf-chart-workspace-dataset-grid").HasAttribute("hidden"));
         Assert.Same(dataGrid, cut.FindComponent<AggregateEntityHost>().Instance);

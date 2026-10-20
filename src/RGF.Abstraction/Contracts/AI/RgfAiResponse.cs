@@ -44,6 +44,14 @@ public class RgfAiResponse : RgfAiMessage
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? WorkflowStatus { get; set; }
 
+    /// <summary>Optional input mode for a waiting continuation; omitted from JSON when null.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public RgfAiResponseMode? ResponseMode { get; set; }
+
+    /// <summary>Optional localized choices for a waiting continuation. Submit the unchanged code as CurrentUserMessage.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public IReadOnlyList<RgfAiChoice>? Choices { get; set; }
+
     /// <summary>Optional opaque token for the next authorized turn; the host owns protection and validation.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? ConversationToken { get; set; }
