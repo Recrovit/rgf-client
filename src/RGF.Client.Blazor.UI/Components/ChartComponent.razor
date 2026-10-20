@@ -19,6 +19,33 @@
         }
         else
         {
+            @if (IsWorkspace)
+            {
+                <ChartWorkspaceView Chart="RgfCharComp" ShowControls="@(!HideChartControls)" HasConfiguration="_workspaceHasConfiguration" IsEditing="_workspaceIsEditing" IsProcessing="IsChartProcessing"
+                                    OnSelected="OnWorkspaceSettingSelectedAsync" OnNew="() => OnWorkspaceDraft(false)"
+                                    OnCopy="() => OnWorkspaceDraft(true)" OnEdit="ToggleWorkspaceSettings" OnRedraw="OnRedrawChartAsync"
+                                    SettingsContent="SettingsEditor(RgfCharComp)" ChartContent="ChartDisplay(RgfCharComp)" />
+            }
+            else
+            {
+                <ChartDialogView SettingsContent="SettingsEditor(RgfCharComp)" ChartContent="ChartDisplay(RgfCharComp)" />
+            }
+        }
+    </ContentTemplate>
+
+    <FooterTemplate Context="RgfCharComp">
+        @if (!IsWorkspace)
+        {
+            <ChartDialogView Chart="RgfCharComp" ShowControls="@(!HideChartControls)" FooterContent="ChartActions(RgfCharComp)"
+                             SaveContent="SaveControls(RgfCharComp)" OnSelected="arg => OnChartSettingsChanged(arg.Key as int?, arg.Value)" />
+        }
+    </FooterTemplate>
+</RgfChartComponent>
+
+@inherits BaseChartComponent
+@inject IRecroSecService RecroSec
+@code {
+    private RenderFragment<RgfChartComponent> SettingsEditor => RgfCharComp => @<text>
             @if (!HideChartControls)
             {
                 <div class="rgf-apexchart-settings accordion pb-2">
@@ -218,11 +245,28 @@
                                         </div>
                                     </div>
                                 </EditForm>
+                                @if (IsWorkspace)
+                                {
+                                    <div class="rgf-chart-workspace-save d-flex flex-wrap align-items-center gap-2 mt-2">
+                                        <div class="rgf-chart-workspace-name d-flex flex-wrap align-items-center gap-2">
+                                            <RgfInputText Label="@RecroDict.GetRgfUiString("SavedName")" LabelCssClass="mb-0 text-nowrap" Width="30rem"
+                                                          @bind-Value="RgfCharComp.ChartSettings.SettingsName"
+                                                          Disabled="@(RgfCharComp.ChartSettings.IsReadonly == true)" />
+                                        </div>
+                                        @SaveControls(RgfCharComp)
+                                        <div class="rgf-chart-workspace-data-actions">
+                                            @ChartDataActions(RgfCharComp)
+                                        </div>
+                                    </div>
+                                }
                             </div>
                         </div>
                     </div>
                 </div>
             }
+    </text>;
+
+    private RenderFragment<RgfChartComponent> ChartDisplay => RgfCharComp => @<text>
             <div id="@ContainerId" class="@(Embedded ? "rgf-apexchart-container rgf-apexchart-container-embedded card" : "rgf-apexchart-container card")">
                 @if (!Embedded)
                 {
@@ -250,9 +294,24 @@
                 <div class="@(Embedded ? "card-body rgf-apexchart-card-body-embedded" : "card-body")">
                     <div class="@(Embedded ? "tab-content rgf-apexchart-tab-content-embedded" : "tab-content")">
                         <div id="@($"{_tabsId}-tab-{RecroChartTab.Grid}-pane")" class="@(Embedded ? $"tab-pane fade rgf-apexchart-tab-pane-embedded show{(ActiveTabIndex == RecroChartTab.Grid ? " active" : "")}" : $"tab-pane fade show{(ActiveTabIndex == RecroChartTab.Grid ? " active" : "")}")" role="tabpanel" tabindex="0">
+                            @if (IsWorkspace && !HideChartControls && ActiveTabIndex == RecroChartTab.Grid && RgfCharComp.DataStatus != RgfProcessingStatus.Valid)
+                            {
+                                <div class="rgf-chart-workspace-dataset d-flex justify-content-start p-3">
+                                    @DataSetAction(RgfCharComp)
+                                </div>
+                            }
                             @if (RgfCharComp.ChartDataGrid != null)
                             {
-                                @RgfCharComp.ChartDataGrid
+                                @if (IsWorkspace)
+                                {
+                                    <div class="rgf-chart-workspace-dataset-grid" hidden="@(RgfCharComp.DataStatus != RgfProcessingStatus.Valid)">
+                                        @RgfCharComp.ChartDataGrid
+                                    </div>
+                                }
+                                else
+                                {
+                                    @RgfCharComp.ChartDataGrid
+                                }
                             }
                             else
                             {
@@ -260,6 +319,12 @@
                             }
                         </div>
                         <div id="@($"{_tabsId}-tab-{RecroChartTab.Chart}-pane")" class="@ApexChartComponentClass" role="tabpanel" tabindex="0">
+                            @if (IsWorkspace && !HideChartControls && ActiveTabIndex == RecroChartTab.Chart && RgfCharComp.ChartStatus != RgfProcessingStatus.Valid)
+                            {
+                                <div class="rgf-chart-workspace-create d-flex justify-content-start p-3">
+                                    @CreateChartAction(RgfCharComp)
+                                </div>
+                            }
                             <div style="visibility:@(RgfCharComp.ChartStatus == RgfProcessingStatus.Valid ? "visible" : "hidden")">
                                 <ApexChartComponent @ref=ApexChartRef ChartSettings="@ApexChartSettings" />
                             </div>
@@ -267,20 +332,36 @@
                     </div>
                 </div>
             </div>
-        }
-    </ContentTemplate>
+    </text>;
 
-    <FooterTemplate Context="RgfCharComp">
-        @if (!HideChartControls)
-        {
-            <div class="d-flex flex-wrap justify-content-between align-items-center">
-                <div class="btn-group d-flex flex-grow-1" role="group">
-                    <div class="rg-predef-name input-group input-group-sm">
-                        <RgfComboBox TValue="int?" Value="@RgfCharComp.ChartSettings.ChartSettingsId" Text="@RgfCharComp.ChartSettings.SettingsName" AllowCustom="true"
-                                     Tooltip="@RecroDict.GetRgfUiString("SavedName")"
-                                     DataSource="RgfCharComp.ChartSettingList.Select(e => new KeyValuePair<int?, string>(e.ChartSettingsId, e.SettingsName)).OrderBy(e => e.Value)"
-                                     InputChanged="(arg) => OnChartSettingsChanged(arg.Key as int?, arg.Value)" />
+    private RenderFragment<RgfChartComponent> ChartActions => RgfCharComp => @<text>
+                    <div class="p-1">
+                        <RgfButton CssClass="btn-primary" MinWidth="5rem" Label="@RecroDict.GetRgfUiString("Redraw")" Disabled="RgfCharComp.ChartStatus != RgfProcessingStatus.Valid"
+                                   OnClick="(arg) => OnRedrawChartAsync()" />
                     </div>
+                    @ChartDataActions(RgfCharComp)
+    </text>;
+
+    private RenderFragment<RgfChartComponent> CreateChartAction => RgfCharComp => @<text>
+                    <div class="p-1">
+                        <RgfButton CssClass="btn-primary" MinWidth="5rem" Label="@RgfCharComp.GetRecroDictChart("CreateChart")" Disabled="RgfCharComp.ChartStatus != RgfProcessingStatus.Invalid || RgfCharComp.DataStatus == RgfProcessingStatus.InProgress || IsWorkspace && IsChartProcessing"
+                                   OnClick="(arg) => OnCreateChart()" />
+                    </div>
+    </text>;
+
+    private RenderFragment<RgfChartComponent> DataSetAction => RgfCharComp => @<text>
+                    <div class="p-1">
+                        <RgfButton CssClass="btn-primary" MinWidth="5rem" Label="@RgfCharComp.GetRecroDictChart("DataSet")" Disabled="RgfCharComp.DataStatus != RgfProcessingStatus.Invalid || IsWorkspace && IsChartProcessing"
+                                   OnClick="(arg) => OnGetData()" />
+                    </div>
+    </text>;
+
+    private RenderFragment<RgfChartComponent> ChartDataActions => RgfCharComp => @<text>
+                    @CreateChartAction(RgfCharComp)
+                    @DataSetAction(RgfCharComp)
+    </text>;
+
+    private RenderFragment<RgfChartComponent> SaveControls => RgfCharComp => @<text>
                     <div class="rg-predef-save">
                         <div class="ps-1" style="width:max-content;">
                             <RgfComboBox TValue="string" @bind-Value="RgfCharComp.ChartSettings.RoleId" DataSource="RecroSec.Roles" IncludeEmptyItem="true"
@@ -296,47 +377,81 @@
                                        OnClick="(arg) => RgfCharComp.OnDeleteChartSettingsAsync()" />
                         </div>
                     </div>
-                </div>
-            </div>
-            <div class="d-flex flex-wrap justify-content-end align-items-center">
-                <div id="gombok" class="d-flex">
-                    <div class="p-1">
-                        <RgfButton CssClass="btn-primary" MinWidth="5rem" Label="@RecroDict.GetRgfUiString("Redraw")" Disabled="RgfCharComp.ChartStatus != RgfProcessingStatus.Valid"
-                                   OnClick="(arg) => OnRedraw()" />
-                    </div>
-                    <div class="p-1">
-                        <RgfButton CssClass="btn-primary" MinWidth="5rem" Label="@RgfCharComp.GetRecroDictChart("CreateChart")" Disabled="RgfCharComp.ChartStatus != RgfProcessingStatus.Invalid || RgfCharComp.DataStatus == RgfProcessingStatus.InProgress"
-                                   OnClick="(arg) => OnCreateChart()" />
-                    </div>
-                    <div class="p-1">
-                        <RgfButton CssClass="btn-primary" MinWidth="5rem" Label="@RgfCharComp.GetRecroDictChart("DataSet")" Disabled="RgfCharComp.DataStatus != RgfProcessingStatus.Invalid"
-                                   OnClick="(arg) => OnGetData()" />
-                    </div>
-                    @if (!IsWorkspace)
-                    {
-                        <div class="p-1">
-                            <RgfButton CssClass="btn-secondary" MinWidth="5rem" Label="@RecroDict.GetRgfUiString("Close")"
-                                       OnClick="RgfCharComp.OnClose" />
-                        </div>
-                    }
-                </div>
-            </div>
-        }
-    </FooterTemplate>
-</RgfChartComponent>
+    </text>;
 
-@inherits BaseChartComponent
-@inject IRecroSecService RecroSec
-@code {
+    private async Task OnWorkspaceSettingSelectedAsync(int? id)
+    {
+        if (IsChartProcessing) return;
+        _workspaceIsEditing = false;
+        if (id == null)
+        {
+            _workspaceHasConfiguration = false;
+            RgfChartRef.SetDataStatus(RgfProcessingStatus.Invalid);
+            return;
+        }
+        var setting = RgfChartRef.ChartSettingList.FirstOrDefault(setting => setting.ChartSettingsId == id);
+        if (setting == null) return;
+        _workspaceHasConfiguration = true;
+        ChangeChartProcessing(1);
+        try
+        {
+            await OnChartSettingsChanged(id, setting.SettingsName);
+        }
+        finally
+        {
+            ChangeChartProcessing(-1);
+        }
+    }
+
+    private void OnWorkspaceDraft(bool copyCurrent)
+    {
+        _workspaceHasConfiguration = true;
+        RgfChartRef.CreateChartSettings(copyCurrent);
+        Initialize(_chartSettings);
+        OpenWorkspaceSettings();
+    }
+
+    private void ToggleWorkspaceSettings()
+    {
+        if (_workspaceIsEditing)
+        {
+            _workspaceIsEditing = false;
+            _workspaceActivationPending = true;
+        }
+        else
+        {
+            OpenWorkspaceSettings();
+        }
+    }
+
+    private void OpenWorkspaceSettings()
+    {
+        _workspaceIsEditing = true;
+        SettingsAccordionActive = true;
+        _workspaceActivationPending = true;
+    }
+
     private readonly string _tabsId = RgfBaseComponent.GetNextId();
     private readonly string _panelId = RgfBaseComponent.GetNextId();
     private bool IsWorkspace => !Embedded && EntityParameters.ChartParameters.PresentationMode == RgfChartPresentationMode.Workspace;
+    private bool _workspaceHasConfiguration;
+    private bool _workspaceIsEditing;
+    private int _chartProcessingCount;
+    private bool IsChartProcessing => _chartProcessingCount > 0;
+
+    private void ChangeChartProcessing(int change)
+    {
+        _chartProcessingCount += change;
+        if (!_workspaceDisposed) StateHasChanged();
+    }
+
     private bool _workspaceActivationPending;
     private bool _workspaceDisposed;
     private Task<IJSObjectReference>? _workspaceModuleTask;
 
     protected override void OnInitialized()
     {
+        _workspaceHasConfiguration = IsWorkspace && InitialChartSettingsId > 0;
         base.OnInitialized();
         EntityParameters.ChartParameters.EventDispatcher.Subscribe(RgfChartEventKind.LayoutCommitted, OnLayoutCommittedAsync, this);
         EntityParameters.ChartParameters.EventDispatcher.Subscribe(RgfChartEventKind.WorkspaceActivated, OnWorkspaceActivatedAsync, this);
@@ -346,6 +461,10 @@
     private Task OnWorkspaceActivatedAsync(IRgfEventArgs<RgfChartEventArgs> args)
     {
         if (!IsWorkspace || _workspaceDisposed) return Task.CompletedTask;
+        if (args.Args.EventKind == RgfChartEventKind.Initialized && InitialChartSettingsId > 0)
+        {
+            _workspaceHasConfiguration = RgfChartRef?.ChartSettings.ChartSettingsId == InitialChartSettingsId;
+        }
         _workspaceActivationPending = true;
         return InvokeAsync(StateHasChanged);
     }
@@ -361,6 +480,59 @@
         }
     }
 
+    protected override async Task<bool> OnCreateChart()
+    {
+        if (IsWorkspace && !_workspaceHasConfiguration) return false;
+        ChangeChartProcessing(1);
+        try
+        {
+            return await base.OnCreateChart();
+        }
+        finally
+        {
+            ChangeChartProcessing(-1);
+        }
+    }
+
+    protected override async Task<bool> OnGetData()
+    {
+        ChangeChartProcessing(1);
+        try
+        {
+            return await base.OnGetData();
+        }
+        finally
+        {
+            ChangeChartProcessing(-1);
+        }
+    }
+
+    private async Task OnRedrawChartAsync()
+    {
+        ChangeChartProcessing(1);
+        try
+        {
+            await OnRedraw();
+        }
+        finally
+        {
+            ChangeChartProcessing(-1);
+        }
+    }
+
+    protected override async Task UpdateChart(bool suppressToast = false)
+    {
+        ChangeChartProcessing(1);
+        try
+        {
+            await base.UpdateChart(suppressToast);
+        }
+        finally
+        {
+            ChangeChartProcessing(-1);
+        }
+    }
+
     protected override void OnTabActivated(RecroChartTab tab)
     {
         base.OnTabActivated(tab);
@@ -371,7 +543,7 @@
     {
         if (IsWorkspace)
         {
-            if (_workspaceDisposed || EntityParameters.DisplayMode != RfgDisplayMode.Chart) return;
+            if (_workspaceDisposed || !_workspaceHasConfiguration || EntityParameters.DisplayMode != RfgDisplayMode.Chart) return;
             _selfRef ??= DotNetObjectReference.Create<BaseChartComponent>(this);
             // Import the same standalone asset in Debug and Release.
             _workspaceModuleTask ??= _jsRuntime.InvokeAsync<IJSObjectReference>("import",
@@ -433,7 +605,7 @@
     {
         if (IsWorkspace)
         {
-            if (_workspaceDisposed || EntityParameters.DisplayMode != RfgDisplayMode.Chart ||
+            if (_workspaceDisposed || !_workspaceHasConfiguration || EntityParameters.DisplayMode != RfgDisplayMode.Chart ||
                 width <= 0 || height <= 0 || ActiveTabIndex != RecroChartTab.Chart || RgfChartRef == null) return;
             ApexChartSettings.Width = _chartSettings.Width ?? Math.Max(width - 2, 100);
             ApexChartSettings.Height = _chartSettings.Height ?? Math.Max(height - 50, 100);

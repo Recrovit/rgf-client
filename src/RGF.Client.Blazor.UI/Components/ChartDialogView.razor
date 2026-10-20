@@ -1,0 +1,37 @@
+@* RGF-DOC: rgf.client.blazor-ui.entity-ui *@
+@inject IRecroDictService RecroDict
+
+@SettingsContent
+@ChartContent
+@if (ShowControls && FooterContent != null && Chart != null)
+{
+    <div class="d-flex flex-wrap justify-content-between align-items-center">
+        <div class="btn-group d-flex flex-grow-1" role="group">
+            <div class="rg-predef-name input-group input-group-sm">
+                <RgfComboBox TValue="int?" Value="@Chart.ChartSettings.ChartSettingsId" Text="@Chart.ChartSettings.SettingsName" AllowCustom="true"
+                             Tooltip="@RecroDict.GetRgfUiString("SavedName")"
+                             DataSource="Chart.ChartSettingList.Select(e => new KeyValuePair<int?, string>(e.ChartSettingsId, e.SettingsName)).OrderBy(e => e.Value)"
+                             InputChanged="OnSelected" />
+            </div>
+            @SaveContent
+        </div>
+    </div>
+    <div class="d-flex flex-wrap justify-content-end align-items-center">
+        <div id="gombok" class="d-flex">
+            @FooterContent
+            <div class="p-1">
+                <RgfButton CssClass="btn-secondary" MinWidth="5rem" Label="@RecroDict.GetRgfUiString("Close")" OnClick="Chart.OnClose" />
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public RgfChartComponent? Chart { get; set; }
+    [Parameter] public bool ShowControls { get; set; }
+    [Parameter] public EventCallback<KeyValuePair<object?, string>> OnSelected { get; set; }
+    [Parameter] public RenderFragment? SettingsContent { get; set; }
+    [Parameter] public RenderFragment? ChartContent { get; set; }
+    [Parameter] public RenderFragment? FooterContent { get; set; }
+    [Parameter] public RenderFragment? SaveContent { get; set; }
+}

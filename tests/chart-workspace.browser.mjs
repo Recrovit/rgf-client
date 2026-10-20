@@ -12,14 +12,15 @@ const apexSource = await readFile(process.env.RGF_APEXCHARTS_ESM ?? join(process
     '.nuget/packages/blazor-apexcharts/7.0.0/staticwebassets/js/apexcharts.esm.js'));
 const html = `<!doctype html><html><head><meta charset="utf-8"><style>
 body{margin:0} #entity{margin:20px;width:1000px} .toolbar{height:40px}
-.rgf-apexchart-settings{height:120px} .rgf-apexchart-header{height:40px}
-.footer{height:40px} .rgf-entity-chart{width:100%;min-height:400px}
+.rgf-chart-workspace-toolbar{height:48px} .rgf-apexchart-settings{height:120px} .rgf-apexchart-header{height:40px}
+.rgf-entity-chart{width:100%;min-height:400px}
 </style></head><body><main id="entity"><div class="toolbar"><button id="toggle">Chart</button></div>
 <div id="grid"><input id="selection" value="retained selection"></div>
 <div class="rgf-entity-chart" style="display:none"><div class="rgf-chart-workspace">
+<div class="rgf-chart-workspace-toolbar">Saved settings / New / Copy / Edit</div>
 <div class="rgf-apexchart-settings">Settings</div><div id="chart">
 <div class="rgf-apexchart-header">Chart / DataSet</div><div id="apex"></div></div>
-<div class="footer">Create / DataSet / Save / Delete</div></div></div></main>
+</div></div></main>
 <script type="module">
 import * as sizing from '/module.js'; import ApexCharts from '/apex.js';
 window.sizing=sizing;window.ApexCharts=ApexCharts;window.calls=[];window.creations=0;window.errors=[];
@@ -79,6 +80,10 @@ try {
     await evaluate('show()'); await delay(400);
     assert.equal(await evaluate('creations'), 1, JSON.stringify(await evaluate('({calls,errors,style:getComputedStyle(document.querySelector(".rgf-entity-chart")).display})')));
     assert.ok(await evaluate("document.querySelector('#apex svg').getBoundingClientRect().width > 900"));
+    const initialHeight = await evaluate('calls.at(-1).height');
+    await evaluate("document.querySelector('.rgf-chart-workspace-toolbar').style.height='96px'"); await delay(400);
+    assert.equal(await evaluate('calls.at(-1).height'), initialHeight - 48, 'toolbar height is deducted from available chart space');
+    assert.equal(await evaluate('creations'), 1, 'toolbar resize retains ApexCharts instance');
     const firstCalls = await evaluate('calls.length');
     await evaluate('hide()');
     await cdp('Emulation.setDeviceMetricsOverride', { width: 900, height: 700, deviceScaleFactor: 1, mobile: false });

@@ -14,7 +14,7 @@ export async function activate(containerId, chartRef) {
             const width = Math.floor(host.getBoundingClientRect().width);
             const top = host.getBoundingClientRect().top;
             const settings = host.querySelector('.rgf-apexchart-settings');
-            const footer = host.querySelector('.rgf-chart-workspace')?.lastElementChild;
+            const toolbar = host.querySelector('.rgf-chart-workspace-toolbar');
             const header = container.querySelector('.rgf-apexchart-header');
             let bottom = window.innerHeight;
             for (let ancestor = host.parentElement; ancestor; ancestor = ancestor.parentElement) {
@@ -24,7 +24,7 @@ export async function activate(containerId, chartRef) {
             }
             const height = Math.max(250, Math.floor(bottom - Math.max(0, top)
                 - (settings?.getBoundingClientRect().height || 0)
-                - (footer === container ? 0 : footer?.getBoundingClientRect().height || 0)
+                - (toolbar?.getBoundingClientRect().height || 0)
                 - (header?.getBoundingClientRect().height || 0) - 24));
             if (width <= 0 || (width === state.width && height === state.height)) return;
             if (state.pending) { state.schedule(); return; }

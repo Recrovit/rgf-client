@@ -25,6 +25,93 @@ public sealed class RgfChartComponentTests
 {
     private const string CardRequiresSingleAggregateMessage = "Card charts require exactly one aggregate and do not support additional grouping.";
 
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task CreateChartSettings_ResetsIdentityAndValidation_AndPersistsOnlyOnSave(bool copyCurrent, bool allowPublic)
+    {
+        using var context = CreateTestContext();
+        var entity = CreateEntityParameters(new RgfEntity
+        {
+            EntityId = 1, EntityName = "Orders", EntityVersion = "1", MenuTitle = "Orders", Title = "Orders",
+            Permissions = new RgfPermissions(allowPublic), Properties = []
+        }, (session, description) => new FakeRgManager(session, description)
+        {
+            SavedChartSettingsResult = new() { ChartSettingsId = 42 }
+        });
+        var cut = RenderChartComponent(context, entity);
+        var chart = cut.Instance;
+        var defaults = RgfChartSettings.DeepCopy(chart.ChartSettings)!;
+        var original = chart.ChartSettings;
+        original.ChartSettingsId = 7;
+        original.ExportKey = "stable-original-key";
+        original.SettingsName = "Original";
+        original.RoleId = "Managers";
+        original.IsReadonly = true;
+        original.Remark = "Remark";
+        original.SeriesType = RgfChartSeriesType.Card;
+        original.Width = 640;
+        original.AggregationSettings.Take = 5;
+        original.ParentGridSettings = new() { SQLTimeout = 67, Conditions = [new() { Id = 1, Param1 = "saved" }] };
+        chart.ChartSettingList.Add(RgfChartSettings.DeepCopy(original)!);
+        var oldContext = chart.EditContext;
+        chart.MessageStore.Add(new Microsoft.AspNetCore.Components.Forms.FieldIdentifier(oldContext.Model, "SeriesType"), "Old validation error");
+
+        await cut.InvokeAsync(() => chart.CreateChartSettings(copyCurrent));
+        var draft = chart.ChartSettings;
+        Assert.NotSame(original, draft);
+        Assert.NotSame(oldContext, chart.EditContext);
+        Assert.Same(draft, chart.EditContext.Model);
+        Assert.Empty(chart.EditContext.GetValidationMessages());
+        Assert.True(chart.EditContext.Validate());
+        Assert.Null(draft.ChartSettingsId);
+        Assert.Null(draft.ExportKey);
+        Assert.False(draft.IsReadonly);
+        Assert.Equal(copyCurrent && allowPublic ? "Managers" : null, draft.RoleId);
+        Assert.Equal(RgfProcessingStatus.Invalid, chart.DataStatus);
+        Assert.Equal(RgfProcessingStatus.Invalid, chart.ChartStatus);
+        Assert.Single(chart.ChartSettingList);
+        var manager = (FakeRgManager)entity.Manager!;
+        Assert.Equal(0, manager.SaveChartSettingsCalls);
+        if (copyCurrent)
+        {
+            Assert.Equal(original.SeriesType, draft.SeriesType);
+            Assert.Equal(original.Remark, draft.Remark);
+            Assert.Equal(640, draft.Width);
+            Assert.Equal(5, draft.AggregationSettings.Take);
+            Assert.Equal("saved", Assert.Single(draft.ParentGridSettings!.Conditions!).Param1?.ToString());
+            draft.AggregationSettings.Columns[0].Sort = -1;
+            draft.ParentGridSettings.Conditions![0].Param1 = "changed";
+            Assert.Equal(0, original.AggregationSettings.Columns[0].Sort);
+            Assert.Equal("saved", original.ParentGridSettings.Conditions![0].Param1?.ToString());
+        }
+        else
+        {
+            Assert.Equal(defaults.SeriesType, draft.SeriesType);
+            Assert.Equal(defaults.ShowDataLabels, draft.ShowDataLabels);
+            Assert.Equal("Count", Assert.Single(draft.AggregationSettings.Columns).Aggregate);
+            Assert.Empty(draft.SettingsName);
+            Assert.Null(draft.ParentGridSettings);
+            Assert.Null(draft.Width);
+            Assert.Null(draft.Remark);
+        }
+        draft.RoleId = null;
+        draft.SettingsName = "Draft";
+        Assert.True(await chart.SaveChartSettingsAsync());
+        Assert.Equal(1, manager.SaveChartSettingsCalls);
+        Assert.Equal(42, draft.ChartSettingsId);
+        Assert.Equal(2, chart.ChartSettingList.Count);
+        Assert.Equal(7, original.ChartSettingsId);
+        Assert.Equal("stable-original-key", original.ExportKey);
+        Assert.True(original.IsReadonly);
+        await cut.InvokeAsync(async () => Assert.True(await chart.DeleteChartSettingsAsync()));
+        Assert.Equal(42, manager.DeletedChartSettingsId);
+        Assert.Equal(7, Assert.Single(chart.ChartSettingList).ChartSettingsId);
+        Assert.Null(draft.ChartSettingsId);
+    }
+
     [Fact]
     public void AllowedProperties_IncludeAutoExternal_AndAggregateSelectorsRespectNumericAndDateRules()
     {
@@ -550,6 +637,8 @@ public sealed class RgfChartComponentTests
     private sealed class FakeRgManager(RgfSessionParams sessionParams, RgfEntity entityDesc) : IRgManager
     {
         public RgfChartSettings? SavedChartSettingsResult { get; set; }
+        public int SaveChartSettingsCalls { get; private set; }
+        public int? DeletedChartSettingsId { get; private set; }
 
         public RgfSessionParams SessionParams { get; } = sessionParams;
 
@@ -600,8 +689,15 @@ public sealed class RgfChartComponentTests
         public Task<bool> DeleteGridSettingsAsync(int gridSettingsId) => throw new NotSupportedException();
         public Task<List<RgfChartSettings>> GetChartSettingsListAsync() => Task.FromResult(new List<RgfChartSettings>());
         public Task<RgfChartSettings?> SaveChartSettingsAsync(RgfChartSettings settings, bool recreate = false)
-            => Task.FromResult(SavedChartSettingsResult);
-        public Task<bool> DeleteChartSettingsAsync(int chartSettingsId) => throw new NotSupportedException();
+        {
+            SaveChartSettingsCalls++;
+            return Task.FromResult(SavedChartSettingsResult);
+        }
+        public Task<bool> DeleteChartSettingsAsync(int chartSettingsId)
+        {
+            DeletedChartSettingsId = chartSettingsId;
+            return Task.FromResult(true);
+        }
         public RgfGridRequest CreateGridRequest(Action<RgfGridRequest>? create = null)
         {
             var request = RgfGridRequest.Create(SessionParams);

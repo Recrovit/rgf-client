@@ -55,7 +55,7 @@ public partial class RgfChartComponent : ComponentBase, IDisposable
 
     private RgfChartParameters ChartParameters => EntityParameters.ChartParameters;
 
-    public RgfChartSettings ChartSettings { get; set; } = new() { ShowDataLabels = true };
+    public RgfChartSettings ChartSettings { get; set; } = CreateDefaultChartSettings();
 
     public List<RgfChartSettings> ChartSettingList { get; private set; } = [];
 
@@ -92,8 +92,6 @@ public partial class RgfChartComponent : ComponentBase, IDisposable
         if (_disposed) return;
 
         RebuildAllowedProperties();
-
-        ChartSettings.AggregationSettings.Columns = new List<RgfAggregationColumn> { new() { Id = 0, Aggregate = "Count" } };
 
         ResetEditContext();
 
@@ -598,6 +596,25 @@ public partial class RgfChartComponent : ComponentBase, IDisposable
         return false;
     }
 
+    /// <summary>Starts an unsaved chart using the initial defaults or an independent copy of the current settings.</summary>
+    /// <param name="copyCurrent">Whether to preserve the current chart configuration instead of using defaults.</param>
+    public void CreateChartSettings(bool copyCurrent = false)
+    {
+        ChartSettings = copyCurrent
+            ? RgfChartSettings.DeepCopy(ChartSettings)!
+            : CreateDefaultChartSettings();
+        ChartSettings.ChartSettingsId = null;
+        ChartSettings.ExportKey = null;
+        ChartSettings.IsReadonly = false;
+        if (!IsPublicChartSettingAllowed)
+        {
+            ChartSettings.RoleId = null;
+        }
+        _pendingParentRefresh = false;
+        ResetEditContext();
+        SetDataStatus(RgfProcessingStatus.Invalid);
+    }
+
     public virtual async Task<bool> SaveChartSettingsAsync()
     {
         var res = await Manager.SaveChartSettingsAsync(ChartSettings);
@@ -729,6 +746,15 @@ public partial class RgfChartComponent : ComponentBase, IDisposable
     }
 
     private static bool IsNumericAggregationProperty(RgfProperty property) => property.ListType == PropertyListType.Numeric || property.ClientDataType.IsNumeric();
+
+    private static RgfChartSettings CreateDefaultChartSettings() => new()
+    {
+        ShowDataLabels = true,
+        AggregationSettings = new()
+        {
+            Columns = [new() { Id = 0, Aggregate = "Count" }]
+        }
+    };
 
     private void ResetEditContext()
     {

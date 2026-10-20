@@ -61,7 +61,7 @@
 }
 
 .card-body {
-    padding-bottom: 5px;
+    padding: 0px 0px 5px 0px;
 }
 
     .card-body.rgf-apexchart-card-body-embedded {
@@ -75,4 +75,22 @@
     min-width: 0;
     min-height: 0;
     box-sizing: border-box;
+}
+
+.rgf-chart-workspace-save > .rg-predef-save,
+.rgf-chart-workspace-save > .rgf-chart-workspace-data-actions {
+    display: contents;
+}
+
+.rgf-chart-workspace-name {
+    max-width: 100%;
+}
+
+.rgf-chart-workspace-name ::deep input {
+    max-width: 100%;
+}
+
+.rgf-chart-workspace-save > .rg-predef-save > div,
+.rgf-chart-workspace-data-actions > div {
+    flex-shrink: 0;
 }

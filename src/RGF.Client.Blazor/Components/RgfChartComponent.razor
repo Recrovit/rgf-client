@@ -4,7 +4,14 @@
 {
     @if (IsWorkspace && !_contentReady)
     {
-        <p><em>@_recroDict.GetRgfUiString("Loading")</em></p>
+        @if (RgfBlazorConfiguration.TryGetComponentType(RgfBlazorConfiguration.ComponentType.LoadingIndicator, out var componentType))
+        {
+            <DynamicComponent Type="@componentType" Parameters="@(new Dictionary<string, object> { ["LoadingIndicatorParameters"] = new RgfLoadingIndicatorParameters { Text = _recroDict.GetRgfUiString("Loading") } })" />
+        }
+        else
+        {
+            <p><em>@_recroDict.GetRgfUiString("Loading")</em></p>
+        }
     }
     else if (IsWorkspace)
     {

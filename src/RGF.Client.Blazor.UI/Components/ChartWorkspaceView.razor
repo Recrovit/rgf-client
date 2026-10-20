@@ -1,0 +1,43 @@
+@* RGF-DOC: rgf.client.blazor-ui.entity-ui *@
+@inject IRecroDictService RecroDict
+
+@if (ShowControls && Chart != null)
+{
+    <div class="rgf-chart-workspace-toolbar d-flex flex-wrap align-items-center gap-2 p-2">
+        <RgfComboBox TValue="int?" Value="@(HasConfiguration ? Chart.ChartSettings.ChartSettingsId : null)"
+                     ValueExpression="() => Chart.ChartSettings.ChartSettingsId"
+                     ValueChanged="OnSelected" IncludeEmptyItem="true" Width="auto" Disabled="IsProcessing"
+                     Tooltip="@RecroDict.GetRgfUiString("SavedName")"
+                     DataSource="Chart.ChartSettingList.Select(e => new KeyValuePair<int?, string>(e.ChartSettingsId, e.SettingsName)).OrderBy(e => e.Value)" />
+        <RgfButton IconName="bi-plus-lg" CssClass="btn-outline-secondary" Tooltip="@RecroDict.GetRgfUiString("New")" OnClick="() => OnNew.InvokeAsync()" />
+        <RgfButton IconName="bi-copy" CssClass="btn-outline-secondary" Tooltip="@RecroDict.GetRgfUiString("Copy")" Disabled="@(!HasConfiguration)" OnClick="() => OnCopy.InvokeAsync()" />
+        <RgfButton IconName="bi-pencil" CssClass="@(IsEditing ? "btn-success" : "btn-outline-secondary")" Tooltip="@RecroDict.GetRgfUiString("Modify")"
+                   Disabled="@(!HasConfiguration || Chart.ChartSettings.IsReadonly == true)" OnClick="() => OnEdit.InvokeAsync()" />
+        <RgfButton IconName="bi-arrow-clockwise" CssClass="btn-outline-secondary" Tooltip="@RecroDict.GetRgfUiString("Redraw")"
+                   Disabled="@(!HasConfiguration || IsProcessing || Chart.ChartStatus != RgfProcessingStatus.Valid)" OnClick="() => OnRedraw.InvokeAsync()" />
+    </div>
+}
+@if (SettingsContent != null || ChartContent != null)
+{
+    <div class="rgf-chart-workspace-content" hidden="@(!HasConfiguration)">
+        @if (IsEditing)
+        {
+            @SettingsContent
+        }
+        @ChartContent
+    </div>
+}
+@code {
+    [Parameter] public RgfChartComponent? Chart { get; set; }
+    [Parameter] public bool ShowControls { get; set; }
+    [Parameter] public bool HasConfiguration { get; set; }
+    [Parameter] public bool IsEditing { get; set; }
+    [Parameter] public bool IsProcessing { get; set; }
+    [Parameter] public EventCallback<int?> OnSelected { get; set; }
+    [Parameter] public EventCallback OnNew { get; set; }
+    [Parameter] public EventCallback OnCopy { get; set; }
+    [Parameter] public EventCallback OnEdit { get; set; }
+    [Parameter] public EventCallback OnRedraw { get; set; }
+    [Parameter] public RenderFragment? SettingsContent { get; set; }
+    [Parameter] public RenderFragment? ChartContent { get; set; }
+}

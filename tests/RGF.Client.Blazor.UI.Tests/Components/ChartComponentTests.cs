@@ -38,6 +38,11 @@ public sealed class ChartComponentTests
         var cut = context.Render<UiChartComponent>(parameters => parameters
             .Add(component => component.EntityParameters, entity)
             .Add(component => component.Embedded, embedded));
+        Assert.Single(cut.FindComponents<RgfChartComponent>());
+        Assert.Single(cut.FindComponents<ApexChartComponent>());
+        Assert.NotEmpty(cut.FindComponents<Recrovit.RecroGridFramework.Client.Blazor.UI.Components.ChartDialogView>());
+        Assert.Empty(cut.FindComponents<Recrovit.RecroGridFramework.Client.Blazor.UI.Components.ChartWorkspaceView>());
+        Assert.Empty(cut.FindAll(".rgf-chart-workspace-toolbar"));
         var chart = cut.FindComponent<RgfChartComponent>().Instance;
         var visualization = cut.FindComponent<ApexChartComponent>();
         var settings = visualization.Instance.ChartSettings;
@@ -61,6 +66,27 @@ public sealed class ChartComponentTests
         Assert.Equal("Saved configuration", chart.ChartSettings.SettingsName);
         Assert.Equal(type, chart.ChartSettings.SeriesType);
         Assert.Equal("Count", Assert.Single(chart.ChartSettings.AggregationSettings.Columns).Aggregate);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ChartComponent_DataOnlyRendersDatasetWithoutChartViews(bool embedded)
+    {
+        using var context = CreateTestContext();
+        var entity = CreateEntityParameters();
+        entity.DialogTemplate = parameters => parameters.Content;
+        var cut = context.Render<UiChartComponent>(parameters => parameters
+            .Add(component => component.EntityParameters, entity)
+            .Add(component => component.Embedded, embedded)
+            .Add(component => component.DataOnly, true)
+            .Add(component => component.HideChartControls, true));
+        Assert.Single(cut.FindComponents<RgfChartComponent>());
+        Assert.Single(cut.FindComponents<FakeEntityHostComponent>());
+        Assert.Empty(cut.FindComponents<ApexChartComponent>());
+        Assert.Empty(cut.FindComponents<Recrovit.RecroGridFramework.Client.Blazor.UI.Components.ChartDialogView>());
+        Assert.Empty(cut.FindComponents<Recrovit.RecroGridFramework.Client.Blazor.UI.Components.ChartWorkspaceView>());
+        Assert.Empty(cut.FindAll(".rgf-apexchart-settings"));
     }
 
     [Fact]

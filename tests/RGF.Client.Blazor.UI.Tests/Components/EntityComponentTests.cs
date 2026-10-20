@@ -1,4 +1,4 @@
-using Bunit;
+﻿using Bunit;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.DependencyInjection;
 using Recrovit.RecroGridFramework.Abstraction.Contracts.API;
@@ -21,6 +21,92 @@ namespace Recrovit.RecroGridFramework.Client.Blazor.UI.Tests.Components;
 [Collection(RgfBlazorUiStaticStateCollection.Name)]
 public sealed class EntityComponentTests
 {
+    [Fact]
+    public async Task WorkspaceChart_DraftActionsRetainOneControllerAndRenderer_AndOpenExistingEditor()
+    {
+        using var context = CreateTestContext(true);
+        var entity = CreateEntityParameters(RfgDisplayMode.Grid);
+        entity.ChartParameters.SupportsWorkspace = true;
+        var cut = RenderWorkspace(context, entity, standardChart: true);
+        await cut.InvokeAsync(() => ChartCommand(entity));
+        var chart = cut.FindComponent<RgfChartComponent>().Instance;
+        var renderer = cut.FindComponent<Recrovit.RecroGridFramework.Blazor.RgfApexCharts.Components.ApexChartComponent>().Instance;
+        Assert.True(cut.Find(".rgf-chart-workspace-content").HasAttribute("hidden"));
+        Assert.Empty(cut.FindAll(".rgf-apexchart-settings.accordion"));
+        Assert.Equal(string.Empty, cut.Find(".rgf-chart-workspace-toolbar select").GetAttribute("value") ?? string.Empty);
+        Assert.True(cut.Find(".rgf-chart-workspace-toolbar .bi-arrow-clockwise").ParentElement!.HasAttribute("disabled"));
+        Assert.True(cut.Find(".rgf-chart-workspace-toolbar .bi-copy").ParentElement!.HasAttribute("disabled"));
+        Assert.True(cut.Find(".rgf-chart-workspace-toolbar .bi-pencil").ParentElement!.HasAttribute("disabled"));
+        cut.Find(".rgf-chart-workspace-toolbar .bi-plus-lg").ParentElement!.Click();
+        Assert.False(cut.Find(".rgf-chart-workspace-content").HasAttribute("hidden"));
+        Assert.Single(cut.FindAll(".rgf-chart-workspace-toolbar .bi-arrow-clockwise"));
+        var editButton = cut.Find(".rgf-chart-workspace-toolbar .bi-pencil").ParentElement!;
+        Assert.NotNull(editButton.NextElementSibling!.QuerySelector(".bi-arrow-clockwise"));
+        Assert.Equal(2, cut.FindAll(".accordion-body .rgf-chart-workspace-data-actions button").Count);
+        Assert.Empty(cut.FindAll("#gombok"));
+        var source = RgfChartSettings.DeepCopy(chart.ChartSettings)!;
+        source.ChartSettingsId = 7;
+        source.ExportKey = "original-key";
+        source.SettingsName = "Original";
+        source.Remark = "Preserved remark";
+        source.SeriesType = RgfChartSeriesType.Card;
+        source.IsReadonly = true;
+        await cut.InvokeAsync(() =>
+        {
+            chart.ChartSettingList.Add(source);
+            chart.ChartSettings = RgfChartSettings.DeepCopy(source)!;
+        });
+        cut.Render();
+        Assert.Single(cut.FindAll(".rgf-chart-workspace-toolbar select"));
+        Assert.Empty(cut.FindAll(".rg-predef-name"));
+        Assert.True(cut.Find(".rgf-chart-workspace-toolbar .bi-pencil").ParentElement!.HasAttribute("disabled"));
+        Assert.True(cut.Find(".rgf-chart-workspace-save input").HasAttribute("disabled"));
+        Assert.True(cut.Find(".rgf-chart-workspace-save .bi-floppy").ParentElement!.HasAttribute("disabled"));
+        Assert.True(cut.Find(".rgf-chart-workspace-save .bi-trash").ParentElement!.HasAttribute("disabled"));
+        cut.Find(".accordion-button").Click();
+        Assert.Empty(cut.FindAll(".accordion-collapse.show"));
+
+        cut.Find(".rgf-chart-workspace-toolbar .bi-copy").ParentElement!.Click();
+        Assert.Null(chart.ChartSettings.ChartSettingsId);
+        Assert.Null(chart.ChartSettings.ExportKey);
+        Assert.False(chart.ChartSettings.IsReadonly);
+        Assert.Equal("Preserved remark", chart.ChartSettings.Remark);
+        Assert.Equal(RgfChartSeriesType.Card, chart.ChartSettings.SeriesType);
+        Assert.Single(cut.FindAll(".accordion-collapse.show"));
+        Assert.Single(chart.ChartSettingList);
+        Assert.False(cut.Find(".rgf-chart-workspace-save .bi-floppy").ParentElement!.HasAttribute("disabled"));
+        Assert.True(cut.Find(".rgf-chart-workspace-save .bi-trash").ParentElement!.HasAttribute("disabled"));
+        Assert.Equal(7, source.ChartSettingsId);
+        Assert.Equal("original-key", source.ExportKey);
+        Assert.True(source.IsReadonly);
+
+        cut.Find(".rgf-chart-workspace-toolbar .bi-plus-lg").ParentElement!.Click();
+        Assert.Empty(chart.ChartSettings.SettingsName);
+        Assert.Null(chart.ChartSettings.Remark);
+        Assert.Equal(RgfChartSeriesType.Bar, chart.ChartSettings.SeriesType);
+        Assert.Equal("Count", Assert.Single(chart.ChartSettings.AggregationSettings.Columns).Aggregate);
+        Assert.Same(chart.ChartSettings, chart.EditContext.Model);
+        Assert.True(chart.EditContext.Validate());
+        Assert.Single(chart.ChartSettingList);
+        cut.Find(".accordion-button").Click();
+        cut.Find(".rgf-chart-workspace-toolbar .bi-pencil").ParentElement!.Click();
+        Assert.Empty(cut.FindAll(".rgf-apexchart-settings.accordion"));
+        cut.Find(".rgf-chart-workspace-toolbar .bi-pencil").ParentElement!.Click();
+        Assert.Single(cut.FindAll(".accordion-collapse.show"));
+        Assert.Single(cut.FindComponents<RgfChartComponent>());
+        Assert.Same(chart, cut.FindComponent<RgfChartComponent>().Instance);
+        Assert.Same(renderer, cut.FindComponent<Recrovit.RecroGridFramework.Blazor.RgfApexCharts.Components.ApexChartComponent>().Instance);
+        Assert.Single(cut.FindAll(".rgf-chart-workspace-save .bi-floppy"));
+        Assert.Single(cut.FindAll(".rgf-chart-workspace-save .bi-trash"));
+        cut.Find(".rgf-chart-workspace-toolbar .bi-pencil").ParentElement!.Click();
+        Assert.Empty(cut.FindAll(".rgf-apexchart-settings.accordion"));
+        Assert.Empty(cut.FindAll(".rgf-chart-workspace-data-actions"));
+        Assert.Single(cut.FindAll(".rgf-chart-workspace-toolbar .bi-arrow-clockwise"));
+        Assert.Same(renderer, cut.FindComponent<Recrovit.RecroGridFramework.Blazor.RgfApexCharts.Components.ApexChartComponent>().Instance);
+        cut.Find(".rgf-chart-workspace-toolbar .bi-pencil").ParentElement!.Click();
+        Assert.Single(cut.FindAll(".rgf-apexchart-settings.accordion"));
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
@@ -35,10 +121,37 @@ public sealed class EntityComponentTests
         var chart = cut.FindComponent<RgfChartComponent>().Instance;
         var api = (PendingRgfApiService)context.Services.GetRequiredService<IRgfApiService>();
         await entity.Manager!.GetFilterHandlerAsync();
+        cut.Find(".rgf-chart-workspace-toolbar .bi-plus-lg").ParentElement!.Click();
         cut.FindAll("select").Single(select => select.QuerySelector("option[value='Card']") != null).Change("Card");
-        await cut.FindAll("button").Single(button => button.TextContent.Trim() == "CreateChart").ClickAsync(new());
+        cut.Find(".rgf-chart-workspace-toolbar .bi-pencil").ParentElement!.Click();
+        Assert.Empty(cut.FindAll(".rgf-apexchart-settings.accordion"));
+        var dataSetAction = cut.Find(".rgf-chart-workspace-dataset");
+        Assert.Contains("justify-content-start", dataSetAction.ClassList);
+        var dataSetButton = cut.Find(".rgf-chart-workspace-dataset button");
+        Assert.Equal("DataSet", dataSetButton.TextContent.Trim());
+        Assert.False(dataSetButton.HasAttribute("disabled"));
+        Assert.True(cut.Find(".rgf-chart-workspace-dataset-grid").HasAttribute("hidden"));
+        var dataGrid = cut.FindComponent<AggregateEntityHost>().Instance;
+        await dataSetButton.ClickAsync(new());
+        Assert.Equal(RgfProcessingStatus.Valid, chart.DataStatus);
+        Assert.Equal(RgfProcessingStatus.Invalid, chart.ChartStatus);
+        Assert.False(cut.Find(".rgf-chart-workspace-dataset-grid").HasAttribute("hidden"));
+        Assert.Same(dataGrid, cut.FindComponent<AggregateEntityHost>().Instance);
+        Assert.Single(api.ChartRequests);
+        Assert.Empty(cut.FindAll(".rgf-apexchart-card-view"));
+        Assert.Empty(cut.FindAll(".rgf-chart-workspace-create"));
+        Assert.Empty(cut.FindAll(".rgf-chart-workspace-dataset"));
+        Assert.Empty(cut.FindAll(".rgf-apexchart-settings.accordion"));
+        cut.FindAll(".rgf-apexchart-header button").Single(button => button.TextContent.Trim() == "Chart").Click();
+        Assert.Contains("justify-content-start", cut.Find(".rgf-chart-workspace-create").ClassList);
+        var createChartButton = cut.Find(".rgf-chart-workspace-create button");
+        Assert.Equal("CreateChart", createChartButton.TextContent.Trim());
+        Assert.False(createChartButton.HasAttribute("disabled"));
+        await createChartButton.ClickAsync(new());
         Assert.Equal(RgfProcessingStatus.Valid, chart.ChartStatus);
         Assert.Single(api.ChartRequests);
+        Assert.Single(cut.FindAll(".rgf-apexchart-card-view"));
+        Assert.Empty(cut.FindAll(".rgf-chart-workspace-create"));
 
         await cut.InvokeAsync(() => chart.ChartSettingList.Add(new()
         {
@@ -50,9 +163,10 @@ public sealed class EntityComponentTests
                 SQLTimeout = 67
             }
         }));
+        await cut.InvokeAsync(() => chart.ChartSettingList.Add(new() { ChartSettingsId = 8, SettingsName = "Other saved chart" }));
         cut.Render();
         var selection = cut.FindComponents<Recrovit.RecroGridFramework.Client.Blazor.UI.Components.Base.RgfComboBox<int?>>()
-            .Single(combo => combo.Instance.AllowCustom);
+            .Single(combo => combo.Instance.Width == "16rem");
         var sourceChanges = 0;
         entity.Manager.ListHandler.AggregateSourceChanged += () => sourceChanges++;
         var forwardedChanges = new List<bool>();
@@ -60,19 +174,30 @@ public sealed class EntityComponentTests
             args => { forwardedChanges.Add(args.Args.IsChartSettingsChange); });
         if (delayParentRefresh) api.GridResponseGate = new(TaskCreationOptions.RunContinuationsAsynchronously);
         var gridRequestsBefore = api.GridRequests.Count;
-        var loading = cut.InvokeAsync(() => selection.Instance.OnSelected("7"));
+        var loading = selection.Find("select").ChangeAsync(new() { Value = "7" });
         if (delayParentRefresh)
         {
             await api.GridResponseStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), Xunit.TestContext.Current.CancellationToken);
             await cut.InvokeAsync(async () => await Task.Delay(150));
-            Assert.False(loading.IsCompleted);
+            Assert.True(selection.Instance.Disabled);
+            Assert.True(cut.Find(".rgf-chart-workspace-toolbar .bi-arrow-clockwise").ParentElement!.HasAttribute("disabled"));
+            Assert.True(selection.Find("select").HasAttribute("disabled"));
+            await cut.InvokeAsync(() => selection.Instance.ValueChanged.InvokeAsync(8));
+            await cut.InvokeAsync(() => selection.Instance.ValueChanged.InvokeAsync(null));
+            Assert.False(cut.Find(".rgf-chart-workspace-content").HasAttribute("hidden"));
+            Assert.Equal(7, chart.ChartSettings.ChartSettingsId);
+            Assert.Equal(gridRequestsBefore + 1, api.GridRequests.Count);
             Assert.Single(api.ChartRequests);
             Assert.Equal(RgfProcessingStatus.Invalid, chart.ChartStatus);
             Assert.Empty(cut.FindAll(".rgf-apexchart-card-view"));
             api.GridResponseGate!.SetResult(true);
         }
         await loading;
+        cut.FindComponent<RgfChartComponent>().WaitForAssertion(() => Assert.Equal(RgfProcessingStatus.Valid, chart.ChartStatus), TimeSpan.FromSeconds(5));
         await cut.InvokeAsync(async () => await Task.Delay(100));
+        Assert.False(selection.Instance.Disabled);
+        Assert.False(cut.Find(".rgf-chart-workspace-toolbar .bi-arrow-clockwise").ParentElement!.HasAttribute("disabled"));
+        Assert.False(selection.Find("select").HasAttribute("disabled"));
         Assert.Equal(1, sourceChanges);
         Assert.Equal([true], forwardedChanges);
         Assert.Equal(gridRequestsBefore + 1, api.GridRequests.Count);
@@ -92,6 +217,26 @@ public sealed class EntityComponentTests
         Assert.Equal(71, api.ChartRequests[^1].ParentGridRequest.ListParam.SQLTimeout);
         Assert.Equal([true, false], forwardedChanges);
         Assert.Single(cut.FindAll(".rgf-apexchart-card-view"));
+        Assert.Empty(cut.FindAll(".rgf-apexchart-settings.accordion"));
+        cut.Find(".rgf-chart-workspace-toolbar .bi-pencil").ParentElement!.Click();
+        Assert.Single(cut.FindAll(".rgf-apexchart-settings.accordion"));
+        var renderer = cut.FindComponent<Recrovit.RecroGridFramework.Blazor.RgfApexCharts.Components.ApexChartComponent>().Instance;
+        await selection.Find("select").ChangeAsync(new() { Value = "" });
+        Assert.True(cut.Find(".rgf-chart-workspace-content").HasAttribute("hidden"));
+        Assert.Empty(cut.FindAll("#gombok"));
+        Assert.Empty(cut.FindAll(".rgf-chart-workspace-data-actions"));
+        Assert.Empty(cut.FindAll(".rgf-apexchart-settings.accordion"));
+        Assert.Equal(RgfProcessingStatus.Invalid, chart.ChartStatus);
+        var requestCount = api.ChartRequests.Count;
+        await cut.InvokeAsync(() => entity.Manager.ListHandler.ApplyFilterState([new() { Id = 1, Param1 = "after-clear" }], 73));
+        await cut.InvokeAsync(async () => await Task.Delay(100));
+        Assert.Equal(requestCount, api.ChartRequests.Count);
+        await selection.Find("select").ChangeAsync(new() { Value = "7" });
+        cut.WaitForAssertion(() => Assert.Equal(RgfProcessingStatus.Valid, chart.ChartStatus), TimeSpan.FromSeconds(5));
+        Assert.False(cut.Find(".rgf-chart-workspace-content").HasAttribute("hidden"));
+        Assert.Empty(cut.FindAll(".rgf-apexchart-settings.accordion"));
+        Assert.Same(renderer, cut.FindComponent<Recrovit.RecroGridFramework.Blazor.RgfApexCharts.Components.ApexChartComponent>().Instance);
+        Assert.Single(cut.FindComponents<RgfChartComponent>());
     }
 
     [Theory]
@@ -112,6 +257,7 @@ public sealed class EntityComponentTests
         await cut.InvokeAsync(async () => await Task.Delay(100));
         Assert.Empty(api.ChartRequests);
 
+        cut.Find(".rgf-chart-workspace-toolbar .bi-plus-lg").ParentElement!.Click();
         await cut.InvokeAsync(() =>
         {
             chart.ChartSettings.SettingsName = "Retained card";
@@ -121,11 +267,22 @@ public sealed class EntityComponentTests
         cut.WaitForAssertion(() => Assert.Equal(RgfProcessingStatus.Valid, chart.ChartStatus), TimeSpan.FromSeconds(5));
         Assert.Single(cut.FindAll(".rgf-apexchart-card-view"));
 
+        Assert.False(cut.Find(".rgf-chart-workspace-dataset-grid").HasAttribute("hidden"));
+        var dataGrid = cut.FindComponent<AggregateEntityHost>().Instance;
         var gate = api.ChartResponseGate = new(TaskCreationOptions.RunContinuationsAsynchronously);
         await cut.InvokeAsync(() => handler.ApplyFilterState([new() { Id = 1, Param1 = "first" }], 31));
         await api.WaitForChartRequestsAsync(2);
         Assert.Equal(RgfProcessingStatus.Invalid, chart.ChartStatus);
         Assert.Empty(cut.FindAll(".rgf-apexchart-card-view"));
+        var selection = cut.FindComponents<Recrovit.RecroGridFramework.Client.Blazor.UI.Components.Base.RgfComboBox<int?>>()
+            .Single(combo => combo.Instance.Width == "16rem");
+        Assert.True(selection.Instance.Disabled);
+        Assert.True(cut.Find(".rgf-chart-workspace-dataset-grid").HasAttribute("hidden"));
+        Assert.Same(dataGrid, cut.FindComponent<AggregateEntityHost>().Instance);
+        Assert.True(cut.Find(".rgf-chart-workspace-create button").HasAttribute("disabled"));
+        Assert.True(selection.Find("select").HasAttribute("disabled"));
+        await cut.InvokeAsync(() => selection.Instance.ValueChanged.InvokeAsync(null));
+        Assert.False(cut.Find(".rgf-chart-workspace-content").HasAttribute("hidden"));
         await cut.InvokeAsync(() =>
         {
             handler.ApplyFilterState([new() { Id = 1, Param1 = "second" }], 41);
@@ -153,6 +310,10 @@ public sealed class EntityComponentTests
             Assert.Single(cut.FindAll(".rgf-apexchart-card-view"));
         }
 
+        cut.WaitForAssertion(() => Assert.Equal(failLatest, cut.Find(".rgf-chart-workspace-dataset-grid").HasAttribute("hidden")), TimeSpan.FromSeconds(5));
+        Assert.Same(dataGrid, cut.FindComponent<AggregateEntityHost>().Instance);
+        cut.WaitForAssertion(() => Assert.False(selection.Instance.Disabled), TimeSpan.FromSeconds(5));
+        Assert.False(selection.Find("select").HasAttribute("disabled"));
         await cut.InvokeAsync(() => ChartCommand(entity));
         await cut.InvokeAsync(() => handler.ApplyFilterState([new() { Id = 1, Param1 = "hidden" }], 53));
         // Drain the deferred source notification before asserting that no query started.
@@ -261,7 +422,6 @@ public sealed class EntityComponentTests
             if (loading.IsCompleted) await loading;
             cut.WaitForAssertion(() => Assert.Equal(1, requests));
             if (loading.IsCompleted) await loading;
-            Assert.False(loading.IsCompleted);
             Assert.Equal("saved-filter", Assert.Single(entity.Manager.ListHandler.GetGridSettings().Conditions!).Param1?.ToString());
             api.GridResponseGate.SetResult(true);
             await loading;
