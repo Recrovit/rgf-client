@@ -820,7 +820,37 @@ try {
     assert.equal(await evaluate('usageListeners'), 2);
     await evaluate("document.querySelector('#usage-row-0').remove(); usage.dispose('usage-row-0')");
     assert.equal(await evaluate('usageListeners'), 0, 'disposal by stable ID also works after Blazor removes the DOM node');
-    console.log("PASS: usage/selector top layer, viewport bounds, focus, Escape, outside click, collapse/switch/dispose, long history resources, local dates, all dock/mobile modes, host isolation, persistence, dialog/toast stacking");
+    await evaluate(`document.querySelector('.chat-box').innerHTML = '<div class="message text-bg-secondary align-self-start">Choose a response</div><fieldset class="rgf-ai-choices align-self-start mt-2"><legend class="fs-6">Choose a response</legend>' + [0,1].map(i => '<label class="rgf-ai-choice card p-2 mb-2"><span class="d-flex align-items-start gap-2"><input id="reply-'+i+'" type="radio" class="form-check-input flex-shrink-0" name="replies"><span>'+('LongLocalizedChoice'.repeat(20))+'</span></span></label>').join('') + '<button type="button" class="btn btn-success" id="confirm-reply">Confirm response</button></fieldset>'`);
+    for (const [width, height] of [[1200,800], [390,700], [390,260]]) {
+        await viewport(width, height);
+        for (const mode of [0,1,2,3]) {
+            await layout({mode, isCollapsed:false, height:560, dockHeight:300});
+            await evaluate("document.querySelector('.rgf-ai-choices').scrollIntoView({block:'nearest'})");
+            const cards = await rect('.rgf-ai-choices'), panel = await rect('section');
+            assert.ok(cards.x >= panel.x && cards.right <= panel.right, 'continuation cards fit narrow dock/mobile panels');
+            assert.equal(await evaluate("document.querySelector('.rgf-ai-choices').scrollWidth <= document.querySelector('.rgf-ai-choices').clientWidth"), true, 'long localized choices wrap without horizontal overflow');
+        }
+    }
+    await viewport(1200,800);
+    await layout({mode:0, isCollapsed:false, height:560});
+    await evaluate("document.querySelector('#reply-0').focus()");
+    await cdp('Input.dispatchKeyEvent', {type:'keyDown',key:' ',code:'Space',windowsVirtualKeyCode:32,text:' '});
+    await cdp('Input.dispatchKeyEvent', {type:'keyUp',key:' ',code:'Space',windowsVirtualKeyCode:32});
+    assert.equal(await evaluate("document.querySelector('#reply-0').checked"), true, 'Space selects a native continuation radio');
+    await cdp('Input.dispatchKeyEvent', {type:'keyDown',key:'ArrowDown',code:'ArrowDown',windowsVirtualKeyCode:40});
+    await cdp('Input.dispatchKeyEvent', {type:'keyUp',key:'ArrowDown',code:'ArrowDown',windowsVirtualKeyCode:40});
+    assert.equal(await evaluate("document.querySelector('#reply-1').checked && !document.querySelector('#reply-0').checked"), true, 'arrow keys change the single selected response');
+    assert.equal(await evaluate("getComputedStyle(document.querySelector('#reply-1').closest('label')).outlineStyle"), 'solid', 'focused continuation card has a visible outline');
+    await cdp('Input.dispatchKeyEvent', {type:'keyDown',key:'Tab',code:'Tab',windowsVirtualKeyCode:9});
+    await cdp('Input.dispatchKeyEvent', {type:'keyUp',key:'Tab',code:'Tab',windowsVirtualKeyCode:9});
+    assert.equal(await evaluate('document.activeElement.id'), 'confirm-reply', 'Tab reaches separate confirmation after the radio group');
+    await evaluate("document.querySelector('#confirm-reply').onclick=()=>window.replyConfirmed=true");
+    await cdp('Input.dispatchKeyEvent', {type:'keyDown',key:'Enter',code:'Enter',windowsVirtualKeyCode:13,text:'\r'});
+    await cdp('Input.dispatchKeyEvent', {type:'keyUp',key:'Enter',code:'Enter',windowsVirtualKeyCode:13});
+    assert.equal(await evaluate('window.replyConfirmed'), true, 'Enter activates confirmation');
+    await evaluate("document.querySelector('.rgf-ai-choices').disabled=true");
+    assert.equal(await evaluate("[...document.querySelectorAll('.rgf-ai-choices input, .rgf-ai-choices button')].every(e=>e.matches(':disabled'))"), true, 'processing fieldset disables every native reply control');
+    console.log("PASS: continuation cards/keyboard, usage/selector top layer, viewport bounds, focus, Escape, outside click, collapse/switch/dispose, long history resources, local dates, all dock/mobile modes, host isolation, persistence, dialog/toast stacking");
     }
 } finally {
     socket?.close(); child.kill();

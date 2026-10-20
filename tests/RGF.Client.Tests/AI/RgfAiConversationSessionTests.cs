@@ -9,6 +9,62 @@ public sealed class RgfAiConversationSessionTests
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
+    public async Task Continuation_CommitsOnlyAcceptedReplyBeforeNextQuestion(bool separatePresentation)
+    {
+        var question = new RgfAiResponse { Success = true, WorkflowStatus = "WaitingForInput",
+            ConversationId = "id", ConversationToken = "token", Message = "Question" };
+        var state = new RgfAiConversationState();
+        state.ApplyResponse(question);
+        var completion = new TaskCompletionSource<RgfAiResponse>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var transport = new FakeTransport((_, _) => completion.Task);
+        var session = new RgfAiConversationSession(transport, state);
+        var instruction = "  exact code\t\n";
+        var display = separatePresentation ? "Localized answer" : instruction;
+        var turn = separatePresentation
+            ? session.SendWithPresentationAsync(instruction, display, cancellationToken: TestContext.Current.CancellationToken)
+            : session.SendAsync(instruction, cancellationToken: TestContext.Current.CancellationToken);
+        Assert.Same(question, Assert.Single(state.Messages));
+        var request = Assert.Single(transport.Requests);
+        Assert.Equal(instruction, request.CurrentUserMessage);
+        Assert.Equal("id", request.ConversationId);
+        Assert.Equal("token", request.ConversationToken);
+        var next = new RgfAiResponse { Success = true, WorkflowStatus = "WaitingForInput", Message = "Next question" };
+        completion.SetResult(next);
+        await turn;
+        Assert.Equal(new[] { "Question", display, "Next question" }, state.Messages.Select(m => m.Message));
+        Assert.Equal(new[] { RgfAiMessageRole.Assistant, RgfAiMessageRole.User, RgfAiMessageRole.Assistant }, state.Messages.Select(m => m.Role));
+        Assert.True(state.IsPendingWorkflow);
+    }
+
+    [Theory]
+    [InlineData("rejected")]
+    [InlineData("transport")]
+    [InlineData("cancelled")]
+    public async Task FailedContinuation_PreservesQuestionIdentityAndHistory(string failure)
+    {
+        var state = new RgfAiConversationState();
+        var question = new RgfAiResponse { Success = true, WorkflowStatus = "WaitingForInput",
+            ConversationId = "id", ConversationToken = "token", Message = "Question" };
+        state.ApplyResponse(question);
+        var transport = new FakeTransport((_, _) => failure switch
+        {
+            "transport" => Task.FromException<RgfAiResponse>(new IOException()),
+            "cancelled" => Task.FromException<RgfAiResponse>(new OperationCanceledException()),
+            _ => Task.FromResult(new RgfAiResponse { ErrorCode = "InvalidContinuationResponse", Message = "Choose again" })
+        });
+        var session = new RgfAiConversationSession(transport, state);
+        if (failure == "rejected") Assert.False((await session.SendAsync("rejected", cancellationToken: TestContext.Current.CancellationToken)).Success);
+        else await Assert.ThrowsAnyAsync<Exception>(() => session.SendAsync("rejected", cancellationToken: TestContext.Current.CancellationToken));
+        Assert.Same(question, Assert.Single(state.Messages));
+        Assert.Equal("id", state.ConversationId);
+        Assert.Equal("token", state.ConversationToken);
+        Assert.True(state.IsPendingWorkflow);
+        Assert.False(session.IsProcessing);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
     public async Task Send_ForwardsCurrentTurnAndAppliesResponse(bool display)
     {
         var response = new RgfAiResponse { Success = true, ConversationId = "id", ConversationToken = "token", Message = "answer" };

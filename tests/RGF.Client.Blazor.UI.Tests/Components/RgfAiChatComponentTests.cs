@@ -13,6 +13,150 @@ namespace Recrovit.RecroGridFramework.Client.Blazor.UI.Tests.Components;
 
 public sealed class RgfAiChatComponentTests
 {
+    private static RgfAiResponse Question(RgfAiResponseMode mode = RgfAiResponseMode.ChoiceOrText) => new()
+    {
+        Success = true, WorkflowStatus = "WaitingForInput", Message = "Which response?", ResponseMode = mode,
+        Choices = [new() { Code = "first", UserText = "Első válasz" }, new() { Code = "  second\t\n", UserText = "Második válasz" }]
+    };
+
+    [Theory]
+    [InlineData(RgfAiResponseMode.FreeText, false, false)]
+    [InlineData(RgfAiResponseMode.ChoiceOrText, true, false)]
+    [InlineData(RgfAiResponseMode.ChoiceOnly, true, true)]
+    public void ResponseModesControlCardsAndTextInput(RgfAiResponseMode mode, bool choices, bool textDisabled)
+    {
+        using var context = CreateContext();
+        var session = new RgfAiConversationSession(new TestTransport());
+        session.Conversation.ApplyResponse(Question(mode));
+        var cut = context.Render<RgfAiChatComponent>(p => p.Add(c => c.Session, session).Add(c => c.InputFooter, "<span>Footer</span>"));
+        Assert.Equal(choices ? 2 : 0, cut.FindAll("input[type=radio]").Count);
+        Assert.Equal(textDisabled, cut.Find("textarea").HasAttribute("disabled"));
+        Assert.Equal(textDisabled, cut.Find("[aria-label=Send]").HasAttribute("disabled"));
+        Assert.Contains("Footer", cut.Find(".rgf-ai-actions").TextContent);
+        Assert.Single(cut.FindAll(".message"));
+        if (choices)
+        {
+            Assert.True(cut.Find("fieldset button").HasAttribute("disabled"));
+            Assert.Equal(new[] { "Első válasz", "Második válasz" }, cut.FindAll(".rgf-ai-choice").Select(e => e.TextContent.Trim()));
+            Assert.Single(cut.FindAll("fieldset legend"));
+            Assert.Single(cut.FindAll("input[type=radio]").Select(e => e.GetAttribute("name")).Distinct());
+        }
+    }
+
+    [Fact]
+    public async Task ChoiceSelectionAndConfirmationUseOriginalCodeAndOnlyAcceptedDisplayText()
+    {
+        using var context = CreateContext();
+        var pending = new TaskCompletionSource<RgfAiResponse>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var transport = new TestTransport { Send = _ => pending.Task };
+        var session = new RgfAiConversationSession(transport);
+        session.Conversation.ApplyResponse(Question());
+        var cut = context.Render<RgfAiChatComponent>(p => p.Add(c => c.Session, session).Add(c => c.AllowCancellation, true));
+        cut.FindAll("input[type=radio]")[0].Change(true);
+        Assert.Single(cut.FindAll(".rgf-ai-choice.border-primary"));
+        cut.FindAll("input[type=radio]")[1].Change(true);
+        Assert.False(cut.FindAll("input[type=radio]")[0].HasAttribute("checked"));
+        Assert.True(cut.FindAll("input[type=radio]")[1].HasAttribute("checked"));
+        Assert.Equal("Második válasz", cut.Find(".rgf-ai-choice.border-primary").TextContent.Trim());
+        Assert.Empty(transport.Requests);
+        Assert.Single(session.Conversation.Messages);
+        var turn = cut.Find("fieldset button").ClickAsync(new MouseEventArgs());
+        Assert.Equal("  second\t\n", Assert.Single(transport.Requests).CurrentUserMessage);
+        Assert.Single(session.Conversation.Messages);
+        Assert.All(cut.FindAll("input[type=radio], fieldset button, textarea, [aria-label=Send]"), e => Assert.True(e.HasAttribute("disabled")));
+        Assert.Single(cut.FindAll("[aria-label='Cancel request']"));
+        pending.SetResult(Response("Accepted"));
+        await turn;
+        Assert.Empty(cut.FindAll("fieldset"));
+        Assert.Equal(new[] { "Which response?", "Második válasz", "Accepted" }, cut.FindAll(".message").Select(e => e.TextContent.Trim()));
+        Assert.Single(cut.FindAll(".message.text-bg-primary"));
+        Assert.False(cut.Find("textarea").HasAttribute("disabled"));
+    }
+
+    [Theory]
+    [InlineData(RgfAiResponseMode.FreeText)]
+    [InlineData(RgfAiResponseMode.ChoiceOrText)]
+    public async Task FreeTextContinuationDefersHistoryAndRejectedInputLeavesQuestionUsable(RgfAiResponseMode mode)
+    {
+        using var context = CreateContext();
+        var pending = new TaskCompletionSource<RgfAiResponse>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var accept = false;
+        var session = new RgfAiConversationSession(new TestTransport { Send = _ => accept ? Task.FromResult(Response("Accepted")) : pending.Task });
+        session.Conversation.ApplyResponse(Question(mode));
+        var cut = context.Render<RgfAiChatComponent>(p => p.Add(c => c.Session, session));
+        cut.Find("textarea").Change("Rejected text");
+        var turn = cut.Find("[aria-label=Send]").ClickAsync(new MouseEventArgs());
+        Assert.Single(session.Conversation.Messages);
+        pending.SetResult(new() { ErrorCode = "InvalidContinuationResponse", Message = "<b>Choose a valid answer</b>" });
+        await turn;
+        Assert.Single(session.Conversation.Messages);
+        var alert = cut.Find("[role=alert]");
+        Assert.Equal("<b>Choose a valid answer</b>", alert.TextContent);
+        Assert.Empty(alert.Children);
+        Assert.False(cut.Find("textarea").HasAttribute("disabled"));
+        Assert.Equal(mode == RgfAiResponseMode.ChoiceOrText ? 2 : 0, cut.FindAll("input[type=radio]").Count);
+        accept = true;
+        cut.Find("textarea").Change("Accepted text");
+        await cut.Find("[aria-label=Send]").ClickAsync(new MouseEventArgs());
+        Assert.Empty(cut.FindAll("[role=alert], fieldset"));
+        Assert.Equal(new[] { "Which response?", "Accepted text", "Accepted" }, session.Conversation.Messages.Select(m => m.Message));
+    }
+
+    [Fact]
+    public async Task InvalidChoiceRemainsSelectableAndNewQuestionAndSessionClearSelection()
+    {
+        using var context = CreateContext();
+        var next = new RgfAiResponse { ErrorCode = "InvalidContinuationResponse", Message = "Choose again" };
+        var transport = new TestTransport { Send = _ => Task.FromResult(next) };
+        var session = new RgfAiConversationSession(transport);
+        session.Conversation.ApplyResponse(Question(RgfAiResponseMode.ChoiceOnly));
+        var cut = context.Render<RgfAiChatComponent>(p => p.Add(c => c.Session, session));
+        cut.FindAll("input[type=radio]")[1].Change(true);
+        await cut.Find("fieldset button").ClickAsync(new MouseEventArgs());
+        Assert.Single(session.Conversation.Messages);
+        Assert.Equal("Choose again", cut.Find("[role=alert]").TextContent);
+        Assert.False(cut.Find("fieldset").HasAttribute("disabled"));
+        Assert.False(cut.Find("fieldset button").HasAttribute("disabled"));
+        next = Question(RgfAiResponseMode.ChoiceOnly);
+        next.Message = "Next question";
+        cut.FindAll("input[type=radio]")[0].Change(true);
+        await cut.Find("fieldset button").ClickAsync(new MouseEventArgs());
+        Assert.Equal(new[] { "Which response?", "Első válasz", "Next question" }, session.Conversation.Messages.Select(m => m.Message));
+        Assert.Equal(2, cut.FindAll("input[type=radio]").Count);
+        Assert.Empty(cut.FindAll("input[checked]"));
+        Assert.True(cut.Find("fieldset button").HasAttribute("disabled"));
+        cut.FindAll("input[type=radio]")[0].Change(true);
+        var other = new RgfAiConversationSession(new TestTransport());
+        other.Conversation.ApplyResponse(Question());
+        cut.Render(p => p.Add(c => c.Session, other));
+        Assert.Empty(cut.FindAll("input[checked]"));
+        Assert.True(cut.Find("fieldset button").HasAttribute("disabled"));
+        Assert.Single(other.Conversation.Messages);
+        session.Conversation.Reset();
+        cut.Render(p => p.Add(c => c.Session, session));
+        Assert.Empty(cut.FindAll("fieldset, .message"));
+    }
+
+    [Fact]
+    public async Task ChoiceOnlyGuardsTextSendAndExternalProcessingDisablesChoices()
+    {
+        using var context = CreateContext();
+        var pending = new TaskCompletionSource<RgfAiResponse>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var transport = new TestTransport { Send = _ => pending.Task };
+        var session = new RgfAiConversationSession(transport);
+        session.Conversation.ApplyResponse(Question(RgfAiResponseMode.ChoiceOnly));
+        var cut = context.Render<RgfAiChatComponent>(p => p.Add(c => c.Session, session));
+        cut.Find("textarea").Change("Blocked text");
+        await cut.Find("[aria-label=Send]").ClickAsync(new MouseEventArgs());
+        Assert.Empty(transport.Requests);
+        var turn = session.SendAsync("first", cancellationToken: Xunit.TestContext.Current.CancellationToken);
+        cut.WaitForAssertion(() => Assert.True(cut.Find("fieldset").HasAttribute("disabled")));
+        Assert.All(cut.FindAll("input[type=radio], fieldset button, textarea, [aria-label=Send]"), e => Assert.True(e.HasAttribute("disabled")));
+        pending.SetResult(Response("Done"));
+        await turn;
+        cut.WaitForAssertion(() => Assert.Empty(cut.FindAll("fieldset")));
+    }
+
     [Theory]
     [InlineData("AiCredit.UserDisabled", false, true)]
     [InlineData("AiProviderNotConfigured", false, true)]

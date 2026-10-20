@@ -17,7 +17,7 @@ public partial class RgfAiChatComponent : IDisposable
     [Parameter]
     public EventCallback<Exception> SendFailed { get; set; }
 
-    /// <summary>Shows manual transport, workflow and cancellation alerts; defaults to false. Provider and supported Credit warnings remain visible.</summary>
+    /// <summary>Shows manual transport, workflow and cancellation alerts; defaults to false. Provider, supported Credit and invalid continuation warnings remain visible.</summary>
     [Parameter]
     public bool ShowSendErrors { get; set; }
 
@@ -35,6 +35,38 @@ public partial class RgfAiChatComponent : IDisposable
     private string? _sendError;
     private string? _errorKind;
     private RgfAiResponse? _failedResponse;
+    private RgfAiResponse? _choiceResponse;
+    private RgfAiChoice? _selectedChoice;
+
+    private RgfAiResponse? PendingResponse => Session.Conversation.IsPendingWorkflow
+        ? Session.Conversation.Messages.LastOrDefault() as RgfAiResponse : null;
+    private bool TextInputDisabled => Session.IsProcessing || PendingResponse?.ResponseMode == RgfAiResponseMode.ChoiceOnly;
+    private bool HasChoices => PendingResponse is { Choices.Count: > 0, ResponseMode:
+        RgfAiResponseMode.ChoiceOnly or RgfAiResponseMode.ChoiceOrText };
+
+    private void SynchronizeChoices()
+    {
+        var response = PendingResponse;
+        if (!ReferenceEquals(_choiceResponse, response))
+        {
+            _choiceResponse = response;
+            _selectedChoice = null;
+        }
+    }
+
+    private void SelectChoice(RgfAiResponse response, RgfAiChoice choice)
+    {
+        if (!Session.IsProcessing && HasChoices && ReferenceEquals(response, PendingResponse)
+            && response.Choices!.Contains(choice)) _selectedChoice = choice;
+    }
+
+    private Task ConfirmChoiceAsync()
+    {
+        if (Session.IsProcessing || !HasChoices || _selectedChoice is null
+            || !ReferenceEquals(_choiceResponse, PendingResponse)
+            || !PendingResponse!.Choices!.Contains(_selectedChoice)) return Task.CompletedTask;
+        return SendTurnAsync(_selectedChoice.Code, _selectedChoice.UserText);
+    }
 
     private static readonly HashSet<string> CreditErrorCodes = new(StringComparer.Ordinal)
     {
@@ -50,6 +82,7 @@ public partial class RgfAiChatComponent : IDisposable
 
     protected override void OnParametersSet()
     {
+        SynchronizeChoices();
         if (disposed || ReferenceEquals(Session, subscribedSession))
         {
             return;
@@ -60,6 +93,8 @@ public partial class RgfAiChatComponent : IDisposable
         }
         subscribedSession = Session;
         subscribedSession.StateChanged += OnSessionStateChanged;
+        _selectedChoice = null;
+        Prompt = string.Empty;
         ClearSendError();
     }
 
@@ -81,27 +116,33 @@ public partial class RgfAiChatComponent : IDisposable
                 if (!disposed && ReferenceEquals(Session, notifyingSession))
                 {
                     if (requestStarted) ClearSendError();
+                    SynchronizeChoices();
                     StateHasChanged();
                 }
             });
         }
     }
 
-    private async Task OnSendAsync()
+    private Task OnSendAsync()
     {
-        if (Session.IsProcessing || string.IsNullOrWhiteSpace(Prompt))
+        if (TextInputDisabled || string.IsNullOrWhiteSpace(Prompt))
         {
-            return;
+            return Task.CompletedTask;
         }
         var message = Prompt.Trim();
         Prompt = string.Empty;
+        return SendTurnAsync(message, message);
+    }
+
+    private async Task SendTurnAsync(string message, string presentationText)
+    {
         ClearSendError();
         var sendingSession = Session;
         using var cancellation = new CancellationTokenSource();
         _sendCancellation = cancellation;
         try
         {
-            var response = await sendingSession.SendAsync(message, cancellationToken: cancellation.Token);
+            var response = await sendingSession.SendWithPresentationAsync(message, presentationText, cancellationToken: cancellation.Token);
             if (disposed || !ReferenceEquals(Session, sendingSession)) return;
             if (!response.Success)
             {
@@ -109,12 +150,14 @@ public partial class RgfAiChatComponent : IDisposable
                 var providerMissing = response.ErrorCode == RgfAiErrorCodes.AiProviderNotConfigured;
                 var creditConfiguration = response.ErrorCode == "AiCredit.InvalidConfiguration";
                 var creditRejected = response.ErrorCode != null && CreditErrorCodes.Contains(response.ErrorCode);
-                _errorKind = providerMissing || creditConfiguration ? "configuration" : creditRejected ? "credit" : "workflow";
+                var invalidContinuation = response.ErrorCode == "InvalidContinuationResponse";
+                _errorKind = providerMissing || creditConfiguration ? "configuration" : creditRejected ? "credit"
+                    : invalidContinuation ? "continuation" : "workflow";
                 _sendError = creditConfiguration
                     ? "Recroby could not complete the request due to a configuration error. Please contact your system administrator."
                     : providerMissing
                     ? "No AI provider is configured. Configure an AI provider and model to use Recroby."
-                    : creditRejected && !string.IsNullOrWhiteSpace(response.Message)
+                    : (creditRejected || invalidContinuation) && !string.IsNullOrWhiteSpace(response.Message)
                     ? response.Message
                     : "The Recroby workflow could not complete the request.";
             }

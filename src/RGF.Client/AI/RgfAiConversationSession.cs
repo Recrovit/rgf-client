@@ -31,19 +31,36 @@ public sealed class RgfAiConversationSession
 
     /// <summary>Sends one turn and applies a successful response to the conversation state.</summary>
     /// <param name="instruction">Nonblank current instruction; it is forwarded without trimming.</param>
-    /// <param name="addToPresentationHistory">Whether to append the user instruction before sending; defaults to true.</param>
+    /// <param name="addToPresentationHistory">Whether to display the user instruction; pending workflow replies are appended only on success.</param>
     /// <param name="cancellationToken">Cancellation delegated to the transport.</param>
     /// <returns>The original response, including unsuccessful workflow responses.</returns>
     /// <remarks>Only one turn may run per session. Transport and notification exceptions propagate;
-    /// processing is cleared in finally. A displayed user message remains after failure or cancellation.
+    /// processing is cleared in finally. Ordinary displayed user messages remain after failure or cancellation;
+    /// pending workflow replies are displayed only after a successful response.
     /// Do not reset or mutate conversation state while sending.</remarks>
     /// <exception cref="ArgumentException">The instruction is empty or whitespace.</exception>
     /// <exception cref="ArgumentNullException">The instruction is null.</exception>
     /// <exception cref="InvalidOperationException">A turn is already running in this session.</exception>
-    public async Task<RgfAiResponse> SendAsync(string instruction, bool addToPresentationHistory = true,
+    public Task<RgfAiResponse> SendAsync(string instruction, bool addToPresentationHistory = true,
         CancellationToken cancellationToken = default)
+        => SendWithPresentationAsync(instruction, instruction, addToPresentationHistory, cancellationToken);
+
+    /// <summary>Sends an unchanged instruction with separate text for presentation history.</summary>
+    /// <param name="instruction">Nonblank transport value, forwarded without trimming or transformation.</param>
+    /// <param name="presentationText">Nonblank text displayed as the user's message instead of the transport value.</param>
+    /// <param name="addToPresentationHistory">Whether to display the user message.</param>
+    /// <param name="cancellationToken">Cancellation delegated to the transport.</param>
+    /// <returns>The original response, including unsuccessful workflow responses.</returns>
+    /// <remarks>Pending workflow replies enter history only on success, immediately before the assistant response.
+    /// All other lifecycle, notification and exception behavior matches SendAsync.</remarks>
+    /// <exception cref="ArgumentException">The instruction or presentation text is empty or whitespace.</exception>
+    /// <exception cref="ArgumentNullException">The instruction or presentation text is null.</exception>
+    /// <exception cref="InvalidOperationException">A turn is already running in this session.</exception>
+    public async Task<RgfAiResponse> SendWithPresentationAsync(string instruction, string presentationText,
+        bool addToPresentationHistory = true, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(instruction);
+        ArgumentException.ThrowIfNullOrWhiteSpace(presentationText);
         if (Interlocked.CompareExchange(ref processing, 1, 0) != 0)
         {
             throw new InvalidOperationException("An AI turn is already running in this conversation session.");
@@ -51,13 +68,18 @@ public sealed class RgfAiConversationSession
 
         try
         {
-            if (addToPresentationHistory)
+            var deferUserMessage = Conversation.IsPendingWorkflow;
+            if (addToPresentationHistory && !deferUserMessage)
             {
-                Conversation.AddUserMessage(instruction);
+                Conversation.AddUserMessage(presentationText);
             }
             StateChanged?.Invoke();
             var request = Conversation.CreateRequest(instruction);
             var response = await transport.SendAsync(request, cancellationToken);
+            if (addToPresentationHistory && deferUserMessage && response.Success)
+            {
+                Conversation.AddUserMessage(presentationText);
+            }
             Conversation.ApplyResponse(response);
             StateChanged?.Invoke();
             return response;

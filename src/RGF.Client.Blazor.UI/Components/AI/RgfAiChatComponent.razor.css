@@ -15,6 +15,27 @@
     word-wrap: break-word;
 }
 
+.rgf-ai-choices {
+    width: 100%;
+    min-width: 0;
+    max-width: 36rem;
+}
+
+.rgf-ai-choice {
+    cursor: pointer;
+    overflow-wrap: anywhere;
+}
+
+    .rgf-ai-choice:focus-within {
+        outline: 2px solid var(--bs-primary, #0d6efd);
+        outline-offset: 2px;
+    }
+
+.rgf-ai-choices:disabled .rgf-ai-choice {
+    cursor: default;
+    opacity: .65;
+}
+
 .rgf-ai-actions {
     display: flex;
     flex-wrap: wrap;

@@ -11,6 +11,25 @@
             @if (message.Role == RgfAiMessageRole.Assistant && message is RgfAiResponse response)
             {
                 <RgfAiUsageSummary @key="(Session, messageIndex, response)" Response="response" />
+                @if (HasChoices && ReferenceEquals(response, PendingResponse))
+                {
+                    <fieldset class="rgf-ai-choices align-self-start mt-2" disabled="@Session.IsProcessing">
+                        <legend class="fs-6">Choose a response</legend>
+                        @foreach (var choice in response.Choices!)
+                        {
+                            <label class="rgf-ai-choice card p-2 mb-2 @(ReferenceEquals(_selectedChoice, choice) ? "border-primary bg-primary-subtle" : "")">
+                                <span class="d-flex align-items-start gap-2">
+                                    <input type="radio" class="form-check-input flex-shrink-0" name="@(InputId + "-choices")"
+                                           checked="@ReferenceEquals(_selectedChoice, choice)" disabled="@Session.IsProcessing"
+                                           @onchange="() => SelectChoice(response, choice)" />
+                                    <span>@choice.UserText</span>
+                                </span>
+                            </label>
+                        }
+                        <button type="button" class="btn btn-success" disabled="@(Session.IsProcessing || _selectedChoice is null)"
+                                @onclick="ConfirmChoiceAsync">Confirm response</button>
+                    </fieldset>
+                }
             }
         }
         @if (Session.IsProcessing)
@@ -27,7 +46,7 @@
         }
     </div>
     <div class="input-group mt-3">
-        <RgfInputText Id="@InputId" @bind-Value="Prompt" Multiline="true" />
+        <RgfInputText Id="@InputId" @bind-Value="Prompt" Multiline="true" Disabled="TextInputDisabled" />
     </div>
     @if (InputFooter is null)
     {
@@ -40,9 +59,9 @@
             @InputFooter
         </div>
     }
-    @if (ShowSendErrors && _sendError != null && _errorKind != "configuration" && _errorKind != "credit")
+    @if ((ShowSendErrors || _errorKind == "continuation") && _sendError != null && _errorKind != "configuration" && _errorKind != "credit")
     {
-        <div class="alert @(_errorKind == "workflow" ? "alert-warning" : "alert-danger") mt-2 mb-0" role="alert" data-error-kind="@_errorKind">@_sendError</div>
+        <div class="alert @(_errorKind == "workflow" || _errorKind == "continuation" ? "alert-warning" : "alert-danger") mt-2 mb-0" role="alert" data-error-kind="@_errorKind">@_sendError</div>
         @if (_failedResponse is not null)
         {
             <RgfAiUsageSummary @key="_failedResponse" Response="_failedResponse" />
@@ -53,7 +72,7 @@
 @code {
     private RenderFragment InputControls => @<text>
         <RgfButton CssClass="btn-success m-1 align-self-start rgf-ai-action-icon"
-                   Title="Send" AdditionalAttributes="@(new() { { "aria-label", "Send" } })" OnClick="OnSendAsync" Disabled="Session.IsProcessing">
+                   Title="Send" AdditionalAttributes="@(new() { { "aria-label", "Send" } })" OnClick="OnSendAsync" Disabled="TextInputDisabled">
             <i class="bi bi-send" aria-hidden="true"></i>
         </RgfButton>
         @if (AllowCancellation && Session.IsProcessing && _sendCancellation != null)

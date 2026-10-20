@@ -12,6 +12,38 @@ namespace Recrovit.RecroGridFramework.Client.Blazor.UI.Tests.Components;
 
 public sealed class RgfRecrobyWorkspaceTests
 {
+    [Fact]
+    public async Task ContinuationChoicesRemainWithTheirConversationAndUseSharedChat()
+    {
+        using var context = Context();
+        var cut = context.Render<RgfRecrobyWorkspace>();
+        await using var owner = context.Services.GetRequiredService<IRgfRecrobyWorkspaceService>().CreateOwner();
+        var transport = new PendingTransport();
+        var session = new RgfAiConversationSession(transport);
+        session.Conversation.ApplyResponse(new()
+        {
+            Success = true, WorkflowStatus = "WaitingForInput", Message = "Select an answer", ResponseMode = RgfAiResponseMode.ChoiceOnly,
+            Choices = [new() { Code = "  original\t", UserText = "Localized response" }]
+        });
+        await owner.OpenOrActivateAsync("custom", "continuation", "Pending conversation", () => session);
+        var chat = cut.FindComponents<RgfAiChatComponent>().Last();
+        chat.Find("input[type=radio]").Change(true);
+        cut.Find("[data-action=new]").Click();
+        Assert.Empty(cut.FindComponents<RgfAiChatComponent>().Last().FindAll("fieldset"));
+        Assert.True(await owner.OpenOrActivateAsync("custom", "continuation", "Ignored", () => throw new Exception("Must retain session")));
+        Assert.Same(chat.Instance, cut.FindComponents<RgfAiChatComponent>()[1].Instance);
+        Assert.True(chat.Find("input[type=radio]").HasAttribute("checked"));
+        var turn = chat.Find("fieldset button").ClickAsync(new());
+        Assert.Equal("  original\t", Assert.Single(transport.Requests).CurrentUserMessage);
+        Assert.Single(session.Conversation.Messages);
+        cut.Find("[data-action=new]").Click();
+        transport.Complete("Next assistant message");
+        await turn;
+        Assert.Empty(chat.FindAll("fieldset"));
+        Assert.Equal(new[] { "Select an answer", "Localized response", "Next assistant message" }, session.Conversation.Messages.Select(m => m.Message));
+        Assert.Empty(cut.FindComponents<RgfAiChatComponent>().Last().Instance.Session.Conversation.Messages);
+    }
+
     // Resource loading is independently covered by configuration tests.
     private sealed class RootWithoutResourceLoading : Recrovit.RecroGridFramework.Client.Blazor.UI.Components.RgfRootComponent
     {
@@ -763,7 +795,12 @@ public sealed class RgfRecrobyWorkspaceTests
     private sealed class PendingTransport : IRgfAiTransport
     {
         private readonly TaskCompletionSource<RgfAiResponse> completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
-        public Task<RgfAiResponse> SendAsync(RgfAiRequest request, CancellationToken cancellationToken = default) => completion.Task;
+        public List<RgfAiRequest> Requests { get; } = [];
+        public Task<RgfAiResponse> SendAsync(RgfAiRequest request, CancellationToken cancellationToken = default)
+        {
+            Requests.Add(request);
+            return completion.Task;
+        }
         public void Complete(string message) => completion.SetResult(new() { Success = true, Message = message });
     }
 }
