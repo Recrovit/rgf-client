@@ -7,6 +7,7 @@
 @typeparam TValue
 @inherits RgfInput<TValue>
 @code {
+    // RGF-DOC: rgf.client.blazor-ui.entity-ui
 
     [Parameter]
     public InputDateType DateType { get; set; } = InputDateType.Date;
@@ -15,7 +16,7 @@
 
     protected override void OnParametersSet()
     {
-        _baseCssClass = "form-control form-control-sm";
+        _baseCssClass = "form-control form-control-sm rgf-input-date";
 
         base.OnParametersSet();
     }

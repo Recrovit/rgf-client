@@ -6,6 +6,17 @@ html.rgf-large-ui {
     font-size: 112.5%;
 }
 
+/* RGF-DOC: rgf.client.blazor-ui.entity-ui */
+input.form-control.rgf-input-date:invalid {
+    border-color: var(--bs-form-invalid-border-color, #dc3545) !important;
+    background-image: none !important;
+    outline: 0 !important;
+}
+
+    input.form-control.rgf-input-date:invalid:focus {
+        box-shadow: 0 0 0 0.25rem rgba(var(--bs-danger-rgb, 220, 53, 69), 0.25) !important;
+    }
+
 table.recro-grid td > div.cell-content {
     width: 40px;
 }

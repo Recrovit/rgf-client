@@ -15,6 +15,10 @@ This file contains the consolidated release history for the `rgf-client` solutio
 - Added UI-independent AI conversation state with read-only presentation history, conversation continuation and model selection. Programmatic requests can be created without adding displayed chat messages; backend history remains authoritative.
 - Added independent AI conversation sessions with turn lifecycle, cancellation and configurable transports. Grid hosts can adapt existing CustomFunctions and final progress responses without taking ownership of progress connections.
 
+### Bugs Fixed
+
+- Date and local date-time inputs now show an invalid border while typing an invalid date and clear it when corrected, without changing value updates or adding validation messages.
+
 ### Breaking Changes
 
 - Custom `IRgListHandler` implementations must implement the `AggregateSourceChanged` event and the `RefreshDataAsync(int?, bool)` overload, distinguishing source changes from presentation reloads. The original refresh overload remains available.
