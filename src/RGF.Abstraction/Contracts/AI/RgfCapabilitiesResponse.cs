@@ -13,4 +13,7 @@ public static class RgfAiErrorCodes
 {
     /// <summary>A request could not run because the backend has no configured AI provider.</summary>
     public const string AiProviderNotConfigured = "AiProviderNotConfigured";
+
+    /// <summary>A request failed because the AI provider rejected its credentials.</summary>
+    public const string AiProviderAuthenticationFailed = "AiProviderAuthenticationFailed";
 }

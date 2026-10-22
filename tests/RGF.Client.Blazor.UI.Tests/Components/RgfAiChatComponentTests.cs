@@ -458,6 +458,8 @@ public sealed class RgfAiChatComponentTests
     [InlineData("AiCredit.InvalidConfiguration", null)]
     [InlineData("AiCredit.InvalidConfiguration", "")]
     [InlineData("AiCredit.InvalidConfiguration", " \n ")]
+    [InlineData(RgfAiErrorCodes.AiProviderAuthenticationFailed, "Hidden server sk-private-key-fragment")]
+    [InlineData(RgfAiErrorCodes.AiProviderAuthenticationFailed, null)]
     [InlineData("AiCredit.UserNotFound", "An authenticated RGF user is required for AI Credit access.")]
     [InlineData("AiCredit.InfrastructureFailure", "AI Credit access could not be verified. Please try again later.")]
     public async Task KnownCreditRejectionsShowSafeMessageRegardlessOfShowSendErrors(string code, string? message)
@@ -479,7 +481,7 @@ public sealed class RgfAiChatComponentTests
             await cut.Find("button").ClickAsync(new MouseEventArgs());
 
             var alert = Assert.Single(cut.FindAll("[role=alert]"));
-            var configuration = code == "AiCredit.InvalidConfiguration";
+            var configuration = code is "AiCredit.InvalidConfiguration" or RgfAiErrorCodes.AiProviderAuthenticationFailed;
             Assert.Equal(configuration ? "configuration" : "credit", alert.GetAttribute("data-error-kind"));
             Assert.Contains("alert-warning", alert.ClassList);
             Assert.Equal(configuration

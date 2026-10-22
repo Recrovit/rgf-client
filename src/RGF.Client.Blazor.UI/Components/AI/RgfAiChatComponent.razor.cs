@@ -148,12 +148,13 @@ public partial class RgfAiChatComponent : IDisposable
             {
                 _failedResponse = response;
                 var providerMissing = response.ErrorCode == RgfAiErrorCodes.AiProviderNotConfigured;
-                var creditConfiguration = response.ErrorCode == "AiCredit.InvalidConfiguration";
+                var configurationFailure = response.ErrorCode is "AiCredit.InvalidConfiguration"
+                    or RgfAiErrorCodes.AiProviderAuthenticationFailed;
                 var creditRejected = response.ErrorCode != null && CreditErrorCodes.Contains(response.ErrorCode);
                 var invalidContinuation = response.ErrorCode == "InvalidContinuationResponse";
-                _errorKind = providerMissing || creditConfiguration ? "configuration" : creditRejected ? "credit"
+                _errorKind = providerMissing || configurationFailure ? "configuration" : creditRejected ? "credit"
                     : invalidContinuation ? "continuation" : "workflow";
-                _sendError = creditConfiguration
+                _sendError = configurationFailure
                     ? "Recroby could not complete the request due to a configuration error. Please contact your system administrator."
                     : providerMissing
                     ? "No AI provider is configured. Configure an AI provider and model to use Recroby."
