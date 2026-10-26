@@ -8,14 +8,17 @@ public sealed class RgfAiConversationStateTests
     [Fact]
     public void EffortAndPendingStateBelongToEachConversation()
     {
-        var first = new RgfAiConversationState { AiModelOverride = "p/model", AiReasoningEffortOverride = "high" };
+        var first = new RgfAiConversationState { AiModelOverride = "p/model", AiReasoningEffortOverride = "high", ResponseFormat = RgfAiResponseFormat.Maximum };
         var second = new RgfAiConversationState();
         first.ApplyResponse(new() { Success = true, WorkflowStatus = "WaitingForInput" });
         Assert.True(first.IsPendingWorkflow);
         Assert.False(second.IsPendingWorkflow);
         Assert.Equal("high", first.CreateRequest("Hello").AiReasoningEffortOverride);
         Assert.Null(second.CreateRequest("Hello").AiReasoningEffortOverride);
+        Assert.Equal(RgfAiResponseFormat.Maximum, first.CreateRequest("Hello").ResponseFormat);
+        Assert.Null(second.CreateRequest("Hello").ResponseFormat);
         first.Reset();
+        Assert.Equal(RgfAiResponseFormat.Maximum, first.ResponseFormat);
         Assert.False(first.IsPendingWorkflow);
         Assert.Equal("high", first.AiReasoningEffortOverride);
     }

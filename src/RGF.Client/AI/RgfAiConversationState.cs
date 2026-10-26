@@ -26,6 +26,9 @@ public sealed class RgfAiConversationState
     /// <summary>Optional effort token retained across reset; null preserves configured behavior.</summary>
     public string? AiReasoningEffortOverride { get; set; }
 
+    /// <summary>Optional generation format retained across reset; null preserves backend defaults.</summary>
+    public RgfAiResponseFormat? ResponseFormat { get; set; }
+
     /// <summary>Indicates whether the conversation is waiting to resume an existing workflow run.</summary>
     public bool IsPendingWorkflow { get; private set; }
 
@@ -49,7 +52,8 @@ public sealed class RgfAiConversationState
             ConversationId = ConversationId,
             ConversationToken = ConversationToken,
             AiModelOverride = AiModelOverride,
-            AiReasoningEffortOverride = AiReasoningEffortOverride
+            AiReasoningEffortOverride = AiReasoningEffortOverride,
+            ResponseFormat = ResponseFormat
         };
     }
 
@@ -68,7 +72,7 @@ public sealed class RgfAiConversationState
         messages.Add(response);
     }
 
-    /// <summary>Clears conversation identity and presentation history, preserving model selection.</summary>
+    /// <summary>Clears identity and history, preserving model, effort and response format selection.</summary>
     public void Reset()
     {
         ConversationId = null;

@@ -87,7 +87,7 @@ public sealed class RgfRecrobyWorkspaceTests
         Assert.Equal(string.Empty, cut.Find("[data-action=new]").TextContent.Trim());
         Assert.Equal("New conversation", cut.Find("[data-action=new]").GetAttribute("aria-label"));
         Assert.Single(cut.FindAll(".rgf-recroby-conversation-bar [data-action=new]"));
-        Assert.Empty(cut.FindAll("[role=tab], .nav-tabs, select"));
+        Assert.Empty(cut.FindAll("[role=tab], .nav-tabs"));
         Assert.Single(cut.FindAll("[data-action=switch]"));
         Assert.Equal("New chat", cut.Find("[data-action=switch]").GetAttribute("title"));
         Assert.Equal("dialog", cut.Find("[data-action=switch]").GetAttribute("aria-haspopup"));
@@ -357,7 +357,7 @@ public sealed class RgfRecrobyWorkspaceTests
         Assert.Equal("custom: " + title, cut.Find("[data-action=switch]").GetAttribute("title"));
         Assert.Equal(title, cut.Find(".rgf-recroby-title").TextContent);
         Assert.Equal("custom: " + title, cut.Find(".rgf-recroby-conversation:not([hidden])").GetAttribute("aria-label"));
-        Assert.Empty(cut.FindAll("[role=tab], [role=tabpanel], select"));
+        Assert.Empty(cut.FindAll("[role=tab], [role=tabpanel]"));
     }
 
     private static void Rename(IRenderedComponent<RgfRecrobyWorkspace> cut, string title)

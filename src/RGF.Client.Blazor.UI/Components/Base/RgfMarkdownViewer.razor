@@ -1,0 +1,22 @@
+@inherits RgfBaseComponent
+@* RGF-DOC: rgf.client.blazor-ui.markdown-viewer *@
+<div class="rgf-markdown-viewer @CssClass" style="@Style">
+    @if (ShowToggle)
+    {
+        <div class="rgf-markdown-toolbar">
+            <button type="button" class="btn btn-sm rgf-markdown-toggle" title="@ToggleLabel"
+                    aria-label="@ToggleLabel" aria-pressed="@(_renderMarkdown ? "true" : "false")"
+                    @onclick="() => _renderMarkdown = !_renderMarkdown">
+                <i class="bi @(_renderMarkdown ? "bi-file-text" : "bi-markdown")" aria-hidden="true"></i>
+            </button>
+        </div>
+    }
+    @if (_renderMarkdown)
+    {
+        <div class="rgf-markdown-content">@((MarkupString)_html)</div>
+    }
+    else
+    {
+        <div class="rgf-markdown-plain">@Text</div>
+    }
+</div>

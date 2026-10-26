@@ -8,8 +8,11 @@
     background: #f8f9fa;
 }
 
+.rgf-ai-plain, .alert { white-space: pre-wrap; }
+
 .message {
-    max-width: 75%;
+    min-width: 0;
+    max-width: 90%;
     padding: 10px;
     border-radius: 10px;
     word-wrap: break-word;
@@ -19,6 +22,21 @@
     width: 100%;
     min-width: 0;
     max-width: 36rem;
+}
+
+.message.rgf-ai-markdown {
+    position: relative;
+    max-width: min(90%, calc(100% - 2.5rem));
+    margin-right: 2.5rem;
+}
+
+.message.rgf-ai-markdown ::deep .rgf-markdown-toolbar {
+    position: absolute;
+    top: 0;
+    left: calc(100% + .25rem);
+    width: 2rem;
+    margin: 0;
+    color: #212529;
 }
 
 .rgf-ai-choice {

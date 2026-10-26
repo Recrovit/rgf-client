@@ -13,6 +13,52 @@ namespace Recrovit.RecroGridFramework.Client.Blazor.UI.Tests.Components;
 
 public sealed class RgfAiChatComponentTests
 {
+    [Theory]
+    [InlineData(null, false)]
+    [InlineData(RgfAiResponseFormat.PlainText, false)]
+    [InlineData(RgfAiResponseFormat.Minimal, true)]
+    [InlineData(RgfAiResponseFormat.Normal, true)]
+    [InlineData(RgfAiResponseFormat.Maximum, true)]
+    public void ServerFormatControlsPresentation(RgfAiResponseFormat? format, bool markdown)
+    {
+        using var context = CreateContext();
+        var transport = new TestTransport();
+        var session = new RgfAiConversationSession(transport);
+        session.Conversation.ResponseFormat = RgfAiResponseFormat.Maximum;
+        session.Conversation.AddUserMessage("**user**\n\ntext");
+        session.Conversation.ApplyResponse(new() { Success = true, Message = "**assistant**\n\ntext", ResponseFormat = format });
+        var cut = context.Render<RgfAiChatComponent>(p => p.Add(c => c.Session, session));
+        Assert.Equal(markdown ? 1 : 0, cut.FindAll("strong").Count);
+        Assert.Equal(markdown ? 1 : 0, cut.FindAll("[aria-label='View plain text']").Count);
+        Assert.Equal("**user**\n\ntext", cut.Find(".rgf-ai-plain").TextContent);
+        Assert.Empty(transport.Requests);
+    }
+
+    [Fact]
+    public void MessageViewsAreIndependentAndRetainedUntilResetWithoutTransportCalls()
+    {
+        using var context = CreateContext();
+        var transport = new TestTransport();
+        var session = new RgfAiConversationSession(transport);
+        RgfAiResponse ResponseWithMarkdown() => new() { Success = true, Message = "**reply**", ResponseFormat = RgfAiResponseFormat.Normal };
+        session.Conversation.ApplyResponse(ResponseWithMarkdown());
+        var cut = context.Render<RgfAiChatComponent>(p => p.Add(c => c.Session, session));
+        cut.Find("[aria-label='View plain text']").Click();
+        session.Conversation.ApplyResponse(ResponseWithMarkdown());
+        cut.Render();
+        Assert.Equal("**reply**", cut.Find(".rgf-markdown-plain").TextContent);
+        Assert.Single(cut.FindAll("strong"));
+        cut.Find("[aria-label='View plain text']").Click();
+        Assert.Equal(2, cut.FindAll(".rgf-markdown-plain").Count);
+        Assert.Empty(transport.Requests);
+        session.Conversation.Reset();
+        session.Conversation.ApplyResponse(ResponseWithMarkdown());
+        cut.Render();
+        Assert.Single(cut.FindAll("strong"));
+        Assert.Empty(cut.FindAll(".rgf-markdown-plain"));
+        Assert.Empty(transport.Requests);
+    }
+
     private static RgfAiResponse Question(RgfAiResponseMode mode = RgfAiResponseMode.ChoiceOrText) => new()
     {
         Success = true, WorkflowStatus = "WaitingForInput", Message = "Which response?", ResponseMode = mode,

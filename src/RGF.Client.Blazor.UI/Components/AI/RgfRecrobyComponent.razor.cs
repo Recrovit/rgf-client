@@ -44,6 +44,19 @@ public partial class RgfRecrobyComponent : IAsyncDisposable
     private string SelectedEffort { get => ActiveSession.Conversation.AiReasoningEffortOverride ?? string.Empty; set => SelectEffort(value); }
     private string DisplayEffort => ActiveSession.Conversation.AiReasoningEffortOverride ?? Model?.DefaultEffort ?? "Default";
 
+    private string SelectedFormat
+    {
+        get => (ActiveSession.Conversation.ResponseFormat ?? RgfAiResponseFormat.PlainText).ToString();
+        set
+        {
+            if (!SelectionDisabled && Enum.TryParse<RgfAiResponseFormat>(value, out var format) && Enum.IsDefined(format))
+                ActiveSession.Conversation.ResponseFormat = format;
+        }
+    }
+    private string DisplayFormat => SelectedFormat == nameof(RgfAiResponseFormat.PlainText) ? "Plain text" : SelectedFormat;
+    private static readonly KeyValuePair<string, string>[] FormatItems = Enum.GetValues<RgfAiResponseFormat>()
+        .Select(format => new KeyValuePair<string, string>(format.ToString(), format == RgfAiResponseFormat.PlainText ? "Plain text" : format.ToString())).ToArray();
+
     private RgfAiProviderCatalogItem? Provider
     {
         get
@@ -68,6 +81,10 @@ public partial class RgfRecrobyComponent : IAsyncDisposable
         if (Session is null)
             _session ??= new(new RgfAiApiTransport(Services.GetRequiredService<IRgfApiService>()));
         if (ReferenceEquals(_subscribed, ActiveSession)) return;
+        var conversation = ActiveSession.Conversation;
+        if (conversation.ResponseFormat is null && conversation.ConversationId is null && conversation.ConversationToken is null
+            && conversation.Messages.Count == 0 && !ActiveSession.IsProcessing && !conversation.IsPendingWorkflow)
+            conversation.ResponseFormat = RgfAiResponseFormat.Minimal;
         if (_subscribed is not null) _subscribed.StateChanged -= SessionChanged;
         _subscribed = ActiveSession;
         _subscribed.StateChanged += SessionChanged;
@@ -141,7 +158,7 @@ public partial class RgfRecrobyComponent : IAsyncDisposable
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (_disposed || _catalog?.Providers.Count is not > 0) return;
+        if (_disposed) return;
         _moduleImport ??= JS.InvokeAsync<IJSObjectReference>("import",
             $"{RgfClientConfiguration.AppRootPath}/_content/Recrovit.RecroGridFramework.Client.Blazor.UI/Components/AI/RgfRecrobyComponent.razor.js").AsTask();
         _module = await _moduleImport;

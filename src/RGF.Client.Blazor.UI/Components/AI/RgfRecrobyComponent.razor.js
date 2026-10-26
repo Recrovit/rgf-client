@@ -24,31 +24,8 @@ export function sync(element, close) {
     if (!instances.has(element)) {
         const controller = new AbortController();
         const options = { signal: controller.signal };
-        for (const button of element.querySelectorAll("[popovertarget]")) {
-            const panel = document.getElementById(button.getAttribute("popovertarget"));
-            panel.addEventListener("toggle", () => {
-                const open = panel.matches(":popover-open");
-                button.setAttribute("aria-expanded", String(open));
-                position(element);
-                if (open) panel.querySelector("select")?.focus({ preventScroll: true });
-            }, options);
-            panel.addEventListener("keydown", event => {
-                if (event.key !== "Escape") return;
-                event.preventDefault();
-                event.stopPropagation();
-                panel.hidePopover();
-                button.focus({ preventScroll: true });
-            }, options);
-            panel.addEventListener("change", event => {
-                if (!event.target.matches("select[data-close-popover]") || event.target.disabled
-                    || !panel.matches(":popover-open")) return;
-                panel.hidePopover();
-                button.focus({ preventScroll: true });
-            }, options);
-        }
         const observer = new ResizeObserver(() => position(element));
         observer.observe(element);
-        for (const panel of element.querySelectorAll("[popover]")) observer.observe(panel);
         const mutations = new MutationObserver(() => {
             if (element.closest("[hidden]")) closePanels(element);
             else position(element);
@@ -59,7 +36,34 @@ export function sync(element, close) {
         window.addEventListener("scroll", () => position(element), { ...options, capture: true });
         window.visualViewport?.addEventListener("resize", () => position(element), options);
         window.visualViewport?.addEventListener("scroll", () => position(element), options);
-        instances.set(element, { controller, observer, mutations });
+        instances.set(element, { controller, observer, mutations, panels: new WeakSet() });
+    }
+    const state = instances.get(element);
+    const options = { signal: state.controller.signal };
+    for (const button of element.querySelectorAll("[popovertarget]")) {
+        const panel = document.getElementById(button.getAttribute("popovertarget"));
+        if (!panel || state.panels.has(panel)) continue;
+        state.panels.add(panel);
+        state.observer.observe(panel);
+        panel.addEventListener("toggle", () => {
+            const open = panel.matches(":popover-open");
+            button.setAttribute("aria-expanded", String(open));
+            position(element);
+            if (open) panel.querySelector("select")?.focus({ preventScroll: true });
+        }, options);
+        panel.addEventListener("keydown", event => {
+            if (event.key !== "Escape") return;
+            event.preventDefault();
+            event.stopPropagation();
+            panel.hidePopover();
+            button.focus({ preventScroll: true });
+        }, options);
+        panel.addEventListener("change", event => {
+            if (!event.target.matches("select[data-close-popover]") || event.target.disabled
+                || !panel.matches(":popover-open")) return;
+            panel.hidePopover();
+            button.focus({ preventScroll: true });
+        }, options);
     }
     if (close || element.closest("[hidden]")) closePanels(element);
     position(element);

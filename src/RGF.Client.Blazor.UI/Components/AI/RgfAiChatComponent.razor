@@ -5,8 +5,17 @@
         @for (var messageIndex = 0; messageIndex < Session.Conversation.Messages.Count; messageIndex++)
         {
             var message = Session.Conversation.Messages[messageIndex];
-            <div class="message @(message.Role == RgfAiMessageRole.User ? "text-bg-primary align-self-end" : "text-bg-secondary align-self-start")">
-                @message.Message
+            var hasMarkdownView = message.Role == RgfAiMessageRole.Assistant && message is RgfAiResponse formatted
+                && formatted.ResponseFormat is RgfAiResponseFormat.Minimal or RgfAiResponseFormat.Normal or RgfAiResponseFormat.Maximum;
+            <div @key="(Session, messageIndex, message)" class="@($"message {(message.Role == RgfAiMessageRole.User ? "text-bg-primary align-self-end" : "text-bg-secondary align-self-start")}{(hasMarkdownView ? " rgf-ai-markdown" : "")}")">
+                @if (hasMarkdownView)
+                {
+                    <RgfMarkdownViewer @key="(Session, message)" Text="@message.Message" RenderMarkdown="true" ShowToggle="true" />
+                }
+                else
+                {
+                    <div class="rgf-ai-plain">@message.Message</div>
+                }
             </div>
             @if (message.Role == RgfAiMessageRole.Assistant && message is RgfAiResponse response)
             {
@@ -22,7 +31,7 @@
                                     <input type="radio" class="form-check-input flex-shrink-0" name="@(InputId + "-choices")"
                                            checked="@ReferenceEquals(_selectedChoice, choice)" disabled="@Session.IsProcessing"
                                            @onchange="() => SelectChoice(response, choice)" />
-                                    <span>@choice.UserText</span>
+                                    <span class="rgf-ai-plain">@choice.UserText</span>
                                 </span>
                             </label>
                         }

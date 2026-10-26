@@ -20,6 +20,7 @@ const assets = {
     "/usage.css": ["text/css", await readFile(new URL("Components/AI/RgfAiUsageSummary.razor.css", base), "utf8")],
     "/selection.js": ["text/javascript", await readFile(new URL("Components/AI/RgfRecrobyComponent.razor.js", base), "utf8")],
     "/selection.css": ["text/css", (await readFile(new URL("Components/AI/RgfRecrobyComponent.razor.css", base), "utf8")).replaceAll("::deep", "")],
+    "/markdown.css": ["text/css", (await readFile(new URL("Components/Base/RgfMarkdownViewer.razor.css", base), "utf8")).replaceAll("::deep", "")],
     "/chat.css": ["text/css", (await readFile(new URL("Components/AI/RgfAiChatComponent.razor.css", base), "utf8")).replaceAll("::deep", "")],
     "/module.js": ["text/javascript", await readFile(new URL("Components/AI/RgfRecrobyWorkspace.razor.js", base), "utf8")],
     "/style.css": ["text/css", (await readFile(new URL("Components/AI/RgfRecrobyWorkspace.razor.css", base), "utf8")).replaceAll("::deep", "")],
@@ -32,7 +33,7 @@ assets['/components.css'] = ['text/css', (await Promise.all(['Dashboard/Dashboar
 assets[moduleRoot + 'RgfRecrobyComponent.razor.js'] = assets['/selection.js'];
 assets[moduleRoot + 'RgfRecrobyWorkspace.razor.js'] = assets['/module.js'];
 const html = `<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="/bootstrap.css"><link rel="stylesheet" href="/style.css"><link rel="stylesheet" href="/styles.css">
-<link rel="stylesheet" href="/icons.css"><link rel="stylesheet" href="/usage.css"><link rel="stylesheet" href="/components.css"><link rel="stylesheet" href="/selection.css"><link rel="stylesheet" href="/chat.css"><script src="/jquery.js"></script><script src="/bootstrap.js"></script><script src="/ui.js"></script>
+<link rel="stylesheet" href="/icons.css"><link rel="stylesheet" href="/usage.css"><link rel="stylesheet" href="/components.css"><link rel="stylesheet" href="/selection.css"><link rel="stylesheet" href="/chat.css"><link rel="stylesheet" href="/markdown.css"><script src="/jquery.js"></script><script src="/bootstrap.js"></script><script src="/ui.js"></script>
 <style>body {margin:0} #outside {height:60px} #host {margin-left:120px; width:calc(100% - 160px)}
 .chat-box {overflow-y:auto} .message {padding:10px} .navbar {height:56px} main {flex:1;min-height:0}
 .grid {width:100%} .modal {z-index:1055}</style></head><body>
@@ -55,6 +56,8 @@ const html = `<!doctype html><html><head><meta charset="utf-8"><link rel="styles
 <button id="model-choice" class="btn btn-sm btn-outline-secondary" popovertarget="model-panel" aria-expanded="false"><i class="bi bi-cpu me-1" aria-hidden="true"></i>Provider / Model ▾</button>
 <button id="effort-choice" class="btn btn-sm btn-outline-secondary" popovertarget="effort-panel" aria-expanded="false"><i class="bi bi-lightbulb me-1" aria-hidden="true"></i>Default ▾</button>
 <div id="model-panel" class="rgf-recroby-selection-panel" popover="auto" role="dialog"><label>Provider</label><select class="form-select"><option>Provider</option></select><label>Model</label><select class="form-select" data-close-popover><option>Model</option></select></div>
+<button id="format-choice" class="btn btn-sm btn-outline-secondary" popovertarget="format-panel" aria-expanded="false"><i class="bi bi-markdown me-1" aria-hidden="true"></i>Minimal ▾</button>
+<div id="format-panel" class="rgf-recroby-selection-panel" popover="auto" role="dialog"><label>Response format</label><select class="form-select" data-close-popover><option>Plain text</option><option selected>Minimal</option><option>Normal</option><option>Maximum</option></select></div>
 <div id="effort-panel" class="rgf-recroby-selection-panel" popover="auto" role="dialog"><label>Reasoning effort</label><select class="form-select" data-close-popover><option>Default</option><option>High</option></select></div>
 </div></div></div></div>
 <div class="rgf-recroby-resize" data-resize-handle tabindex="0"></div></section></div>
@@ -87,6 +90,17 @@ for (let index = 0; index < 40; index++) {
     usage.sync(row);
 }
 const selectors = document.querySelector('.rgf-recroby-selectors');
+// First render has format only; catalog controls arrive later.
+const catalogNodes = [...selectors.children].filter(node => /^(model|effort)-/.test(node.id));
+for (const node of catalogNodes) node.remove();
+selection.sync(selectors, false);
+for (const node of catalogNodes) selectors.append(node);
+window.selectionRegistrations = 0;
+for (const panel of selectors.querySelectorAll('[popover]')) {
+    const add = panel.addEventListener.bind(panel);
+    panel.addEventListener = (...args) => { window.selectionRegistrations++; return add(...args); };
+}
+selection.sync(selectors, false);
 selection.sync(selectors, false);
 window.selectionSync = close => selection.sync(selectors, close);
 const element = document.querySelector('.rgf-recroby-workspace');
@@ -659,13 +673,122 @@ try {
     assert.equal(await evaluate('document.activeElement.id'), 'dialog-input');
     await click('#dialog-primary');
     assert.equal(await evaluate("document.querySelector('#host-dialog')"), null, 'Dialog above bottom dock remains operable');
+    assert.equal(await evaluate('selectionRegistrations'), 6, 'late catalog panels each register three handlers exactly once');
+    await evaluate(`(() => {
+        const message = document.createElement('div');
+        message.id = 'markdown-message';
+        message.className = 'message text-bg-secondary align-self-start';
+        message.innerHTML = '<div class="rgf-markdown-viewer"><div class="rgf-markdown-toolbar"><button type="button" class="btn btn-sm rgf-markdown-toggle" aria-label="View plain text"><i class="bi bi-file-text"></i></button></div><div class="rgf-markdown-content"><h2>Long answer</h2><p>' + 'long-link-text'.repeat(60) + '</p><pre><code>' + 'wide code '.repeat(150) + '</code></pre><table><tr>' + '<td>Wide table cell</td>'.repeat(30) + '</tr></table></div></div>';
+        document.querySelector('.chat-box').append(message);
+    })()`);
+    await viewport(1200, 800);
+    await layout({mode:0, isCollapsed:false, width:560, height:560});
+    await evaluate(`(() => {
+        const light = document.querySelector('#markdown-message').cloneNode(true);
+        light.id = 'markdown-light';
+        light.className = 'message text-bg-light align-self-start';
+        light.querySelector('.rgf-markdown-content').textContent = 'Light background';
+        document.querySelector('.chat-box').append(light);
+        window.markdownToggleStyles = selector => {
+            const button = document.querySelector(selector), style = getComputedStyle(button);
+            const rgb = value => value.match(/[\\d.]+/g).map(Number);
+            const foreground = rgb(style.color), border = rgb(style.borderTopColor), outline = rgb(style.outlineColor);
+            let background = [255,255,255], opacity = 1;
+            for (let element = button; element; element = element.parentElement) {
+                opacity *= Number(getComputedStyle(element).opacity);
+            }
+            // Composite transparent ancestor backgrounds in paint order.
+            const ancestors = [];
+            for (let element = button; element; element = element.parentElement) ancestors.unshift(element);
+            const buttonBounds = button.getBoundingClientRect();
+            const center = {x:buttonBounds.x + buttonBounds.width/2, y:buttonBounds.y + buttonBounds.height/2};
+            for (const element of ancestors) {
+                const bounds = element.getBoundingClientRect();
+                // An absolutely positioned control can sit outside an ancestor's painted background.
+                if (center.x < bounds.x || center.x > bounds.right || center.y < bounds.y || center.y > bounds.bottom) continue;
+                const color = rgb(getComputedStyle(element).backgroundColor), alpha = color[3] ?? 1;
+                background = background.map((value,index) => color[index]*alpha + value*(1-alpha));
+            }
+            const luminance = color => color.slice(0,3).map(value => {
+                value /= 255;
+                return value <= .04045 ? value/12.92 : ((value+.055)/1.055)**2.4;
+            }).reduce((sum,value,index) => sum + value*[.2126,.7152,.0722][index], 0);
+            const contrast = color => {
+                const a = luminance(color), b = luminance(background);
+                return (Math.max(a,b)+.05)/(Math.min(a,b)+.05);
+            };
+            return {color:style.color, border:style.borderTopColor,
+                parentColor:getComputedStyle(button.closest('.message')).color,
+                iconColor:getComputedStyle(button.querySelector('i')).color,
+                contrast:contrast(foreground), borderContrast:contrast(border), outlineContrast:contrast(outline),
+                outlineWidth:parseFloat(style.outlineWidth), outlineStyle:style.outlineStyle,
+                visible:style.display !== 'none' && style.visibility === 'visible' && opacity === 1
+                    && button.getBoundingClientRect().width > 0 && button.getBoundingClientRect().height > 0,
+                hover:button.matches(':hover'), active:button.matches(':active'), focusVisible:button.matches(':focus-visible')};
+        };
+    })()`);
+    for (const id of ['markdown-message', 'markdown-light']) {
+        const selector = '#' + id + ' .rgf-markdown-toggle';
+        const checkContrast = async state => {
+            const style = await evaluate(`markdownToggleStyles(${JSON.stringify(selector)})`);
+            assert.equal(style.visible, true, state + ': toggle is fully visible');
+            assert.equal(style.color, style.parentColor, state + ': inherits surrounding text color');
+            assert.equal(style.iconColor, style.color, state + ': icon follows text color');
+            assert.equal(style.border, style.color, state + ': border follows text color');
+            assert.ok(style.borderContrast >= 3, state + ': border contrast is at least 3:1');
+            assert.ok(style.contrast >= 4.5, state + ': icon contrast is at least 4.5:1');
+            return style;
+        };
+        await cdp('Input.dispatchMouseEvent', {type:'mouseMoved', x:0, y:0});
+        await evaluate(`document.activeElement.blur(); document.querySelector(${JSON.stringify(selector)}).scrollIntoView({block:'center'})`);
+        assert.equal((await checkContrast(id + ' normal')).hover, false, 'normal visibility does not require hover');
+        const button = await rect(selector);
+        const point = {x:button.x + button.width/2, y:button.y + button.height/2};
+        await cdp('Input.dispatchMouseEvent', {type:'mouseMoved', ...point});
+        assert.equal((await checkContrast(id + ' hover')).hover, true);
+        await cdp('Input.dispatchMouseEvent', {type:'mousePressed', button:'left', clickCount:1, ...point});
+        assert.equal((await checkContrast(id + ' active')).active, true);
+        await cdp('Input.dispatchMouseEvent', {type:'mouseReleased', button:'left', clickCount:1, ...point});
+        await checkContrast(id + ' focus');
+        await cdp('Input.dispatchMouseEvent', {type:'mouseMoved', x:0, y:0});
+        await cdp('Input.dispatchKeyEvent', {type:'keyDown', key:'Tab'});
+        await cdp('Input.dispatchKeyEvent', {type:'keyUp', key:'Tab'});
+        await evaluate(`document.querySelector(${JSON.stringify(selector)}).focus()`);
+        const focused = await checkContrast(id + ' keyboard focus');
+        assert.equal(focused.focusVisible, true);
+        assert.ok(focused.outlineWidth >= 2 && focused.outlineStyle === 'solid' && focused.outlineContrast >= 3,
+            'keyboard focus has a contrasting outline');
+    }
+    await evaluate("document.activeElement.blur(); document.querySelector('#markdown-light').remove()");
+    console.log('PASS: Markdown toggle computed colors, contrast, normal/hover/active/focus-visible on light and dark bubbles');
+    await evaluate("document.querySelector('#markdown-message').classList.add('rgf-ai-markdown')");
+    for (const [width, height] of [[1200, 800], [390, 700]]) {
+        await viewport(width, height);
+        for (const mode of [0, 1, 2, 3]) {
+            await layout({mode, isCollapsed:false});
+            assert.equal(await evaluate(`(() => {
+                const panel = document.querySelector('section'), message = document.querySelector('#markdown-message');
+                const content = message.querySelector('.rgf-markdown-content');
+                const button = message.querySelector('button').getBoundingClientRect();
+                const bubble = message.getBoundingClientRect(), chat = message.closest('.chat-box').getBoundingClientRect();
+                return button.x >= bubble.right && button.right <= chat.right - 4 && button.y >= bubble.y
+                    && panel.scrollWidth <= panel.clientWidth + 1 && message.getBoundingClientRect().right <= panel.getBoundingClientRect().right
+                    && content.querySelector('pre').scrollWidth > content.querySelector('pre').clientWidth
+                    && content.querySelector('table').scrollWidth > content.querySelector('table').clientWidth;
+            })()`), true, 'Markdown toggle stays to the right of its bubble and long content fits dock/floating/mobile panel');
+            await evaluate("document.querySelector('#markdown-message .rgf-markdown-toggle').scrollIntoView({block:'center'})");
+            const outsideToggle = await evaluate("markdownToggleStyles('#markdown-message .rgf-markdown-toggle')");
+            assert.ok(outsideToggle.visible && outsideToggle.contrast >= 4.5, 'outside toggle stays visible against the chat background');
+        }
+    }
+    await evaluate("document.querySelector('#markdown-message').remove()");
     await evaluate("document.querySelector('#model-choice').lastChild.textContent=' provider / ' + 'long-model-name-'.repeat(20) + ' ▾'");
     for (const [width, height] of [[1200, 800], [800, 400], [390, 700], [390, 260]]) {
         await viewport(width, height);
         for (const mode of [0, 1, 2, 3]) {
             await layout({ mode, isCollapsed: false, height: 360, dockHeight: 300 });
             const before = await rect('section');
-            for (const id of ['model', 'effort']) {
+            for (const id of ['model', 'effort', 'format']) {
                 await evaluate(`document.querySelector('#${id}-choice').scrollIntoView({block:'nearest'})`);
                 await click(`#${id}-choice`);
                 const popup = await rect(`#${id}-panel`), anchor = await rect(`#${id}-choice`);
@@ -691,7 +814,7 @@ try {
     await viewport(1200, 800);
     await evaluate("document.querySelector('#model-choice').lastChild.textContent='Provider / Model ▾'");
     await layout({ mode: 0, isCollapsed: false, height: 560 });
-    for (const id of ['model', 'effort']) {
+    for (const id of ['model', 'effort', 'format']) {
         await click('#' + id + '-choice');
         if (id === 'model') {
             await evaluate("document.querySelector('#model-panel select').dispatchEvent(new Event('change', {bubbles:true}))");
@@ -703,6 +826,7 @@ try {
             'committing a model or effort selection immediately closes its Popover');
         assert.equal(await evaluate('document.activeElement.id'), id + '-choice');
     }
+    await layout({ width: 560 });
     const input = await rect('textarea'), send = await rect('#send'), selectors = await rect('.rgf-recroby-selectors');
     assert.ok(send.y >= input.bottom, 'Send is below the message input');
     assert.ok(selectors.x >= send.right && selectors.y < send.bottom, 'selectors are beside Send when space permits');
