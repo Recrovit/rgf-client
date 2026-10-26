@@ -42,6 +42,7 @@ public partial class RgfRecrobyComponent : IAsyncDisposable
     private string SelectedProvider { get => Provider?.Id ?? string.Empty; set => SelectProvider(value); }
     private string SelectedModel { get => Model?.Id ?? string.Empty; set => SelectModel(value); }
     private string SelectedEffort { get => ActiveSession.Conversation.AiReasoningEffortOverride ?? string.Empty; set => SelectEffort(value); }
+    private string DisplayEffort => ActiveSession.Conversation.AiReasoningEffortOverride ?? Model?.DefaultEffort ?? "Default";
 
     private RgfAiProviderCatalogItem? Provider
     {

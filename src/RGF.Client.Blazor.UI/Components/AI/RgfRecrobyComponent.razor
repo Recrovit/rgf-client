@@ -13,7 +13,7 @@
         <button type="button" class="btn btn-sm btn-outline-secondary" popovertarget="@(_selectorId + "-effort")"
                 disabled="@SelectionDisabled" aria-label="Reasoning effort" aria-expanded="false">
             <i class="bi bi-lightbulb me-1" aria-hidden="true"></i>
-            @(ActiveSession.Conversation.AiReasoningEffortOverride ?? "Default") ▾
+            @DisplayEffort ▾
         </button>
         <div id="@(_selectorId + "-model")" class="rgf-recroby-selection-panel" popover="auto" role="dialog" aria-label="Provider / Model">
             <RgfComboBox TValue="string" Label="Provider" @bind-Value="SelectedProvider"

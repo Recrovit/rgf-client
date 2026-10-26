@@ -136,6 +136,24 @@ public sealed class RgfRecrobyComponentTests
         using var context = SelectionContext(out var api);
         var cut = context.Render<RgfRecrobyComponent>();
         cut.WaitForAssertion(() => Assert.Equal(3, cut.FindAll("select").Count));
+        var state = cut.FindComponent<RgfAiChatComponent>().Instance.Session.Conversation;
+        void AssertEffort(string display, string? effort)
+        {
+            Assert.Equal(display + " ▾", cut.Find("button[aria-label='Reasoning effort']").TextContent.Trim());
+            Assert.Equal(effort, state.AiReasoningEffortOverride);
+            var selected = Assert.Single(cut.FindAll("select")[2].QuerySelectorAll("option[selected]"));
+            Assert.Equal(effort ?? string.Empty, selected.GetAttribute("value"));
+            Assert.Equal(effort ?? "Default", selected.TextContent);
+        }
+        async Task AssertSentEffort(string? effort)
+        {
+            cut.Find("textarea").Change("Hello");
+            await cut.Find(".rgf-ai-actions > button").ClickAsync(new MouseEventArgs());
+            Assert.NotNull(api.Request);
+            Assert.Equal(effort, api.Request.AiReasoningEffortOverride);
+        }
+        AssertEffort("high", null);
+        await AssertSentEffort(null);
         foreach (var (label, iconClass, suffix) in new[] {
             ("Provider / Model", "bi-cpu", "-model"), ("Reasoning effort", "bi-lightbulb", "-effort") })
         {
@@ -154,14 +172,23 @@ public sealed class RgfRecrobyComponentTests
         Assert.False(cut.FindAll("select")[0].HasAttribute("data-close-popover"));
         Assert.True(cut.FindAll("select")[1].HasAttribute("data-close-popover"));
         Assert.True(cut.FindAll("select")[2].HasAttribute("data-close-popover"));
+        cut.FindAll("select")[2].Change("low");
+        AssertEffort("low", "low");
+        await AssertSentEffort("low");
+        cut.FindAll("select")[2].Change(string.Empty);
+        AssertEffort("high", null);
+        await AssertSentEffort(null);
         cut.FindAll("select")[2].Change("high");
         cut.FindAll("select")[1].Change("second");
-        Assert.Equal("Default", cut.Find("button[aria-label='Reasoning effort']").TextContent.Trim().TrimEnd('▾').Trim());
+        AssertEffort("Default", null);
         Assert.Equal(new[] { "Default", "low" }, cut.FindAll("select")[2].QuerySelectorAll("option").Select(o => o.TextContent));
         cut.FindAll("select")[2].Change("low");
+        cut.FindAll("select")[1].Change("first");
+        AssertEffort("high", null);
+        cut.FindAll("select")[2].Change("low");
         cut.FindAll("select")[0].Change("q");
+        AssertEffort("Default", null);
         Assert.Equal(new[] { "other" }, cut.FindAll("select")[1].QuerySelectorAll("option").Select(o => o.TextContent));
-        var state = cut.FindComponent<RgfAiChatComponent>().Instance.Session.Conversation;
         Assert.Equal("q/other", state.AiModelOverride);
         Assert.Null(state.AiReasoningEffortOverride);
         cut.FindAll("select")[2].Change("high");
@@ -172,6 +199,7 @@ public sealed class RgfRecrobyComponentTests
         Assert.Equal("high", api.Request.AiReasoningEffortOverride);
         Assert.Equal("/api/rgf/ai/recroby/catalog", api.CatalogUri);
         cut.FindAll("select")[0].Change("p");
+        AssertEffort("high", null);
         Assert.Equal("p/first", state.AiModelOverride);
         Assert.Null(state.CreateRequest("Again").AiReasoningEffortOverride);
         Assert.All(cut.FindAll("[popover]"), panel => Assert.Equal("auto", panel.GetAttribute("popover")));
