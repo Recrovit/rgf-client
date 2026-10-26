@@ -23,6 +23,7 @@ The package extends the base Blazor client integration with session-auth specifi
 - authenticated principal snapshot synchronization through the host authentication endpoints
 - `AuthenticationStateProvider` decoration so an expired host session is reflected in Blazor auth state
 - SSR cookie forwarding for RGF HTTP clients used from the host
+- SSR Host Origin request-intent signaling when both Origin and Sec-Fetch-Site are absent, restricted to the configured proxy Host scheme and authority; existing browser signals are preserved
 - runtime-agnostic host API and downstream proxy invocation for Blazor client and SSR code
 
 ## Registration API

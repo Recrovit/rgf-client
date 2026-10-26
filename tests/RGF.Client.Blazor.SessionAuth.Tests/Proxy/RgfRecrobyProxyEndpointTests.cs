@@ -24,6 +24,7 @@ public sealed class RgfRecrobyProxyEndpointTests
     {
         var proxy = new RecordingProxy();
         var builder = WebApplication.CreateBuilder(new WebApplicationOptions { Args = [] });
+        ProxyProtectionTestServices.Add(builder);
         builder.Services.AddSingleton<IDownstreamHttpProxyClient>(proxy);
         builder.Services.AddSingleton(DispatchProxy.Create<IDownstreamTransportProxyClient, UnusedTransportProxy>());
         builder.Services.AddSingleton(new DownstreamApiCatalog(new Dictionary<string, DownstreamApiDefinition>
@@ -41,6 +42,9 @@ public sealed class RgfRecrobyProxyEndpointTests
         context.SetEndpoint(endpoint);
         context.Request.Method = method;
         context.Request.Path = path;
+        context.Request.Scheme = "https";
+        context.Request.Host = new HostString("host.example.test");
+        context.Request.Headers.Origin = "https://host.example.test";
         context.Request.Headers[RgfHeaderKeys.RgfClientVersion] = "client-version";
         context.Request.Headers[RgfHeaderKeys.RgfClientBlazorVersion] = "blazor-version";
         context.Request.Headers["RGF-SessionId"] = "session-id";

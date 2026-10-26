@@ -50,7 +50,19 @@ public class RgfProgressService : IRgfProgressService
         _logger.LogDebug("Starting SignalR connection to {Uri} with inactivity timeout of {TimeoutMinutes} minutes", uri.AbsoluteUri, _inactivityTimeoutMinutes);
 
         _hubConnection = new HubConnectionBuilder()
-            .WithUrl(uri.AbsoluteUri)
+            .WithUrl(uri.AbsoluteUri, options =>
+            {
+                // RGF-DOC: rgf.client.blazor-host-openidconnect.server-side-proxy
+                // .NET transports do not supply the browser's Origin automatically.
+                if (!OperatingSystem.IsBrowser() && RgfClientConfiguration.ApiAuthMode == RgfApiAuthMode.ServerProxySsr
+                    && Uri.TryCreate(RgfClientConfiguration.ProxyApiBaseAddress, UriKind.Absolute, out var hostUri)
+                    && (hostUri.Scheme == Uri.UriSchemeHttp || hostUri.Scheme == Uri.UriSchemeHttps)
+                    && string.IsNullOrEmpty(hostUri.UserInfo)
+                    && Uri.Compare(uri, hostUri, UriComponents.SchemeAndServer, UriFormat.Unescaped, StringComparison.OrdinalIgnoreCase) == 0)
+                {
+                    options.Headers["Origin"] = hostUri.GetLeftPart(UriPartial.Authority);
+                }
+            })
             //.AddJsonProtocol(options => options.PayloadSerializerOptions = new JsonSerializerOptions(JsonSerializerDefaults.Web) )
             .Build();
 

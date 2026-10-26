@@ -10,6 +10,8 @@ namespace Recrovit.RecroGridFramework.Client.Blazor.SessionAuth.Proxy;
 /// </summary>
 /// <remarks>
 /// Cookie forwarding applies only to requests initially targeting the configured host origin.
+/// Requests to that origin without Origin or Sec-Fetch-Site receive the configured Host Origin as a request-intent signal.
+/// Existing browser signals are preserved; the signal is not a user credential.
 /// Redirect handling is controlled by the HTTP client, not by this handler.
 /// The Host-to-downstream API authentication boundary is handled separately.
 /// </remarks>
@@ -19,6 +21,13 @@ public sealed class RgfServerProxyAuthCookieHandler(IRgfServerRequestCookieAcces
 
     protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
+        if (IsLocalProxyRequest(request.RequestUri)
+            && !request.Headers.Contains("Origin")
+            && !request.Headers.Contains("Sec-Fetch-Site"))
+        {
+            request.Headers.TryAddWithoutValidation("Origin", new Uri(ApiService.BaseAddress).GetLeftPart(UriPartial.Authority));
+        }
+
         if (ShouldForwardCookie(request, out var cookieHeaderValue))
         {
             request.Headers.TryAddWithoutValidation(CookieHeaderName, cookieHeaderValue);
@@ -53,17 +62,14 @@ public sealed class RgfServerProxyAuthCookieHandler(IRgfServerRequestCookieAcces
 
     private static bool IsLocalProxyRequest(Uri? requestUri)
     {
-        if (requestUri == null)
+        if (requestUri is not { IsAbsoluteUri: true })
         {
             return false;
         }
 
-        if (!requestUri.IsAbsoluteUri)
-        {
-            return true;
-        }
-
-        if (!Uri.TryCreate(ApiService.BaseAddress, UriKind.Absolute, out var proxyBaseAddress))
+        if (!Uri.TryCreate(ApiService.BaseAddress, UriKind.Absolute, out var proxyBaseAddress)
+            || (proxyBaseAddress.Scheme != Uri.UriSchemeHttp && proxyBaseAddress.Scheme != Uri.UriSchemeHttps)
+            || !string.IsNullOrEmpty(proxyBaseAddress.UserInfo))
         {
             return false;
         }

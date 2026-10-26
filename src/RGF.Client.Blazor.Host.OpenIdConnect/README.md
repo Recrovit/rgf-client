@@ -33,6 +33,14 @@ The Server-side Application configuration covers:
 - Client configuration keys for localization, claims, security, and path-base hosting
 - Runtime initialization and validation
 
+## Proxy request protection
+
+Authorized RGF HTTP routes and both progress hub routes apply the shared OIDC Origin/Fetch Metadata policy before access-token acquisition or downstream forwarding. Rejected requests return 403. RGF requests do not require antiforgery tokens; the generic OIDC downstream proxy still requires them for unsafe methods. Public resource, script, stylesheet, RecroDict and capability GET requests retain their existing behavior, and progress routes retain their existing authorization semantics.
+
+Configure `Recrovit:OpenIdConnect:Host:DownstreamProxyRequestProtection` for HTTP and WebSocket origin whitelists. The Host's own origin is automatically allowed. `AllowSameSite` defaults to false; an HTTP whitelist does not override `Sec-Fetch-Site: cross-site`. WebSocket handshakes reject invalid, foreign and `null` origins; missing origins require the existing explicit opt-in.
+
+SSR HTTP clients add the configured `API:ProxyBaseAddress` Host Origin only when targeting that same scheme and authority and both Origin and Sec-Fetch-Site are absent. Existing signals are preserved. The server-side progress client supplies the same Host Origin to its .NET SignalR transports; browser/WASM behavior is unchanged. Configure trusted forwarded headers before authentication and endpoint execution so the Host sees the public scheme and authority. The downstream `RgfApi` address is an independent trust boundary and may be on another server.
+
 ## Related Packages
 
 - [`Recrovit.AspNetCore.Authentication.OpenIdConnect`](https://www.nuget.org/packages/Recrovit.AspNetCore.Authentication.OpenIdConnect/)

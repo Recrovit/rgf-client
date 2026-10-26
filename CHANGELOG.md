@@ -18,9 +18,13 @@ This file contains the consolidated release history for the `rgf-client` solutio
 
 ### Bugs Fixed
 
+- RGF Host HTTP and progress proxies now reject disallowed browser origins before downstream calls. SSR and server-side SignalR supply the configured Host Origin for compatibility; public resource GETs and generic OIDC antiforgery behavior are unchanged.
+
 - Date and local date-time inputs now show an invalid border while typing an invalid date and clear it when corrected, without changing value updates or adding validation messages.
 
 ### Breaking Changes
+
+- RGF Host proxy callers must supply accepted Origin/Fetch Metadata signals. Same-site requests require explicit opt-in, and missing WebSocket origins remain rejected by default. Package builds require a new OIDC release exposing the shared evaluator; published 10.2.0 is insufficient. Until that release is selected, use the updated local OIDC project; Host package creation is blocked with that local reference.
 
 - Custom `IRgListHandler` implementations must implement the `AggregateSourceChanged` event and the `RefreshDataAsync(int?, bool)` overload, distinguishing source changes from presentation reloads. The original refresh overload remains available.
 - Custom Chart templates and direct base entity consumers must explicitly declare workspace support through `ChartParameters.SupportsWorkspace` before entity initialization; the standard UI entity enables it automatically for its registered UI Chart. The standalone ApexCharts provider supports Dialog/Embedded only; subclasses must remove references to the removed protected `BaseChartComponent.IsWorkspace` hook. Custom embedded hosts can set `IsEmbeddedEntity` to keep charts modal even with a workspace-capable implementation.

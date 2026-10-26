@@ -21,6 +21,8 @@ public static class RgfProxyEndpoints
     /// <returns>The supplied route builder.</returns>
     /// <remarks>Grid/API and Recroby routes require authorization; resource and capability requests are forwarded without a user token.
     /// Progress transport forwards the current principal but does not add RequireAuthorization metadata here.
+    /// Authorized HTTP routes and progress transport enforce the OIDC Origin/Fetch Metadata policy before forwarding,
+    /// without requiring antiforgery tokens. Anonymous resource and capability GET routes retain their existing behavior.
     /// Install authentication and proxy transport middleware separately or use the host endpoint helper.</remarks>
     public static IEndpointRouteBuilder MapRgfProxyEndpoints(this IEndpointRouteBuilder endpoints)
     {
@@ -106,15 +108,37 @@ public static class RgfProxyEndpoints
     private static Task ProxyAnonymousGetAsync(HttpContext context, IDownstreamHttpProxyClient proxyClient, CancellationToken cancellationToken) =>
         DownstreamProxyEndpointExecutor.ProxyHttpAsync(context, proxyClient, DownstreamApiName, user: null, cancellationToken);
 
-    private static Task ProxyAuthorizedAsync(HttpContext context, IDownstreamHttpProxyClient proxyClient, CancellationToken cancellationToken) =>
-        DownstreamProxyEndpointExecutor.ProxyHttpAsync(context, proxyClient, DownstreamApiName, context.User, cancellationToken);
+    private static Task ProxyAuthorizedAsync(HttpContext context, IDownstreamHttpProxyClient proxyClient,
+        IDownstreamProxyRequestProtectionEvaluator protectionEvaluator, CancellationToken cancellationToken) =>
+        IsRequestAllowed(context, protectionEvaluator)
+            ? DownstreamProxyEndpointExecutor.ProxyHttpAsync(context, proxyClient, DownstreamApiName, context.User, cancellationToken)
+            : Task.CompletedTask;
+
+    private static bool IsRequestAllowed(HttpContext context, IDownstreamProxyRequestProtectionEvaluator protectionEvaluator)
+    {
+        // The shared evaluator allows endpoints without metadata. Keep this integration fail-closed.
+        if (context.GetEndpoint()?.Metadata.GetMetadata<ProxyEndpointMetadata>() is not null
+            && protectionEvaluator.Evaluate(context).IsAllowed)
+        {
+            return true;
+        }
+
+        context.Response.StatusCode = StatusCodes.Status403Forbidden;
+        return false;
+    }
 
     private static async Task ProxyProgressHubAsync(
         HttpContext context,
         IDownstreamHttpProxyClient httpProxyClient,
         IDownstreamTransportProxyClient transportProxyClient,
+        IDownstreamProxyRequestProtectionEvaluator protectionEvaluator,
         CancellationToken cancellationToken)
     {
+        if (!IsRequestAllowed(context, protectionEvaluator))
+        {
+            return;
+        }
+
         if (context.WebSockets.IsWebSocketRequest)
         {
             await transportProxyClient.ProxyWebSocketAsync(
