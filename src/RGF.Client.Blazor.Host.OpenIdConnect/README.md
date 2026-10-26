@@ -35,11 +35,9 @@ The Server-side Application configuration covers:
 
 ## Proxy request protection
 
-Authorized RGF HTTP routes and both progress hub routes apply the shared OIDC Origin/Fetch Metadata policy before access-token acquisition or downstream forwarding. Rejected requests return 403. RGF requests do not require antiforgery tokens; the generic OIDC downstream proxy still requires them for unsafe methods. Public resource, script, stylesheet, RecroDict and capability GET requests retain their existing behavior, and progress routes retain their existing authorization semantics.
+The Host validates the origins of protected HTTP and WebSocket proxy requests. Allowed origins are configurable through `Recrovit:OpenIdConnect:Host:DownstreamProxyRequestProtection`. Behind a reverse proxy, configure the correct public Host origin and trusted forwarded headers.
 
-Configure `Recrovit:OpenIdConnect:Host:DownstreamProxyRequestProtection` for HTTP and WebSocket origin whitelists. The Host's own origin is automatically allowed. `AllowSameSite` defaults to false; an HTTP whitelist does not override `Sec-Fetch-Site: cross-site`. WebSocket handshakes reject invalid, foreign and `null` origins; missing origins require the existing explicit opt-in.
-
-SSR HTTP clients add the configured `API:ProxyBaseAddress` Host Origin only when targeting that same scheme and authority and both Origin and Sec-Fetch-Site are absent. Existing signals are preserved. The server-side progress client supplies the same Host Origin to its .NET SignalR transports; browser/WASM behavior is unchanged. Configure trusted forwarded headers before authentication and endpoint execution so the Host sees the public scheme and authority. The downstream `RgfApi` address is an independent trust boundary and may be on another server.
+See [Proxy-based API access](https://recrovit.github.io/recrogrid-framework-docs/en/latest/docs/configuration/api/proxy-based-access.html) for configuration, security rules and SSR/SignalR compatibility.
 
 ## Related Packages
 
