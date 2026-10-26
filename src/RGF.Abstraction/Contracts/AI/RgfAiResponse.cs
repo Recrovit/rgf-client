@@ -9,6 +9,10 @@ namespace Recrovit.RecroGridFramework.Abstraction.Contracts.AI;
 /// <summary>The resulting message and execution metadata for an AI turn.</summary>
 public class RgfAiResponse : RgfAiMessage
 {
+    /// <summary>The applied generation format. PlainText also identifies responses generated without formatting guidance.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public RgfAiResponseFormat? ResponseFormat { get; set; }
+
     /// <summary>Creates a response with Assistant role; success defaults to false and identity to an empty string.</summary>
     public RgfAiResponse()
     {

@@ -1,11 +1,17 @@
 #nullable enable
 
+using System.Text.Json.Serialization;
+
 namespace Recrovit.RecroGridFramework.Abstraction.Contracts.AI;
 
 // RGF-DOC: rgf.client.abstraction.ai-contracts
 /// <summary>A conversation turn with one or more messages and optional execution settings.</summary>
 public class RgfAiRequest
 {
+    /// <summary>Optional user message structure; null preserves existing generation behavior. A pending run retains its original format.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public RgfAiResponseFormat? ResponseFormat { get; set; }
+
     /// <summary>Messages for this turn in chronological order. Complete authoritative history is not required; backend runtimes may own it.</summary>
     public List<RgfAiMessage> Messages { get; set; } = [];
 
