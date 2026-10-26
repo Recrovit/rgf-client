@@ -47,8 +47,10 @@ public sealed class RgfServerProxyOriginTests
         public string GetCookieHeader() => "session=test";
     }
 
-    private sealed class CaptureHandler : HttpMessageHandler
+    private sealed class CaptureHandler : DelegatingHandler
     {
+        public CaptureHandler() : base(new HttpClientHandler()) { }
+
         public string? Origin { get; private set; }
         public string? Fetch { get; private set; }
         public string? Cookie { get; private set; }

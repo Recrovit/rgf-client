@@ -14,6 +14,79 @@ namespace Recrovit.RecroGridFramework.Client.Blazor.SessionAuth.Tests.Configurat
 
 public sealed class RgfBlazorSessionAuthConfigurationTests
 {
+    public static IEnumerable<object[]> SsrTransports()
+    {
+        foreach (var name in new[] { ApiService.RgfApiClientName, ApiService.RgfAuthApiClientName,
+            "Recrovit.RGF.Blazor.SessionAuth.ServerProxy", RgfBlazorSessionAuthConfigurationExtensions.HostApiClientName,
+            RgfBlazorSessionAuthConfigurationExtensions.DownstreamProxyClientName })
+        {
+            foreach (var kind in new[] { "sockets", "client", "wrapped-sockets", "wrapped-client" })
+                yield return [name, kind];
+        }
+    }
+
+    [Theory]
+    [MemberData(nameof(SsrTransports))]
+    public void SsrClientsSecureExistingTransportAfterLaterNormalRegistration(string name, string kind)
+    {
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddRgfBlazorSessionAuthSsrServices(CreateConfiguration(proxyBaseAddress: "https://host.example.test"));
+        using HttpMessageHandler transport = kind.EndsWith("sockets", StringComparison.Ordinal)
+            ? new SocketsHttpHandler { UseProxy = false, MaxConnectionsPerServer = 7, ConnectTimeout = TimeSpan.FromSeconds(9) }
+            : new HttpClientHandler { UseProxy = false, MaxConnectionsPerServer = 7 };
+        using HttpMessageHandler primary = kind.StartsWith("wrapped", StringComparison.Ordinal)
+            ? new PassthroughHandler { InnerHandler = new PassthroughHandler { InnerHandler = transport } }
+            : transport;
+        services.AddHttpClient(name).ConfigurePrimaryHttpMessageHandler(() => primary);
+        using var provider = services.BuildServiceProvider();
+        using var client = provider.GetRequiredService<IHttpClientFactory>().CreateClient(name);
+
+        if (transport is SocketsHttpHandler sockets)
+        {
+            Assert.False(sockets.AllowAutoRedirect);
+            Assert.False(sockets.UseCookies);
+            Assert.False(sockets.UseProxy);
+            Assert.Equal(7, sockets.MaxConnectionsPerServer);
+            Assert.Equal(TimeSpan.FromSeconds(9), sockets.ConnectTimeout);
+        }
+        else
+        {
+            var handler = Assert.IsType<HttpClientHandler>(transport);
+            Assert.False(handler.AllowAutoRedirect);
+            Assert.False(handler.UseCookies);
+            Assert.False(handler.UseProxy);
+            Assert.Equal(7, handler.MaxConnectionsPerServer);
+        }
+        if (primary is DelegatingHandler wrapper)
+            Assert.Same(transport, Assert.IsType<PassthroughHandler>(wrapper.InnerHandler).InnerHandler);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void SsrClientRejectsUninspectableTransport(bool missingInnerHandler)
+    {
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddRgfBlazorSessionAuthSsrServices(CreateConfiguration(proxyBaseAddress: "https://host.example.test"));
+        services.AddHttpClient(RgfBlazorSessionAuthConfigurationExtensions.HostApiClientName)
+            .ConfigurePrimaryHttpMessageHandler(() => missingInnerHandler ? new PassthroughHandler() : new OpaqueHandler());
+        using var provider = services.BuildServiceProvider();
+        var exception = Assert.Throws<InvalidOperationException>(() => provider.GetRequiredService<IHttpClientFactory>()
+            .CreateClient(RgfBlazorSessionAuthConfigurationExtensions.HostApiClientName));
+        Assert.Contains(RgfBlazorSessionAuthConfigurationExtensions.HostApiClientName, exception.Message);
+        Assert.Contains("requires an inspectable", exception.Message);
+    }
+
+    private sealed class PassthroughHandler : DelegatingHandler { }
+
+    private sealed class OpaqueHandler : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+            => throw new NotSupportedException();
+    }
+
     [Fact]
     public void AddRgfBlazorSessionAuthClientServices_ShouldConfigureClientFoundContentByDefault()
     {

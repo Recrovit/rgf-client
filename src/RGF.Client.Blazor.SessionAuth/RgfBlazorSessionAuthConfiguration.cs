@@ -150,6 +150,38 @@ public static class RgfBlazorSessionAuthConfigurationExtensions
                     builder.AdditionalHandlers.Add(builder.Services.GetRequiredService<RgfServerProxyAuthCookieHandler>());
                 });
             });
+            services.PostConfigure<HttpClientFactoryOptions>(clientName, httpClientOptions =>
+            {
+                // Apply after normal primary-handler registrations, preserving the configured transport.
+                httpClientOptions.HttpMessageHandlerBuilderActions.Add(builder =>
+                {
+                    if (OperatingSystem.IsBrowser())
+                    {
+                        throw new PlatformNotSupportedException("SSR cookie-forwarding HTTP clients are not supported in the browser.");
+                    }
+
+                    var transport = builder.PrimaryHandler;
+                    var visited = new HashSet<HttpMessageHandler>();
+                    while (transport is DelegatingHandler delegating && visited.Add(transport))
+                    {
+                        transport = delegating.InnerHandler;
+                    }
+
+                    switch (transport)
+                    {
+                        case SocketsHttpHandler sockets:
+                            sockets.AllowAutoRedirect = false;
+                            sockets.UseCookies = false;
+                            break;
+                        case HttpClientHandler client:
+                            client.AllowAutoRedirect = false;
+                            client.UseCookies = false;
+                            break;
+                        default:
+                            throw new InvalidOperationException($"SSR cookie-forwarding HTTP client '{clientName}' requires an inspectable SocketsHttpHandler or HttpClientHandler transport with automatic redirects and cookies disabled. Actual transport: {transport?.GetType().FullName ?? "null"}.");
+                    }
+                });
+            });
         }
     }
 

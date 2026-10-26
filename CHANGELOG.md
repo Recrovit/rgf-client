@@ -18,6 +18,8 @@ This file contains the consolidated release history for the `rgf-client` solutio
 
 ### Bugs Fixed
 
+- Prevented SSR authentication cookie leakage through automatic HTTP redirects and shared cookie storage.
+
 - Added Origin/Fetch Metadata validation to RGF HTTP and SignalR proxy endpoints, preserving SSR compatibility and existing authentication behavior.
 
 - Date and local date-time inputs now show an invalid border while typing an invalid date and clear it when corrected, without changing value updates or adding validation messages.
