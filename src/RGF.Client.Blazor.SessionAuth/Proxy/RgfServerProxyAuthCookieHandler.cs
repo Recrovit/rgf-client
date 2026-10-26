@@ -8,6 +8,11 @@ namespace Recrovit.RecroGridFramework.Client.Blazor.SessionAuth.Proxy;
 /// <summary>
 /// Forwards the incoming authentication cookie when SSR code calls the local host proxy.
 /// </summary>
+/// <remarks>
+/// Cookie forwarding applies only to requests initially targeting the configured host origin.
+/// Redirect handling is controlled by the HTTP client, not by this handler.
+/// The Host-to-downstream API authentication boundary is handled separately.
+/// </remarks>
 public sealed class RgfServerProxyAuthCookieHandler(IRgfServerRequestCookieAccessor cookieAccessor) : DelegatingHandler
 {
     private const string CookieHeaderName = "Cookie";
