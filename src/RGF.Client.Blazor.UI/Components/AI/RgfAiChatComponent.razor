@@ -7,10 +7,10 @@
             var message = Session.Conversation.Messages[messageIndex];
             var hasMarkdownView = message.Role == RgfAiMessageRole.Assistant && message is RgfAiResponse formatted
                 && formatted.ResponseFormat is RgfAiResponseFormat.Minimal or RgfAiResponseFormat.Normal or RgfAiResponseFormat.Maximum;
-            <div @key="(Session, messageIndex, message)" class="@($"message {(message.Role == RgfAiMessageRole.User ? "text-bg-primary align-self-end" : "text-bg-secondary align-self-start")}{(hasMarkdownView ? " rgf-ai-markdown" : "")}")">
-                @if (hasMarkdownView)
+            <div @key="(Session, messageIndex, message)" class="@($"message {(message.Role == RgfAiMessageRole.User ? "text-bg-primary align-self-end" : "text-bg-secondary align-self-start")}{(message.Role == RgfAiMessageRole.Assistant ? " rgf-ai-copy" : "")}{(hasMarkdownView ? " rgf-ai-markdown" : "")}")">
+                @if (message.Role == RgfAiMessageRole.Assistant)
                 {
-                    <RgfMarkdownViewer @key="(Session, message)" Text="@message.Message" RenderMarkdown="true" ShowToggle="true" />
+                    <RgfMarkdownViewer @key="(Session, message)" Text="@message.Message" RenderMarkdown="hasMarkdownView" ShowToggle="hasMarkdownView" ShowCopy="true" />
                 }
                 else
                 {

@@ -1,17 +1,17 @@
 .rgf-markdown-viewer { min-width: 0; max-width: 100%; overflow-wrap: anywhere; }
-.rgf-markdown-toolbar { display: flex; justify-content: flex-end; margin-bottom: .25rem; }
+.rgf-markdown-toolbar { display: flex; flex-direction: column; align-items: flex-end; gap: .25rem; margin-bottom: .25rem; }
 .rgf-markdown-toolbar button { padding: .2rem .4rem; min-width: 2rem; min-height: 2rem; }
-.rgf-markdown-toggle.btn,
-.rgf-markdown-toggle.btn:is(:hover, :active, .active, :focus, :focus-visible) {
+.rgf-markdown-toolbar .btn,
+.rgf-markdown-toolbar .btn:is(:hover, :active, .active, :focus, :focus-visible) {
     color: inherit;
     border-color: currentColor;
     background-color: transparent;
     box-shadow: none;
     outline: none;
 }
-.rgf-markdown-toggle.btn:hover { box-shadow: inset 0 0 0 1px currentColor; }
-.rgf-markdown-toggle.btn:is(:active, .active) { box-shadow: inset 0 0 0 2px currentColor; }
-.rgf-markdown-toggle.btn:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+.rgf-markdown-toolbar .btn:hover { box-shadow: inset 0 0 0 1px currentColor; }
+.rgf-markdown-toolbar .btn:is(:active, .active) { box-shadow: inset 0 0 0 2px currentColor; }
+.rgf-markdown-toolbar .btn:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
 .rgf-markdown-plain { white-space: pre-wrap; }
 .rgf-markdown-content { min-width: 0; max-width: 100%; overflow-x: auto; }
 .rgf-markdown-content ::deep :is(h1, h2, h3, h4, h5, h6) { font-size: 1.1em; font-weight: 600; margin: .75em 0 .35em; }

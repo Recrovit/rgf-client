@@ -1,5 +1,6 @@
 using Bunit;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.JSInterop;
 using Recrovit.RecroGridFramework.Abstraction.Contracts.Services;
 using Recrovit.RecroGridFramework.Client.Blazor.UI.Components.Base;
 using Recrovit.RecroGridFramework.Client.Blazor.UI.Tests.Testing;
@@ -8,6 +9,78 @@ namespace Recrovit.RecroGridFramework.Client.Blazor.UI.Tests.Components;
 
 public sealed class RgfMarkdownViewerTests
 {
+    [Fact]
+    public void CopyIsOptionalAndPrecedesToggle()
+    {
+        using var context = Context();
+        var cut = context.Render<RgfMarkdownViewer>(p => p.Add(c => c.Text, "text").Add(c => c.ShowToggle, true));
+        Assert.Empty(cut.FindAll(".rgf-markdown-copy"));
+        cut.Render(p => p.Add(c => c.ShowCopy, true));
+        var buttons = cut.FindAll("button");
+        Assert.Equal(2, buttons.Count);
+        Assert.Equal("Copy", buttons[0].GetAttribute("aria-label"));
+        Assert.Equal("Copy", buttons[0].GetAttribute("title"));
+        Assert.Equal("View plain text", buttons[1].GetAttribute("aria-label"));
+    }
+
+    [Fact]
+    public void CopyUsesExactOriginalTextInBothViewsAndReportsSuccess()
+    {
+        const string text = "  **bold**\r\n\n\t<script>text</script>  ";
+        using var context = Context();
+        context.JSInterop.SetupVoid("navigator.clipboard.writeText", text).SetVoidResult();
+        var cut = context.Render<RgfMarkdownViewer>(p => p.Add(c => c.Text, text)
+            .Add(c => c.ShowCopy, true).Add(c => c.ShowToggle, true));
+        cut.Find(".rgf-markdown-copy").Click();
+        Assert.Equal("Copied", cut.Find("[role=status]").TextContent);
+        Assert.Contains("visually-hidden", cut.Find("[role=status]").ClassList);
+        Assert.Single(cut.FindAll(".bi-check-lg"));
+        cut.Find(".rgf-markdown-toggle").Click();
+        cut.Find(".rgf-markdown-copy").Click();
+        Assert.Equal(text.Replace("\r\n", "\n"), cut.Find(".rgf-markdown-plain").TextContent);
+        var calls = context.JSInterop.Invocations["navigator.clipboard.writeText"];
+        Assert.Equal(2, calls.Count);
+        Assert.All(calls, call => Assert.Equal(text, Assert.Single(call.Arguments)));
+        cut.Find(".rgf-markdown-copy").MouseLeave();
+        Assert.Single(cut.FindAll(".bi-copy"));
+        Assert.Empty(cut.FindAll(".bi-check-lg"));
+        Assert.Empty(cut.Find("[role=status]").TextContent);
+        Assert.Equal(text.Replace("\r\n", "\n"), cut.Find(".rgf-markdown-plain").TextContent);
+        cut.Render(p => p.Add(c => c.Text, "new"));
+        Assert.Empty(cut.Find("[role=status]").TextContent);
+        Assert.Empty(cut.FindAll(".bi-check-lg"));
+    }
+
+    [Fact]
+    public void CopyFailureIsAccessibleAndCanBeRetried()
+    {
+        using var context = Context();
+        var call = context.JSInterop.SetupVoid("navigator.clipboard.writeText", "text");
+        call.SetException(new JSException("NotAllowedError"));
+        var cut = context.Render<RgfMarkdownViewer>(p => p.Add(c => c.Text, "text").Add(c => c.ShowCopy, true));
+        cut.Find(".rgf-markdown-copy").Click();
+        Assert.Contains("Copy failed", cut.Find("[role=alert]").TextContent);
+        Assert.Empty(cut.Find("[role=status]").TextContent);
+        Assert.Empty(cut.FindAll(".bi-check-lg"));
+        call.SetVoidResult();
+        cut.Find(".rgf-markdown-copy").Click();
+        Assert.Equal("Copied", cut.Find("[role=status]").TextContent);
+        Assert.Contains("visually-hidden", cut.Find("[role=status]").ClassList);
+        Assert.Empty(cut.FindAll("[role=alert]"));
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    public void EmptyCopyIsDisabled(string? text)
+    {
+        using var context = Context();
+        var cut = context.Render<RgfMarkdownViewer>(p => p.Add(c => c.Text, text)
+            .Add(c => c.ShowCopy, true).Add(c => c.RenderMarkdown, false));
+        Assert.True(cut.Find(".rgf-markdown-copy").HasAttribute("disabled"));
+        Assert.Empty(context.JSInterop.Invocations);
+    }
+
     private static BunitContext Context()
     {
         var context = new BunitContext();

@@ -31,6 +31,35 @@ public sealed class RgfAiChatComponentTests
         Assert.Equal(markdown ? 1 : 0, cut.FindAll("strong").Count);
         Assert.Equal(markdown ? 1 : 0, cut.FindAll("[aria-label='View plain text']").Count);
         Assert.Equal("**user**\n\ntext", cut.Find(".rgf-ai-plain").TextContent);
+        Assert.Single(cut.FindAll(".rgf-markdown-copy"));
+        var viewer = Assert.Single(cut.FindComponents<RgfMarkdownViewer>());
+        Assert.True(viewer.Instance.ShowCopy);
+        Assert.Equal(markdown, viewer.Instance.RenderMarkdown);
+        Assert.Equal(markdown, viewer.Instance.ShowToggle);
+        if (!markdown) Assert.Equal("**assistant**\n\ntext", cut.Find(".rgf-markdown-plain").TextContent);
+        Assert.Empty(transport.Requests);
+    }
+
+    [Fact]
+    public void CopyIsIndependentPerReplyAndDoesNotSendOrChangeHistoryOrViews()
+    {
+        using var context = CreateContext();
+        var transport = new TestTransport();
+        var session = new RgfAiConversationSession(transport);
+        session.Conversation.ApplyResponse(new() { Success = true, Message = "**first**", ResponseFormat = RgfAiResponseFormat.Minimal });
+        var cut = context.Render<RgfAiChatComponent>(p => p.Add(c => c.Session, session));
+        cut.Find(".rgf-markdown-toggle").Click();
+        cut.Find(".rgf-markdown-copy").Click();
+        session.Conversation.ApplyResponse(new() { Success = true, Message = "second\n  reply" });
+        cut.Render();
+        Assert.Single(cut.FindAll(".bi-check-lg"));
+        Assert.Single(cut.FindAll(".bi-copy"));
+        cut.FindAll(".rgf-markdown-copy")[1].Click();
+        Assert.Equal(new[] { "**first**", "second\n  reply" },
+            context.JSInterop.Invocations["navigator.clipboard.writeText"].Select(call => (string)Assert.Single(call.Arguments)!));
+        Assert.Equal(new[] { "**first**", "second\n  reply" }, cut.FindAll(".rgf-markdown-plain").Select(e => e.TextContent));
+        Assert.Equal(2, cut.FindAll(".bi-check-lg").Count);
+        Assert.Equal(2, session.Conversation.Messages.Count);
         Assert.Empty(transport.Requests);
     }
 
@@ -80,6 +109,8 @@ public sealed class RgfAiChatComponentTests
         Assert.Equal(textDisabled, cut.Find("[aria-label=Send]").HasAttribute("disabled"));
         Assert.Contains("Footer", cut.Find(".rgf-ai-actions").TextContent);
         Assert.Single(cut.FindAll(".message"));
+        Assert.Single(cut.FindAll(".rgf-markdown-copy"));
+        Assert.Empty(cut.FindAll("fieldset .rgf-markdown-copy"));
         if (choices)
         {
             Assert.True(cut.Find("fieldset button").HasAttribute("disabled"));
@@ -304,7 +335,7 @@ public sealed class RgfAiChatComponentTests
         Assert.Single(usage);
         Assert.Same(response, cut.FindComponents<RgfAiUsageSummary>()[0].Instance.Response);
         Assert.Equal("Original answer", usage[0].PreviousElementSibling!.TextContent.Trim());
-        Assert.Equal("message text-bg-secondary align-self-start", usage[0].PreviousElementSibling!.ClassName);
+        Assert.Equal("message text-bg-secondary align-self-start rgf-ai-copy", usage[0].PreviousElementSibling!.ClassName);
         Assert.Single(cut.FindAll(".message.text-bg-primary.align-self-end"));
         var originalId = cut.Find("[popover]").Id!;
         await session.SendAsync("New question", cancellationToken: Xunit.TestContext.Current.CancellationToken);

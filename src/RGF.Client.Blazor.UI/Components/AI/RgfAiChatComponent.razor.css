@@ -24,13 +24,16 @@
     max-width: 36rem;
 }
 
-.message.rgf-ai-markdown {
+.message.rgf-ai-copy {
     position: relative;
     max-width: min(90%, calc(100% - 2.5rem));
     margin-right: 2.5rem;
+    min-height: 2rem;
 }
 
-.message.rgf-ai-markdown ::deep .rgf-markdown-toolbar {
+.message.rgf-ai-markdown { min-height: 4.25rem; }
+
+.message.rgf-ai-copy ::deep .rgf-markdown-toolbar {
     position: absolute;
     top: 0;
     left: calc(100% + .25rem);

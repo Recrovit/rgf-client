@@ -4,13 +4,14 @@ using Markdig.Renderers.Html;
 using Markdig.Renderers.Html.Inlines;
 using Markdig.Syntax.Inlines;
 using Microsoft.AspNetCore.Components;
+using Microsoft.JSInterop;
 using System.Globalization;
 using System.Net;
 
 namespace Recrovit.RecroGridFramework.Client.Blazor.UI.Components.Base;
 
 // RGF-DOC: rgf.client.blazor-ui.markdown-viewer
-/// <summary>Displays untrusted Markdown or its original text, with an optional local view toggle.</summary>
+/// <summary>Displays untrusted Markdown or its original text, with optional copy and local view controls.</summary>
 public partial class RgfMarkdownViewer
 {
     private static readonly MarkdownPipeline Pipeline = new MarkdownPipelineBuilder().UsePipeTables().DisableHtml().Build();
@@ -19,6 +20,12 @@ public partial class RgfMarkdownViewer
     private bool _previousRenderMarkdown;
     private bool _renderMarkdown;
     private string _html = string.Empty;
+    private string? _htmlText;
+    private bool _htmlInitialized;
+    private bool _copying;
+    private bool _copied;
+    private bool _copyFailed;
+    private int _copyFeedbackVersion;
 
     /// <summary>Original text to display; never modified by the viewer.</summary>
     [Parameter] public string? Text { get; set; }
@@ -26,6 +33,8 @@ public partial class RgfMarkdownViewer
     [Parameter] public bool RenderMarkdown { get; set; } = true;
     /// <summary>Shows an accessible button for switching the local view.</summary>
     [Parameter] public bool ShowToggle { get; set; }
+    /// <summary>Shows a button that copies the unchanged original text using the browser Clipboard API.</summary>
+    [Parameter] public bool ShowCopy { get; set; }
 
     private string ToggleLabel => _renderMarkdown ? "View plain text" : "View Markdown";
 
@@ -34,6 +43,27 @@ public partial class RgfMarkdownViewer
         base.OnParametersSet();
         if (!_initialized || !string.Equals(Text, _previousText, StringComparison.Ordinal))
         {
+            ResetCopyFeedback();
+            _copyFailed = false;
+        }
+        if (!_initialized || Text != _previousText || RenderMarkdown != _previousRenderMarkdown)
+            _renderMarkdown = RenderMarkdown;
+        EnsureMarkdown();
+        _previousText = Text;
+        _previousRenderMarkdown = RenderMarkdown;
+        _initialized = true;
+    }
+
+    private void ToggleView()
+    {
+        _renderMarkdown = !_renderMarkdown;
+        EnsureMarkdown();
+    }
+
+    private void EnsureMarkdown()
+    {
+        if (_renderMarkdown && (!_htmlInitialized || Text != _htmlText))
+        {
             using var writer = new StringWriter(CultureInfo.InvariantCulture);
             var renderer = new HtmlRenderer(writer);
             Pipeline.Setup(renderer);
@@ -41,12 +71,39 @@ public partial class RgfMarkdownViewer
             renderer.ObjectRenderers.Replace<AutolinkInlineRenderer>(new SafeAutolinkRenderer());
             renderer.Render(Markdown.Parse(Text ?? string.Empty, Pipeline));
             _html = writer.ToString();
+            _htmlText = Text;
+            _htmlInitialized = true;
         }
-        if (!_initialized || Text != _previousText || RenderMarkdown != _previousRenderMarkdown)
-            _renderMarkdown = RenderMarkdown;
-        _previousText = Text;
-        _previousRenderMarkdown = RenderMarkdown;
-        _initialized = true;
+    }
+
+    private void ResetCopyFeedback()
+    {
+        _copied = false;
+        _copyFeedbackVersion++;
+    }
+
+    private async Task CopyAsync()
+    {
+        if (string.IsNullOrEmpty(Text) || _copying) return;
+        var text = Text;
+        var feedbackVersion = _copyFeedbackVersion;
+        _copying = true;
+        _copied = false;
+        _copyFailed = false;
+        try
+        {
+            // Invoke directly from the click handler, without an asynchronous module import.
+            await _jsRuntime.InvokeVoidAsync("navigator.clipboard.writeText", text);
+            _copied = Text == text && feedbackVersion == _copyFeedbackVersion;
+        }
+        catch (Exception exception) when (exception is JSException or InvalidOperationException or OperationCanceledException)
+        {
+            _copyFailed = Text == text;
+        }
+        finally
+        {
+            _copying = false;
+        }
     }
 
     // Decode only a separate inspection value; preserve the original URL's escaped delimiters.

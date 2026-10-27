@@ -1,14 +1,24 @@
 @inherits RgfBaseComponent
 @* RGF-DOC: rgf.client.blazor-ui.markdown-viewer *@
 <div class="rgf-markdown-viewer @CssClass" style="@Style">
-    @if (ShowToggle)
+    @if (ShowCopy || ShowToggle)
     {
         <div class="rgf-markdown-toolbar">
-            <button type="button" class="btn btn-sm rgf-markdown-toggle" title="@ToggleLabel"
-                    aria-label="@ToggleLabel" aria-pressed="@(_renderMarkdown ? "true" : "false")"
-                    @onclick="() => _renderMarkdown = !_renderMarkdown">
-                <i class="bi @(_renderMarkdown ? "bi-file-text" : "bi-markdown")" aria-hidden="true"></i>
-            </button>
+            @if (ShowCopy)
+            {
+                <button type="button" class="btn btn-sm rgf-markdown-copy" title="Copy" aria-label="Copy"
+                        disabled="@(string.IsNullOrEmpty(Text) || _copying)" @onclick="CopyAsync" @onmouseleave="ResetCopyFeedback">
+                    <i class="bi @(_copied ? "bi-check-lg" : "bi-copy")" aria-hidden="true"></i>
+                </button>
+            }
+            @if (ShowToggle)
+            {
+                <button type="button" class="btn btn-sm rgf-markdown-toggle" title="@ToggleLabel"
+                        aria-label="@ToggleLabel" aria-pressed="@(_renderMarkdown ? "true" : "false")"
+                        @onclick="ToggleView">
+                    <i class="bi @(_renderMarkdown ? "bi-file-text" : "bi-markdown")" aria-hidden="true"></i>
+                </button>
+            }
         </div>
     }
     @if (_renderMarkdown)
@@ -18,5 +28,13 @@
     else
     {
         <div class="rgf-markdown-plain">@Text</div>
+    }
+    @if (ShowCopy)
+    {
+        <div class="rgf-markdown-copy-status visually-hidden" role="status" aria-live="polite">@(_copied ? "Copied" : null)</div>
+        @if (_copyFailed)
+        {
+            <div class="rgf-markdown-copy-error small" role="alert">Copy failed. Check your browser clipboard permissions and try again.</div>
+        }
     }
 </div>

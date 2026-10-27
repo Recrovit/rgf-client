@@ -678,7 +678,7 @@ try {
         const message = document.createElement('div');
         message.id = 'markdown-message';
         message.className = 'message text-bg-secondary align-self-start';
-        message.innerHTML = '<div class="rgf-markdown-viewer"><div class="rgf-markdown-toolbar"><button type="button" class="btn btn-sm rgf-markdown-toggle" aria-label="View plain text"><i class="bi bi-file-text"></i></button></div><div class="rgf-markdown-content"><h2>Long answer</h2><p>' + 'long-link-text'.repeat(60) + '</p><pre><code>' + 'wide code '.repeat(150) + '</code></pre><table><tr>' + '<td>Wide table cell</td>'.repeat(30) + '</tr></table></div></div>';
+        message.innerHTML = '<div class="rgf-markdown-viewer"><div class="rgf-markdown-toolbar"><button type="button" class="btn btn-sm rgf-markdown-copy" title="Copy" aria-label="Copy"><i class="bi bi-copy" aria-hidden="true"></i></button><button type="button" class="btn btn-sm rgf-markdown-toggle" aria-label="View plain text"><i class="bi bi-file-text"></i></button></div><div class="rgf-markdown-content"><h2>Long answer</h2><p>' + 'long-link-text'.repeat(60) + '</p><pre><code>' + 'wide code '.repeat(150) + '</code></pre><table><tr>' + '<td>Wide table cell</td>'.repeat(30) + '</tr></table></div></div>';
         document.querySelector('.chat-box').append(message);
     })()`);
     await viewport(1200, 800);
@@ -728,59 +728,133 @@ try {
         };
     })()`);
     for (const id of ['markdown-message', 'markdown-light']) {
-        const selector = '#' + id + ' .rgf-markdown-toggle';
-        const checkContrast = async state => {
-            const style = await evaluate(`markdownToggleStyles(${JSON.stringify(selector)})`);
-            assert.equal(style.visible, true, state + ': toggle is fully visible');
-            assert.equal(style.color, style.parentColor, state + ': inherits surrounding text color');
-            assert.equal(style.iconColor, style.color, state + ': icon follows text color');
-            assert.equal(style.border, style.color, state + ': border follows text color');
-            assert.ok(style.borderContrast >= 3, state + ': border contrast is at least 3:1');
-            assert.ok(style.contrast >= 4.5, state + ': icon contrast is at least 4.5:1');
-            return style;
-        };
-        await cdp('Input.dispatchMouseEvent', {type:'mouseMoved', x:0, y:0});
-        await evaluate(`document.activeElement.blur(); document.querySelector(${JSON.stringify(selector)}).scrollIntoView({block:'center'})`);
-        assert.equal((await checkContrast(id + ' normal')).hover, false, 'normal visibility does not require hover');
-        const button = await rect(selector);
-        const point = {x:button.x + button.width/2, y:button.y + button.height/2};
-        await cdp('Input.dispatchMouseEvent', {type:'mouseMoved', ...point});
-        assert.equal((await checkContrast(id + ' hover')).hover, true);
-        await cdp('Input.dispatchMouseEvent', {type:'mousePressed', button:'left', clickCount:1, ...point});
-        assert.equal((await checkContrast(id + ' active')).active, true);
-        await cdp('Input.dispatchMouseEvent', {type:'mouseReleased', button:'left', clickCount:1, ...point});
-        await checkContrast(id + ' focus');
-        await cdp('Input.dispatchMouseEvent', {type:'mouseMoved', x:0, y:0});
-        await cdp('Input.dispatchKeyEvent', {type:'keyDown', key:'Tab'});
-        await cdp('Input.dispatchKeyEvent', {type:'keyUp', key:'Tab'});
-        await evaluate(`document.querySelector(${JSON.stringify(selector)}).focus()`);
-        const focused = await checkContrast(id + ' keyboard focus');
-        assert.equal(focused.focusVisible, true);
-        assert.ok(focused.outlineWidth >= 2 && focused.outlineStyle === 'solid' && focused.outlineContrast >= 3,
-            'keyboard focus has a contrasting outline');
-    }
-    await evaluate("document.activeElement.blur(); document.querySelector('#markdown-light').remove()");
-    console.log('PASS: Markdown toggle computed colors, contrast, normal/hover/active/focus-visible on light and dark bubbles');
-    await evaluate("document.querySelector('#markdown-message').classList.add('rgf-ai-markdown')");
-    for (const [width, height] of [[1200, 800], [390, 700]]) {
-        await viewport(width, height);
-        for (const mode of [0, 1, 2, 3]) {
-            await layout({mode, isCollapsed:false});
-            assert.equal(await evaluate(`(() => {
-                const panel = document.querySelector('section'), message = document.querySelector('#markdown-message');
-                const content = message.querySelector('.rgf-markdown-content');
-                const button = message.querySelector('button').getBoundingClientRect();
-                const bubble = message.getBoundingClientRect(), chat = message.closest('.chat-box').getBoundingClientRect();
-                return button.x >= bubble.right && button.right <= chat.right - 4 && button.y >= bubble.y
-                    && panel.scrollWidth <= panel.clientWidth + 1 && message.getBoundingClientRect().right <= panel.getBoundingClientRect().right
-                    && content.querySelector('pre').scrollWidth > content.querySelector('pre').clientWidth
-                    && content.querySelector('table').scrollWidth > content.querySelector('table').clientWidth;
-            })()`), true, 'Markdown toggle stays to the right of its bubble and long content fits dock/floating/mobile panel');
-            await evaluate("document.querySelector('#markdown-message .rgf-markdown-toggle').scrollIntoView({block:'center'})");
-            const outsideToggle = await evaluate("markdownToggleStyles('#markdown-message .rgf-markdown-toggle')");
-            assert.ok(outsideToggle.visible && outsideToggle.contrast >= 4.5, 'outside toggle stays visible against the chat background');
+        for (const control of ['copy', 'toggle']) {
+            const selector = '#' + id + ' .rgf-markdown-' + control;
+            const checkContrast = async state => {
+                const style = await evaluate(`markdownToggleStyles(${JSON.stringify(selector)})`);
+                assert.equal(style.visible, true, state + ': toggle is fully visible');
+                assert.equal(style.color, style.parentColor, state + ': inherits surrounding text color');
+                assert.equal(style.iconColor, style.color, state + ': icon follows text color');
+                assert.equal(style.border, style.color, state + ': border follows text color');
+                assert.ok(style.borderContrast >= 3, state + ': border contrast is at least 3:1');
+                assert.ok(style.contrast >= 4.5, state + ': icon contrast is at least 4.5:1');
+                return style;
+            };
+            await cdp('Input.dispatchMouseEvent', {type:'mouseMoved', x:0, y:0});
+            await evaluate(`document.activeElement.blur(); document.querySelector(${JSON.stringify(selector)}).scrollIntoView({block:'center'})`);
+            assert.equal((await checkContrast(id + ' normal')).hover, false, 'normal visibility does not require hover');
+            const button = await rect(selector);
+            const point = {x:button.x + button.width/2, y:button.y + button.height/2};
+            await cdp('Input.dispatchMouseEvent', {type:'mouseMoved', ...point});
+            assert.equal((await checkContrast(id + ' hover')).hover, true);
+            await cdp('Input.dispatchMouseEvent', {type:'mousePressed', button:'left', clickCount:1, ...point});
+            assert.equal((await checkContrast(id + ' active')).active, true);
+            await cdp('Input.dispatchMouseEvent', {type:'mouseReleased', button:'left', clickCount:1, ...point});
+            await checkContrast(id + ' focus');
+            await cdp('Input.dispatchMouseEvent', {type:'mouseMoved', x:0, y:0});
+            await cdp('Input.dispatchKeyEvent', {type:'keyDown', key:'Tab'});
+            await cdp('Input.dispatchKeyEvent', {type:'keyUp', key:'Tab'});
+            await evaluate(`document.querySelector(${JSON.stringify(selector)}).focus()`);
+            const focused = await checkContrast(id + ' keyboard focus');
+            assert.equal(focused.focusVisible, true);
+            assert.ok(focused.outlineWidth >= 2 && focused.outlineStyle === 'solid' && focused.outlineContrast >= 3,
+                'keyboard focus has a contrasting outline');
         }
     }
+    await evaluate("document.activeElement.blur(); document.querySelector('#markdown-light').remove()");
+    console.log('PASS: Copy and Markdown toggle computed colors, contrast, normal/hover/active/focus-visible on light and dark bubbles');
+    await evaluate("document.querySelector('#markdown-message').classList.add('rgf-ai-copy', 'rgf-ai-markdown')");
+    // Mirror actual keyed viewer markup; bUnit verifies the component interop and feedback.
+    await evaluate(`(() => {
+        const chat = document.querySelector('.chat-box');
+        for (const [id, markdown] of [['short-markdown', true], ['plain-message', false]]) {
+            const message = document.querySelector('#markdown-message').cloneNode(true);
+            message.id = id;
+            message.querySelector('.rgf-markdown-content').outerHTML = '<div class="rgf-markdown-plain">Short reply</div>';
+            if (!markdown) {
+                message.classList.remove('rgf-ai-markdown');
+                message.querySelector('.rgf-markdown-toggle').remove();
+            }
+            chat.append(message);
+            const usage = document.createElement('div');
+            usage.className = 'rgf-ai-usage';
+            usage.textContent = 'Usage / Credit';
+            chat.append(usage);
+        }
+        const usage = document.createElement('div');
+        usage.className = 'rgf-ai-usage';
+        usage.textContent = 'Usage / Credit';
+        document.querySelector('#markdown-message').after(usage);
+    })()`);
+    for (const [width, height] of [[1200, 800], [800, 400], [390, 700]]) {
+        await viewport(width, height);
+        for (const mode of [0, 1, 2, 3]) {
+            await layout({mode, isCollapsed:false, width:360, dockWidth:300});
+            for (const id of ['markdown-message', 'short-markdown', 'plain-message']) {
+                await evaluate(`document.querySelector('#${id}').scrollIntoView({block:'start'})`);
+                assert.equal(await evaluate(`(() => {
+                    const panel = document.querySelector('section'), message = document.querySelector('#${id}');
+                    const buttons = [...message.querySelectorAll('.rgf-markdown-toolbar button')];
+                    const copy = buttons[0].getBoundingClientRect();
+                    const bubble = message.getBoundingClientRect(), chat = message.closest('.chat-box').getBoundingClientRect();
+                    const next = message.nextElementSibling.getBoundingClientRect();
+                    const toggle = buttons[1]?.getBoundingClientRect();
+                    return buttons[0].classList.contains('rgf-markdown-copy')
+                        && buttons.length === (message.classList.contains('rgf-ai-markdown') ? 2 : 1)
+                        && Math.abs(copy.y - bubble.y) < 1
+                        && (!toggle || (Math.abs(toggle.x - copy.x) < 1 && Math.abs(toggle.y - copy.bottom - 4) < 1))
+                        && buttons.every(button => {
+                            const r = button.getBoundingClientRect();
+                            return r.x >= bubble.right && r.right <= chat.right - 4 && r.bottom <= bubble.bottom + 1 && r.bottom <= next.y + 1;
+                        })
+                        && panel.scrollWidth <= panel.clientWidth + 1 && bubble.right <= panel.getBoundingClientRect().right;
+                })()`), true, id + ': Copy is first at bubble top; toggle is below; no text/Usage overlap in mode ' + mode);
+                for (const control of id === 'plain-message' ? ['copy'] : ['copy', 'toggle']) {
+                    const style = await evaluate(`markdownToggleStyles('#${id} .rgf-markdown-${control}')`);
+                    assert.ok(style.visible && style.contrast >= 4.5, 'outside controls stay visible against the chat background');
+                }
+            }
+            assert.equal(await evaluate(`(() => {
+                const content = document.querySelector('#markdown-message .rgf-markdown-content');
+                return content.querySelector('pre').scrollWidth > content.querySelector('pre').clientWidth
+                    && content.querySelector('table').scrollWidth > content.querySelector('table').clientWidth;
+            })()`), true, 'wide Markdown retains internal scrolling');
+        }
+    }
+    await cdp('Browser.grantPermissions', {origin:await evaluate('location.origin'), permissions:['clipboardReadWrite', 'clipboardSanitizedWrite']});
+    await evaluate(`(() => {
+        window.copySource = '  **original**' + String.fromCharCode(13,10,13,10,9) + 'text  ';
+        const message = document.querySelector('#plain-message');
+        const status = document.createElement('div');
+        status.setAttribute('role', 'status');
+        status.className = 'rgf-markdown-copy-status visually-hidden';
+        message.querySelector('.rgf-markdown-viewer').append(status);
+        // Exercise native browser permission behavior; component handling is covered in bUnit.
+        message.querySelector('.rgf-markdown-copy').onmouseleave = () => {
+            message.querySelector('.rgf-markdown-copy i').className = 'bi bi-copy';
+            status.textContent = '';
+        };
+        message.querySelector('.rgf-markdown-copy').onclick = () => {
+            status.textContent = '';
+            const icon = message.querySelector('.rgf-markdown-copy i');
+            icon.className = 'bi bi-copy';
+            window.copyOperation = navigator.clipboard.writeText(copySource).then(() => {
+                icon.className = 'bi bi-check-lg';
+                status.textContent = 'Copied'; status.classList.add('visually-hidden'); status.setAttribute('role', 'status');
+            }, () => {status.textContent = 'Copy failed'; status.classList.remove('visually-hidden'); status.setAttribute('role', 'alert');});
+        };
+        message.scrollIntoView({block:'center'});
+    })()`);
+    await click('#plain-message .rgf-markdown-copy');
+    await evaluate('copyOperation');
+    assert.equal(await evaluate("document.querySelector('#plain-message [role=status]').textContent"), 'Copied');
+    assert.equal(await evaluate('navigator.clipboard.readText()'), await evaluate('copySource'), 'native clipboard receives original whitespace and Markdown');
+    await evaluate(`window.originalWriteText = navigator.clipboard.writeText; navigator.clipboard.writeText = () => Promise.reject(new DOMException('Denied', 'NotAllowedError'))`);
+    await click('#plain-message .rgf-markdown-copy');
+    await evaluate('copyOperation');
+    assert.equal(await evaluate("document.querySelector('#plain-message [role=alert]').textContent"), 'Copy failed');
+    await evaluate(`navigator.clipboard.writeText = originalWriteText; document.querySelector('#short-markdown').nextElementSibling.remove(); document.querySelector('#short-markdown').remove(); document.querySelector('#plain-message').nextElementSibling.remove(); document.querySelector('#plain-message').remove(); document.querySelector('#markdown-message').nextElementSibling.remove()`);
+    console.log('PASS: Copy-first toolbar geometry for short/long/plain replies, Usage, all docking/mobile layouts, native clipboard success/rejection');
     await evaluate("document.querySelector('#markdown-message').remove()");
     await evaluate("document.querySelector('#model-choice').lastChild.textContent=' provider / ' + 'long-model-name-'.repeat(20) + ' ▾'");
     for (const [width, height] of [[1200, 800], [800, 400], [390, 700], [390, 260]]) {
