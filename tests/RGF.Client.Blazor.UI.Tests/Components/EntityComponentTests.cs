@@ -66,11 +66,13 @@ public sealed class EntityComponentTests
         var gate = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
         api.GridResponseGate = gate;
         var ui = cut.FindComponent<Recrovit.RecroGridFramework.Client.Blazor.UI.Components.EntityComponent>();
-        ui.Render(p => p.Add(c => c.EntityParameters, new RgfEntityParameters("Pending", firstManager.SessionParams)));
+        entity = new RgfEntityParameters("Pending", firstManager.SessionParams);
+        ui.Render(p => p.Add(c => c.EntityParameters, entity));
         Assert.Null(gridContext.Manager);
         Assert.Same(gridContext, component.RecrobyGridContext);
         api.GridResponseGate = null;
-        ui.Render(p => p.Add(c => c.EntityParameters, new RgfEntityParameters("Replacement", firstManager.SessionParams)));
+        entity = new RgfEntityParameters("Replacement", firstManager.SessionParams);
+        ui.Render(p => p.Add(c => c.EntityParameters, entity));
         cut.WaitForAssertion(() => Assert.NotNull(gridContext.Manager));
         var replacement = gridContext.Manager;
         Assert.NotSame(firstManager, replacement);

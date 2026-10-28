@@ -13,6 +13,160 @@ namespace Recrovit.RecroGridFramework.Client.Blazor.UI.Tests.Components;
 public sealed class RgfRecrobyWorkspaceTests
 {
     [Fact]
+    public void GridContextNotifiesOnlyAfterActualStateChanges()
+    {
+        var grid = new RgfRecrobyGridContext();
+        var manager = CreateGridManager();
+        var replacement = CreateGridManager();
+        var states = new List<(object? Manager, string Entity, string Display)>();
+        grid.Changed += () => states.Add((grid.Manager, grid.EntityName, grid.DisplayName));
+
+        grid.ClearManager(manager);
+        Assert.Empty(states);
+        grid.SetManager(manager);
+        Assert.Equal((manager, "Orders", "Orders"), Assert.Single(states));
+        grid.SetManager(manager);
+        grid.ClearManager(replacement);
+        Assert.Single(states);
+
+        manager.EntityDesc.Title = "Customer orders";
+        grid.SetManager(manager);
+        Assert.Equal((manager, "Orders", "Customer orders"), states[1]);
+        manager.EntityDesc.EntityName = "ArchivedOrders";
+        grid.SetManager(manager);
+        Assert.Equal((manager, "ArchivedOrders", "Customer orders"), states[2]);
+        grid.SetManager(replacement);
+        Assert.Equal((replacement, "Orders", "Orders"), states[3]);
+        grid.ClearManager(manager);
+        grid.SetManager(replacement);
+        Assert.Equal(4, states.Count);
+
+        grid.ClearManager(replacement);
+        Assert.Equal(((object?)null, "Orders", "Orders"), states[4]);
+        grid.ClearManager(replacement);
+        Assert.Equal(5, states.Count);
+    }
+
+    [Fact]
+    public async Task SharedGridContextUpdatesLabelsAutomaticallyUntilLastConversationCloses()
+    {
+        using var context = Context();
+        var cut = context.Render<RgfRecrobyWorkspace>();
+        var grid = new RgfRecrobyGridContext();
+        var manager = CreateGridManager();
+        grid.SetManager(manager);
+        await context.Services.GetRequiredService<RgfRecrobyWorkspaceService>().OpenOrActivateGridAsync(grid);
+        cut.Find("[data-action=new]").Click();
+        Assert.Single(GridContextHandlers(grid));
+
+        await Task.Run(() => grid.ClearManager(manager), Xunit.TestContext.Current.CancellationToken);
+        cut.WaitForAssertion(() =>
+        {
+            Assert.Equal("Orders (unavailable)", cut.Find(".rgf-recroby-context").TextContent);
+            Assert.Equal(2, cut.FindAll("[data-action=select]").Count(e => e.TextContent.Contains("Orders (unavailable)")));
+        });
+        await Task.Run(() => grid.SetManager(manager), Xunit.TestContext.Current.CancellationToken);
+        cut.WaitForAssertion(() =>
+        {
+            Assert.Equal("Orders", cut.Find(".rgf-recroby-context").TextContent);
+            Assert.DoesNotContain("unavailable", cut.Markup);
+        });
+
+        await cut.FindAll(".rgf-recroby-choice > .btn-close")[1].ClickAsync(new());
+        Assert.Single(GridContextHandlers(grid));
+        await Task.Run(() => grid.ClearManager(manager), Xunit.TestContext.Current.CancellationToken);
+        cut.WaitForAssertion(() => Assert.Equal("Orders (unavailable)", cut.Find(".rgf-recroby-context").TextContent));
+        await Task.Run(() => grid.SetManager(manager), Xunit.TestContext.Current.CancellationToken);
+        cut.WaitForAssertion(() => Assert.Equal("Orders", cut.Find(".rgf-recroby-context").TextContent));
+
+        await cut.FindAll(".rgf-recroby-choice > .btn-close")[1].ClickAsync(new());
+        Assert.Empty(GridContextHandlers(grid));
+        var renderCount = cut.RenderCount;
+        grid.ClearManager(manager);
+        await cut.InvokeAsync(() => { });
+        Assert.Equal(renderCount, cut.RenderCount);
+        Assert.Equal("General chat", cut.Find(".rgf-recroby-context").TextContent);
+    }
+
+    [Fact]
+    public async Task WorkspaceDetachesAllGridContextsBeforeAsyncComponentCleanup()
+    {
+        using var context = Context();
+        var module = context.JSInterop.SetupModule(invocation => invocation.Arguments[0]?.ToString()?.EndsWith("RgfRecrobyComponent.razor.js") == true);
+        module.Mode = JSRuntimeMode.Loose;
+        var cleanup = module.SetupVoid("dispose", _ => true);
+        var cut = context.Render<RgfRecrobyWorkspace>();
+        var grids = new[] { new RgfRecrobyGridContext(), new RgfRecrobyGridContext() };
+        foreach (var grid in grids)
+        {
+            await context.Services.GetRequiredService<RgfRecrobyWorkspaceService>().OpenOrActivateGridAsync(grid);
+            Assert.Single(GridContextHandlers(grid));
+        }
+
+        var disposal = cut.Instance.DisposeAsync().AsTask();
+        try
+        {
+            cut.WaitForAssertion(() => Assert.NotEmpty(module.Invocations["dispose"]));
+            Assert.False(disposal.IsCompleted);
+            Assert.All(grids, grid => Assert.Empty(GridContextHandlers(grid)));
+        }
+        finally { cleanup.SetVoidResult(); }
+        await disposal;
+    }
+
+    [Fact]
+    public async Task QueuedGridContextChangeDoesNotRenderDisposedWorkspace()
+    {
+        using var context = Context();
+        var cut = context.Render<RgfRecrobyWorkspace>();
+        var grid = new RgfRecrobyGridContext();
+        var manager = CreateGridManager();
+        grid.SetManager(manager);
+        await context.Services.GetRequiredService<RgfRecrobyWorkspaceService>().OpenOrActivateGridAsync(grid);
+        SynchronizationContext? dispatcherContext = null;
+        await cut.InvokeAsync(() => dispatcherContext = SynchronizationContext.Current);
+        Assert.NotNull(dispatcherContext);
+        using var releaseDispatcher = new ManualResetEventSlim();
+        var dispatcherBlocked = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var renderCount = 0;
+        Task disposal;
+        // Post keeps the dispatcher queue occupied until the test explicitly releases it.
+        dispatcherContext.Post(_ =>
+        {
+            dispatcherBlocked.SetResult();
+            releaseDispatcher.Wait();
+        }, null);
+        try
+        {
+            await dispatcherBlocked.Task.WaitAsync(Xunit.TestContext.Current.CancellationToken);
+            renderCount = cut.RenderCount;
+            grid.ClearManager(manager);
+            Assert.Equal(renderCount, cut.RenderCount);
+            disposal = cut.Instance.DisposeAsync().AsTask();
+            Assert.Empty(GridContextHandlers(grid));
+        }
+        finally { releaseDispatcher.Set(); }
+        await disposal;
+        await cut.InvokeAsync(() => { });
+        Assert.Equal(renderCount, cut.RenderCount);
+        Assert.Empty(GridContextHandlers(grid));
+    }
+
+    private static Delegate[] GridContextHandlers(RgfRecrobyGridContext grid) =>
+        ((Action?)typeof(RgfRecrobyGridContext).GetField("Changed",
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.GetValue(grid))?.GetInvocationList() ?? [];
+
+    private static Recrovit.RecroGridFramework.Client.Handlers.IRgManager CreateGridManager() =>
+        System.Reflection.DispatchProxy.Create<Recrovit.RecroGridFramework.Client.Handlers.IRgManager, GridManagerProxy>();
+
+    public class GridManagerProxy : System.Reflection.DispatchProxy
+    {
+        private readonly Recrovit.RecroGridFramework.Abstraction.Models.RgfEntity _entity = new() { EntityName = "Orders", Title = "Orders" };
+        protected override object? Invoke(System.Reflection.MethodInfo? targetMethod, object?[]? args) =>
+            targetMethod?.Name == "get_EntityDesc" ? _entity : throw new NotSupportedException(targetMethod?.Name);
+    }
+
+    [Fact]
     public async Task GridChatsReuseReferenceIdentityAndInheritOnlyContext()
     {
         using var context = Context();

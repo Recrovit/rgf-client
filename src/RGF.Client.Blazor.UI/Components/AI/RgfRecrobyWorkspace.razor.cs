@@ -61,6 +61,7 @@ public partial class RgfRecrobyWorkspace : IAsyncDisposable
     public RenderFragment? ChildContent { get; set; }
 
     private readonly List<Conversation> _conversations = [];
+    private readonly HashSet<RgfRecrobyGridContext> _gridContexts = new(ReferenceEqualityComparer.Instance);
     private Conversation? _active;
     private Conversation? _editing;
     private string _editTitle = string.Empty;
@@ -117,6 +118,15 @@ public partial class RgfRecrobyWorkspace : IAsyncDisposable
             StateHasChanged();
         });
     }
+    private void GridContextChanged()
+    {
+        if (_disposed) return;
+        _ = InvokeAsync(() =>
+        {
+            if (!_disposed) StateHasChanged();
+        });
+    }
+
     private RgfRecrobyLayoutSettings _layout = new();
     private readonly string _selectorId = $"recroby-{Guid.NewGuid():N}";
     private ElementReference _element;
@@ -242,6 +252,8 @@ public partial class RgfRecrobyWorkspace : IAsyncDisposable
     {
         _disposed = true;
         _workspaceRegistration?.Dispose();
+        foreach (var context in _gridContexts) context.Changed -= GridContextChanged;
+        _gridContexts.Clear();
         await InvokeAsync(async () =>
         {
             foreach (var conversation in _conversations.ToArray())
@@ -343,6 +355,7 @@ public partial class RgfRecrobyWorkspace : IAsyncDisposable
         conversation.StateChangedHandler = () => ConversationStateChanged(conversation);
         conversation.Session.StateChanged += conversation.StateChangedHandler;
         _conversations.Add(_active);
+        if (context is not null && _gridContexts.Add(context)) context.Changed += GridContextChanged;
     }
 
     private async Task CloseConversation(Conversation conversation)
@@ -353,6 +366,9 @@ public partial class RgfRecrobyWorkspace : IAsyncDisposable
         if (!_conversations.Contains(conversation)) return;
         if (_editing == conversation) CancelRename();
         _conversations.Remove(conversation);
+        if (conversation.GridContext is { } context &&
+            !_conversations.Any(c => ReferenceEquals(c.GridContext, context)) && _gridContexts.Remove(context))
+            context.Changed -= GridContextChanged;
         if (_active == conversation) _active = _conversations.LastOrDefault();
         if (!_disposed && _conversations.Count == 0) NewGeneralConversation();
     }
