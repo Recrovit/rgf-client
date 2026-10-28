@@ -186,7 +186,7 @@ public sealed class EntityComponentTests
         Assert.Equal("Orders", cut.Find(".rgf-recroby-context").TextContent);
         var session = cut.FindComponents<RgfAiChatComponent>().Last().Instance.Session;
         cut.Find(".btn-toolbar .bi-robot").ParentElement!.Click();
-        Assert.Equal(2, cut.FindComponents<RgfAiChatComponent>().Count);
+        Assert.Single(cut.FindComponents<RgfAiChatComponent>());
         var api = (PendingRgfApiService)context.Services.GetRequiredService<IRgfApiService>();
         var gate = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
         api.GridResponseGate = gate;
@@ -207,13 +207,14 @@ public sealed class EntityComponentTests
         Assert.Same(replacement, gridContext.Manager);
         Assert.Same(session, cut.FindComponents<RgfAiChatComponent>().Last().Instance.Session);
         cut.Find(".btn-toolbar .bi-robot").ParentElement!.Click();
-        Assert.Equal(2, cut.FindComponents<RgfAiChatComponent>().Count);
+        Assert.Single(cut.FindComponents<RgfAiChatComponent>());
         cut.Render(p => p.Add(c => c.ChildContent, "<main>Grid removed</main>"));
         Assert.Null(gridContext.Manager);
         Assert.Equal("Orders", gridContext.DisplayName);
+        session.Conversation.AddUserMessage("Retained Grid history");
         cut.Find("[data-action=new]").Click();
         Assert.Equal("Orders (unavailable)", cut.Find(".rgf-recroby-context").TextContent);
-        Assert.Equal(3, cut.FindComponents<RgfAiChatComponent>().Count);
+        Assert.Equal(2, cut.FindComponents<RgfAiChatComponent>().Count);
         Assert.Empty(cut.FindComponents<RgfAiChatComponent>().Last().Instance.Session.Conversation.Messages);
     }
 

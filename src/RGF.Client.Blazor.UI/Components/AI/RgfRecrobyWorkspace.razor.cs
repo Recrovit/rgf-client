@@ -296,7 +296,12 @@ public partial class RgfRecrobyWorkspace : IAsyncDisposable
         if (_active is not { Closing: false } || !ReferenceEquals(_active.GridContext, context))
         {
             var existing = _conversations.FirstOrDefault(c => !c.Closing && ReferenceEquals(c.GridContext, context));
-            if (existing is not null) SelectConversation(existing);
+            if (existing is not null)
+            {
+                var previous = _active;
+                SelectConversation(existing);
+                RemoveEmptyConversation(previous);
+            }
             else CreateConversation(context);
         }
         _layout.IsCollapsed = false;
@@ -347,6 +352,7 @@ public partial class RgfRecrobyWorkspace : IAsyncDisposable
 
     private void CreateConversation(RgfRecrobyGridContext? context)
     {
+        var previous = _active;
         CancelRename();
         CloseSwitcher(_switcherOpen);
         // Resolve the API only when sending a turn, so an unconfigured backend cannot break startup.
@@ -356,6 +362,19 @@ public partial class RgfRecrobyWorkspace : IAsyncDisposable
         conversation.Session.StateChanged += conversation.StateChangedHandler;
         _conversations.Add(_active);
         if (context is not null && _gridContexts.Add(context)) context.Changed += GridContextChanged;
+        RemoveEmptyConversation(previous);
+    }
+
+    private void RemoveEmptyConversation(Conversation? conversation)
+    {
+        if (conversation is null || conversation.Closing || conversation.Owner is not null) return;
+        var session = conversation.Session;
+        var state = session.Conversation;
+        if (state.Messages.Count != 0 || session.IsProcessing || state.IsPendingWorkflow
+            || state.ConversationId is not null || state.ConversationToken is not null) return;
+
+        // Removing the keyed component from the render tree lets Blazor await its async disposal.
+        RemoveConversation(conversation);
     }
 
     private async Task CloseConversation(Conversation conversation)
@@ -364,13 +383,19 @@ public partial class RgfRecrobyWorkspace : IAsyncDisposable
         conversation.Session.StateChanged -= conversation.StateChangedHandler;
         if (conversation.Component is not null) await conversation.Component.DisposeAsync();
         if (!_conversations.Contains(conversation)) return;
+        RemoveConversation(conversation);
+        if (_active == conversation) _active = _conversations.LastOrDefault();
+        if (!_disposed && _conversations.Count == 0) NewGeneralConversation();
+    }
+
+    private void RemoveConversation(Conversation conversation)
+    {
+        conversation.Session.StateChanged -= conversation.StateChangedHandler;
         if (_editing == conversation) CancelRename();
         _conversations.Remove(conversation);
         if (conversation.GridContext is { } context &&
             !_conversations.Any(c => ReferenceEquals(c.GridContext, context)) && _gridContexts.Remove(context))
             context.Changed -= GridContextChanged;
-        if (_active == conversation) _active = _conversations.LastOrDefault();
-        if (!_disposed && _conversations.Count == 0) NewGeneralConversation();
     }
 
     // The type identifies the general Recroby independently of its displayed title.

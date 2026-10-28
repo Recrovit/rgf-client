@@ -52,10 +52,12 @@ public sealed class RgfRecrobyWorkspaceTests
     {
         using var context = Context();
         var cut = context.Render<RgfRecrobyWorkspace>();
+        AddHistoryToActive(cut);
         var grid = new RgfRecrobyGridContext();
         var manager = CreateGridManager();
         grid.SetManager(manager);
         await context.Services.GetRequiredService<RgfRecrobyWorkspaceService>().OpenOrActivateGridAsync(grid);
+        AddHistoryToActive(cut);
         cut.Find("[data-action=new]").Click();
         Assert.Single(GridContextHandlers(grid));
 
@@ -101,6 +103,7 @@ public sealed class RgfRecrobyWorkspaceTests
         {
             await context.Services.GetRequiredService<RgfRecrobyWorkspaceService>().OpenOrActivateGridAsync(grid);
             Assert.Single(GridContextHandlers(grid));
+            AddHistoryToActive(cut);
         }
 
         var disposal = cut.Instance.DisposeAsync().AsTask();
@@ -176,6 +179,7 @@ public sealed class RgfRecrobyWorkspaceTests
         Assert.True(cut.Find("section").HasAttribute("hidden"));
         Assert.Equal("General chat", cut.Find(".rgf-recroby-context").TextContent);
         Assert.True(cut.Find("[data-new-chat]").HasAttribute("disabled"));
+        AddHistoryToActive(cut);
         var grid = new RgfRecrobyGridContext();
         Assert.True(await service.OpenOrActivateGridAsync(grid));
         Assert.Equal(2, cut.FindComponents<RgfAiChatComponent>().Count);
@@ -189,6 +193,7 @@ public sealed class RgfRecrobyWorkspaceTests
         first.Conversation.ApplyResponse(new() { Success = true, ConversationId = "private-id", ConversationToken = "private-token",
             WorkflowStatus = "WaitingForInput", ResponseMode = RgfAiResponseMode.ChoiceOnly,
             Choices = [new() { Code = "private", UserText = "Private choice" }], Message = "Pending" });
+        AddHistoryToActive(cut);
         cut.Find("[data-action=new]").Click();
         var second = cut.FindComponents<RgfAiChatComponent>().Last().Instance.Session;
         Assert.NotSame(first, second);
@@ -199,13 +204,17 @@ public sealed class RgfRecrobyWorkspaceTests
         Assert.False(second.IsProcessing);
         Assert.True(await service.OpenOrActivateGridAsync(grid));
         Assert.Equal("true", cut.FindAll("[data-action=select]")[2].GetAttribute("aria-pressed"));
+        AddHistoryToActive(cut);
         cut.FindAll("[data-new-chat]")[1].Click();
         Assert.Equal("General chat", cut.Find(".rgf-recroby-context").TextContent);
+        AddHistoryToActive(cut);
         Assert.True(await service.OpenOrActivateGridAsync(grid));
         Assert.Equal("true", cut.FindAll("[data-action=select]")[1].GetAttribute("aria-pressed"));
+        AddHistoryToActive(cut);
         var otherGrid = new RgfRecrobyGridContext();
         Assert.True(await service.OpenOrActivateGridAsync(otherGrid));
         Assert.Equal(5, cut.FindComponents<RgfAiChatComponent>().Count);
+        AddHistoryToActive(cut);
         cut.FindAll("[data-new-chat]")[0].Click();
         Assert.Equal(6, cut.FindComponents<RgfAiChatComponent>().Count);
         Assert.Contains("unavailable", cut.Find(".rgf-recroby-context").TextContent);
@@ -372,6 +381,7 @@ public sealed class RgfRecrobyWorkspaceTests
         using var context = Context();
         var cut = context.Render<RgfRecrobyWorkspace>();
         var first = cut.FindComponent<RgfAiChatComponent>();
+        first.Instance.Session.Conversation.AddUserMessage("Existing history");
         cut.Find("textarea").Change("Draft one");
         cut.Find("[data-action=new]").Click();
         var chats = cut.FindComponents<RgfAiChatComponent>();
@@ -516,7 +526,9 @@ public sealed class RgfRecrobyWorkspaceTests
     {
         using var context = Context();
         var cut = context.Render<RgfRecrobyWorkspace>();
+        AddHistoryToActive(cut);
         cut.Find("[data-action=new]").Click();
+        AddHistoryToActive(cut);
         cut.Find("[data-action=new]").Click();
         var active = cut.FindComponents<RgfAiChatComponent>()[2].Instance;
         cut.Find("[data-action=switch]").Click();
@@ -541,11 +553,13 @@ public sealed class RgfRecrobyWorkspaceTests
         Rename(cut, "Conversation 1");
         for (var i = 1; i < 8; i++)
         {
+            AddHistoryToActive(cut);
             cut.Find("[data-action=new]").Click();
             Rename(cut, $"Conversation {i + 1}");
         }
         cut.Find("[data-action=switch]").Click();
         Assert.Empty(cut.FindAll("input[type=search]"));
+        AddHistoryToActive(cut);
         cut.Find("[data-action=new]").Click();
         cut.Find("[data-action=switch]").Click();
         Assert.Equal(9, cut.FindAll("[data-conversation-type=general] [data-action=select]").Count);
@@ -571,6 +585,7 @@ public sealed class RgfRecrobyWorkspaceTests
     {
         using var context = Context();
         var cut = context.Render<RgfRecrobyWorkspace>();
+        AddHistoryToActive(cut);
         cut.Find("[data-action=new]").Click();
         // Supply future conversation metadata without introducing a public opening API.
         var conversations = (System.Collections.IEnumerable)typeof(RgfRecrobyWorkspace)
@@ -589,6 +604,207 @@ public sealed class RgfRecrobyWorkspaceTests
         Assert.Equal(title, cut.Find(".rgf-recroby-title").TextContent);
         Assert.Equal("custom: " + title, cut.Find(".rgf-recroby-conversation:not([hidden])").GetAttribute("aria-label"));
         Assert.Empty(cut.FindAll("[role=tab], [role=tabpanel]"));
+    }
+
+    [Theory]
+    [InlineData("[data-action=new]")]
+    [InlineData("[data-new-chat]:last-child")]
+    public void NewGeneralChatRemovesEmptyRenamedConversationWithDraftAndSettings(string action)
+    {
+        using var context = Context();
+        var cut = context.Render<RgfRecrobyWorkspace>();
+        var previous = cut.FindComponent<RgfAiChatComponent>().Instance.Session;
+        Rename(cut, "Unused renamed chat");
+        previous.Conversation.AiModelOverride = "custom/model";
+        cut.Find("textarea").Change("Unsent draft");
+        cut.Find(action).Click();
+        var current = Assert.Single(cut.FindComponents<RgfAiChatComponent>()).Instance.Session;
+        Assert.NotSame(previous, current);
+        Assert.Empty(previous.Conversation.Messages);
+        Assert.DoesNotContain("Unused renamed chat", cut.Markup);
+        Assert.Null(current.Conversation.AiModelOverride);
+    }
+
+    [Fact]
+    public void NewGeneralChatPreservesHistory()
+    {
+        using var context = Context();
+        var cut = context.Render<RgfRecrobyWorkspace>();
+        var previous = cut.FindComponent<RgfAiChatComponent>().Instance.Session;
+        previous.Conversation.AddUserMessage("Keep this history");
+        cut.Find("[data-action=new]").Click();
+        Assert.Equal(2, cut.FindComponents<RgfAiChatComponent>().Count);
+        Assert.Same(previous, cut.FindComponents<RgfAiChatComponent>()[0].Instance.Session);
+        Assert.Equal("Keep this history", Assert.Single(previous.Conversation.Messages).Message);
+    }
+
+    [Fact]
+    public async Task GridOpensAndNewChatsReplaceOnlyEmptyConversations()
+    {
+        using var context = Context();
+        var cut = context.Render<RgfRecrobyWorkspace>();
+        var service = context.Services.GetRequiredService<RgfRecrobyWorkspaceService>();
+        var general = cut.FindComponent<RgfAiChatComponent>().Instance.Session;
+        var firstGrid = new RgfRecrobyGridContext();
+        var secondGrid = new RgfRecrobyGridContext();
+        Assert.True(await service.OpenOrActivateGridAsync(firstGrid));
+        var first = Assert.Single(cut.FindComponents<RgfAiChatComponent>()).Instance.Session;
+        Assert.NotSame(general, first);
+        Assert.True(await service.OpenOrActivateGridAsync(firstGrid));
+        Assert.Same(first, Assert.Single(cut.FindComponents<RgfAiChatComponent>()).Instance.Session);
+        cut.Find("[data-new-chat]:first-child").Click();
+        var second = Assert.Single(cut.FindComponents<RgfAiChatComponent>()).Instance.Session;
+        Assert.NotSame(first, second);
+        Assert.Single(GridContextHandlers(firstGrid));
+        Assert.True(await service.OpenOrActivateGridAsync(secondGrid));
+        Assert.Single(cut.FindComponents<RgfAiChatComponent>());
+        Assert.Empty(GridContextHandlers(firstGrid));
+        var retained = cut.FindComponent<RgfAiChatComponent>().Instance.Session;
+        retained.Conversation.AddUserMessage("Retain this Grid history");
+        Assert.True(await service.OpenOrActivateGridAsync(firstGrid));
+        Assert.Equal(2, cut.FindComponents<RgfAiChatComponent>().Count);
+        Assert.True(await service.OpenOrActivateGridAsync(secondGrid));
+        Assert.Same(retained, Assert.Single(cut.FindComponents<RgfAiChatComponent>()).Instance.Session);
+        Assert.Empty(GridContextHandlers(firstGrid));
+        Assert.Single(GridContextHandlers(secondGrid));
+        cut.Find("[data-new-chat]:last-child").Click();
+        Assert.Equal(2, cut.FindComponents<RgfAiChatComponent>().Count);
+        Assert.True(await service.OpenOrActivateGridAsync(secondGrid));
+        Assert.Same(retained, Assert.Single(cut.FindComponents<RgfAiChatComponent>()).Instance.Session);
+    }
+
+    [Theory]
+    [InlineData("ConversationId", "server-id")]
+    [InlineData("ConversationToken", "server-token")]
+    [InlineData("ConversationId", "")]
+    [InlineData("ConversationToken", "")]
+    [InlineData("IsPendingWorkflow", true)]
+    public void BackendStateWithoutDisplayedMessagesPreventsAutomaticRemoval(string property, object value)
+    {
+        using var context = Context();
+        var cut = context.Render<RgfRecrobyWorkspace>();
+        var previous = cut.FindComponent<RgfAiChatComponent>().Instance.Session;
+        // Model backend state without presentation history, which the public response API normally appends.
+        typeof(RgfAiConversationState).GetProperty(property)!.SetValue(previous.Conversation, value);
+        cut.Find("[data-action=new]").Click();
+        Assert.Equal(2, cut.FindComponents<RgfAiChatComponent>().Count);
+        Assert.Same(previous, cut.FindComponents<RgfAiChatComponent>()[0].Instance.Session);
+        Assert.Empty(previous.Conversation.Messages);
+    }
+
+    [Fact]
+    public async Task ProcessingWithoutDisplayedHistoryPreventsAutomaticRemoval()
+    {
+        using var context = Context();
+        var api = new QueuedApi();
+        context.Services.AddSingleton<IRgfApiService>(api);
+        var cut = context.Render<RgfRecrobyWorkspace>();
+        var previous = cut.FindComponent<RgfAiChatComponent>().Instance.Session;
+        using var cancellation = new CancellationTokenSource();
+        var send = previous.SendAsync("Hidden request", false, cancellation.Token);
+        try
+        {
+            Assert.True(previous.IsProcessing);
+            Assert.Empty(previous.Conversation.Messages);
+            cut.Find("[data-action=new]").Click();
+            Assert.Equal(2, cut.FindComponents<RgfAiChatComponent>().Count);
+            Assert.Same(previous, cut.FindComponents<RgfAiChatComponent>()[0].Instance.Session);
+            Assert.False(send.IsCompleted);
+        }
+        finally { cancellation.Cancel(); }
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => send);
+    }
+
+    [Fact]
+    public async Task EmptyOwnerConversationSurvivesNewChatAndGridOpen()
+    {
+        using var context = Context();
+        var cut = context.Render<RgfRecrobyWorkspace>();
+        var service = context.Services.GetRequiredService<RgfRecrobyWorkspaceService>();
+        await using var owner = service.CreateOwner();
+        var session = new RgfAiConversationSession(new PendingTransport());
+        await owner.OpenOrActivateAsync("custom", "owned", "Owned", () => session);
+        cut.Find("[data-action=new]").Click();
+        Assert.Contains(cut.FindComponents<RgfAiChatComponent>(), c => ReferenceEquals(c.Instance.Session, session));
+        await owner.OpenOrActivateAsync("custom", "owned", "Owned", () => throw new Exception("Must reuse"));
+        await service.OpenOrActivateGridAsync(new());
+        Assert.Contains(cut.FindComponents<RgfAiChatComponent>(), c => ReferenceEquals(c.Instance.Session, session));
+        Assert.Empty(session.Conversation.Messages);
+    }
+
+    [Fact]
+    public async Task AutomaticRemovalDetachesEventsAndBlazorAwaitsComponentCleanup()
+    {
+        using var context = Context();
+        var module = context.JSInterop.SetupModule(invocation => invocation.Arguments[0]?.ToString()?.EndsWith("RgfRecrobyComponent.razor.js") == true);
+        module.Mode = JSRuntimeMode.Loose;
+        var cleanup = module.SetupVoid("dispose", _ => true);
+        var cut = context.Render<RgfRecrobyWorkspace>();
+        var service = context.Services.GetRequiredService<RgfRecrobyWorkspaceService>();
+        var grid = new RgfRecrobyGridContext();
+        Task disposal;
+        try
+        {
+            await service.OpenOrActivateGridAsync(grid);
+            var component = cut.FindComponent<RgfRecrobyComponent>().Instance;
+            var session = cut.FindComponent<RgfAiChatComponent>().Instance.Session;
+            var before = module.Invocations["dispose"].Count;
+            await service.OpenOrActivateGridAsync(new());
+            cut.WaitForAssertion(() => Assert.True(module.Invocations["dispose"].Count > before));
+            Assert.Empty(GridContextHandlers(grid));
+            var handlers = (Action?)typeof(RgfAiConversationSession).GetField("StateChanged",
+                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.GetValue(session);
+            Assert.Null(handlers);
+            disposal = component.DisposeAsync().AsTask();
+            Assert.False(disposal.IsCompleted);
+            Assert.Single(cut.FindComponents<RgfAiChatComponent>());
+        }
+        finally { cleanup.SetVoidResult(); }
+        await disposal;
+    }
+
+    [Fact]
+    public async Task ManualSelectionPreservesEmptyConversation()
+    {
+        using var context = Context();
+        var cut = context.Render<RgfRecrobyWorkspace>();
+        var empty = cut.FindComponent<RgfAiChatComponent>().Instance.Session;
+        await using var owner = context.Services.GetRequiredService<IRgfRecrobyWorkspaceService>().CreateOwner();
+        await owner.OpenOrActivateAsync("custom", "owned", "Owned", () => new(new PendingTransport()));
+        cut.FindAll("[data-action=select]")[0].Click();
+        cut.FindAll("[data-action=select]")[1].Click();
+        Assert.Equal(2, cut.FindComponents<RgfAiChatComponent>().Count);
+        Assert.Same(empty, cut.FindComponents<RgfAiChatComponent>()[0].Instance.Session);
+        Assert.Empty(empty.Conversation.Messages);
+    }
+
+    [Fact]
+    public async Task NewChatLeavesClosingConversationUntilExplicitCleanupCompletes()
+    {
+        using var context = Context();
+        var module = context.JSInterop.SetupModule(invocation => invocation.Arguments[0]?.ToString()?.EndsWith("RgfRecrobyComponent.razor.js") == true);
+        module.Mode = JSRuntimeMode.Loose;
+        var cleanup = module.SetupVoid("dispose", _ => true);
+        var cut = context.Render<RgfRecrobyWorkspace>();
+        var previous = cut.FindComponent<RgfAiChatComponent>().Instance.Session;
+        var close = cut.Find(".rgf-recroby-choice > .btn-close").ClickAsync(new());
+        try
+        {
+            cut.WaitForAssertion(() => Assert.NotEmpty(module.Invocations["dispose"]));
+            cut.Find("[data-action=new]").Click();
+            Assert.Equal(2, cut.FindComponents<RgfAiChatComponent>().Count);
+            Assert.Same(previous, cut.FindComponents<RgfAiChatComponent>()[0].Instance.Session);
+            Assert.False(close.IsCompleted);
+        }
+        finally { cleanup.SetVoidResult(); }
+        await close;
+        Assert.Single(cut.FindComponents<RgfAiChatComponent>());
+    }
+
+    private static void AddHistoryToActive(IRenderedComponent<RgfRecrobyWorkspace> cut)
+    {
+        var index = cut.FindAll(".rgf-recroby-conversation").ToList().FindIndex(e => !e.HasAttribute("hidden"));
+        cut.FindComponents<RgfAiChatComponent>()[index].Instance.Session.Conversation.AddUserMessage("Existing history");
     }
 
     private static void Rename(IRenderedComponent<RgfRecrobyWorkspace> cut, string title)
@@ -732,7 +948,11 @@ public sealed class RgfRecrobyWorkspaceTests
     {
         using var context = Context();
         var cut = context.Render<RgfRecrobyWorkspace>();
-        for (var i = 1; i < 9; i++) cut.Find("[data-action=new]").Click();
+        for (var i = 1; i < 9; i++)
+        {
+            AddHistoryToActive(cut);
+            cut.Find("[data-action=new]").Click();
+        }
         Rename(cut, "Unique title");
         var conversations = (System.Collections.IEnumerable)typeof(RgfRecrobyWorkspace)
             .GetField("_conversations", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.GetValue(cut.Instance)!;
