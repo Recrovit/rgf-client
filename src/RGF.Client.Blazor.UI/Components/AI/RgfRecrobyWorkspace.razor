@@ -1,6 +1,6 @@
-@* RGF-DOC: rgf.client.recroby.integration *@
+﻿@* RGF-DOC: rgf.client.recroby.integration *@
 <div @ref="_element" class="rgf-recroby-workspace" style="--rgf-toast-anchor: @ToastAnchorName;" data-mode="@_layout.Mode" data-collapsed="@_layout.IsCollapsed.ToString().ToLowerInvariant()">
-    <div class="rgf-recroby-content">@ChildContent</div>
+    <div class="rgf-recroby-content"><CascadingValue Value="this" IsFixed="true">@ChildContent</CascadingValue></div>
     <button type="button" class="rgf-recroby-launcher btn btn-primary" hidden="@(!_layout.IsCollapsed)" aria-label="Open Recroby" aria-expanded="false" @onclick="() => _layout.IsCollapsed = false"><i class="bi bi-robot" aria-hidden="true"></i> Recroby</button>
     <section class="rgf-recroby-panel card" aria-label="Recroby" hidden="@_layout.IsCollapsed">
         <header class="card-header d-flex flex-wrap align-items-center gap-2" data-drag-handle>
@@ -23,6 +23,10 @@
             </div>
             <button type="button" class="btn btn-sm btn-outline-secondary" aria-label="Collapse Recroby" @onclick="Collapse">−</button>
         </header>
+        @if (_active != null)
+        {
+            <div class="px-3 pt-1 small text-body-secondary rgf-recroby-context">@ContextLabel(_active)</div>
+        }
         <div class="card-header rgf-recroby-conversation-bar" @onkeydown="SwitcherKeyDown">
             @if (_editing != null)
             {
@@ -40,7 +44,14 @@
                 </button>
             }
             <button type="button" class="btn btn-sm btn-outline-secondary" data-action="rename" title="Rename conversation" aria-label="@($"Rename {_active?.Title}")" @onclick="BeginRename"><i class="bi bi-pencil-square" aria-hidden="true"></i></button>
-            <button type="button" class="btn btn-sm btn-outline-secondary" data-action="new" title="New conversation" aria-label="New conversation" @onclick="NewConversation"><i class="bi bi-plus-lg" aria-hidden="true"></i></button>
+            <div class="btn-group rgf-recroby-new-chat">
+                <button type="button" class="btn btn-sm btn-outline-secondary" data-action="new" title="New conversation" aria-label="New conversation" @onclick="NewConversation"><i class="bi bi-plus-lg" aria-hidden="true"></i></button>
+                <button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle dropdown-toggle-split" popovertarget="@(_selectorId + "-new")" aria-label="New conversation options" aria-haspopup="menu" aria-expanded="false"></button>
+            </div>
+            <div id="@(_selectorId + "-new")" class="rgf-recroby-new-menu" popover="auto" role="menu" aria-label="New conversation">
+                <button type="button" class="dropdown-item" role="menuitem" data-new-chat disabled="@(_active?.GridContext is null)" @onclick="NewConversation">New chat with current Grid</button>
+                <button type="button" class="dropdown-item" role="menuitem" data-new-chat @onclick="NewGeneralConversation">New general chat</button>
+            </div>
             <div id="@(_selectorId + "-list")" class="rgf-recroby-switcher" popover="manual" hidden="@(!_switcherOpen)" role="dialog" aria-label="Conversations">
                 @if (_conversations.Count > 8)
                 {
@@ -57,6 +68,7 @@
                                     <button type="button" class="rgf-recroby-choice-select" data-action="select" title="@conversation.Title"
                                             aria-controls="@($"recroby-panel-{conversation.Id:N}")" aria-pressed="@((conversation == _active).ToString().ToLowerInvariant())" @onclick="() => SelectConversation(conversation)">
                                         <span class="rgf-recroby-choice-title">@conversation.Title</span>
+                                        @if (conversation.GridContext != null) { <small class="rgf-recroby-choice-context">@ContextLabel(conversation)</small> }
                                         @if (conversation == _active) { <i class="bi bi-check-lg" aria-hidden="true"></i> }
                                     </button>
                                     <button type="button" class="btn-close" title="Close @conversation.Title" aria-label="Close @conversation.Title" @onclick="() => CloseConversation(conversation)"></button>

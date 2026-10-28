@@ -1,4 +1,8 @@
-﻿<RgfToolbarComponent @ref="_rgfToolbarRef" EntityParameters="EntityParameters">
+﻿@using Recrovit.RecroGridFramework.Client.AI
+@using Recrovit.RecroGridFramework.Client.Blazor.UI.Components.AI
+@using Microsoft.Extensions.DependencyInjection
+@* RGF-DOC: rgf.client.recroby.integration *@
+<RgfToolbarComponent @ref="_rgfToolbarRef" EntityParameters="EntityParameters">
     <ToolbarTemplate Context="RgfToolbar">
         @if (EntityParameters.DisplayMode != RfgDisplayMode.Tree || EntityParameters.ParentEntityParameters?.Manager == null)
         {
@@ -91,6 +95,15 @@
                                 }
                             </div>
                         }
+                        @if (RecrobyWorkspace != null && WorkspaceService?.CanOpenGrid == true &&
+                            EntityComponent?.RecrobyGridContext.Manager != null &&
+                            !Manager.EntityDesc.EntityName.Equals("RGRecroChart", StringComparison.OrdinalIgnoreCase))
+                        {
+                            <div class="btn-group me-2" role="group">
+                                <RgfButton IconName="bi-robot" CssClass="btn-secondary" Tooltip="Open Recroby"
+                                           OnClick="async () => { await WorkspaceService.OpenOrActivateGridAsync(EntityComponent.RecrobyGridContext); }" />
+                            </div>
+                        }
                         @if (RgfToolbar.SettingsMenu != null)
                         {
                             <RgfHtml TagName="div" CssClass="dropdown me-2" Role="group"
@@ -155,7 +168,16 @@
 
 @inject IRecroDictService RecroDict
 @inject IRecroSecService RecroSec
+@inject IServiceProvider Services
 @code {
+    [CascadingParameter]
+    private RgfEntityComponent? EntityComponent { get; set; }
+
+    [CascadingParameter]
+    private RgfRecrobyWorkspace? RecrobyWorkspace { get; set; }
+
+    private RgfRecrobyWorkspaceService? WorkspaceService => Services.GetService<RgfRecrobyWorkspaceService>();
+
 
     [Parameter, EditorRequired]
     public RgfEntityParameters EntityParameters { get; set; } = null!;

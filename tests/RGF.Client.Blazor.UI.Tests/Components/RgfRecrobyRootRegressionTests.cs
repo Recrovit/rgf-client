@@ -1,4 +1,4 @@
-using Bunit;
+﻿using Bunit;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.Configuration;
 using Recrovit.RecroGridFramework.Abstraction.Models;
@@ -105,6 +105,9 @@ public sealed class RgfRecrobyRootRegressionTests : IDisposable
         Assert.DoesNotContain(api.Requests, r => r.Uri == "/api/rgf/ai/recroby");
         if (!effectiveEnabled)
         {
+            var gridService = context.Services.GetRequiredService<Recrovit.RecroGridFramework.Client.AI.RgfRecrobyWorkspaceService>();
+            Assert.False(gridService.CanOpenGrid);
+            Assert.False(await gridService.OpenOrActivateGridAsync(new()));
             await using var owner = context.Services.GetRequiredService<Recrovit.RecroGridFramework.Client.AI.IRgfRecrobyWorkspaceService>().CreateOwner();
             Assert.False(await owner.OpenOrActivateAsync("custom", "a", "a", () => throw new Exception("Disabled Workspace must not call the factory")));
         }

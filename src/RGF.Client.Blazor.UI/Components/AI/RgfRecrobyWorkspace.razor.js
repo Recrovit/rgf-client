@@ -1,4 +1,4 @@
-/*!
+﻿/*!
 * RgfRecrobyWorkspace.razor.js v1.0.0
 */
 
@@ -9,7 +9,7 @@ const storageKey = "rgf.recroby.workspace.v1";
 const clamp = (value, min, max) => Math.max(min, Math.min(value, Math.max(min, max)));
 
 export function normalize(settings) {
-    const defaults = { mode: 0, isCollapsed: true, x: 48, y: 80, width: 440, height: 560, dockWidth: 400, dockHeight: 320 };
+    const defaults = { mode: 2, isCollapsed: true, x: 48, y: 80, width: 440, height: 560, dockWidth: 400, dockHeight: 320 };
     const result = { ...defaults };
     for (const key of ["x", "y", "width", "height", "dockWidth", "dockHeight"])
         if (Number.isFinite(settings?.[key])) result[key] = settings[key];
@@ -42,6 +42,42 @@ export function initialize(element, reference, settings) {
     } catch { /* Storage may be blocked or contain an older invalid value. */ }
     instances.set(element, state);
     const listen = (target, event, handler, capture = false) => target.addEventListener(event, handler, { signal: controller.signal, capture });
+    const newMenu = element.querySelector(".rgf-recroby-new-menu");
+    const newToggle = element.querySelector("[aria-label='New conversation options']");
+    const positionNewMenu = () => {
+        if (!newMenu?.matches(":popover-open") || !newToggle) return;
+        const rect = newToggle.getBoundingClientRect();
+        const viewport = window.visualViewport;
+        const left = viewport?.offsetLeft ?? 0, top = viewport?.offsetTop ?? 0;
+        const width = viewport?.width ?? window.innerWidth, height = viewport?.height ?? window.innerHeight;
+        newMenu.style.maxWidth = `${Math.max(0, width - 16)}px`;
+        newMenu.style.maxHeight = `${Math.max(0, height - 16)}px`;
+        newMenu.style.left = `${clamp(rect.right - newMenu.offsetWidth, left + 8, left + width - newMenu.offsetWidth - 8)}px`;
+        newMenu.style.top = `${clamp(rect.bottom + 4, top + 8, top + height - newMenu.offsetHeight - 8)}px`;
+    };
+    if (newMenu) {
+        listen(newMenu, "toggle", () => {
+            newToggle?.setAttribute("aria-expanded", String(newMenu.matches(":popover-open")));
+            positionNewMenu();
+            if (newMenu.matches(":popover-open")) newMenu.querySelector("button:not(:disabled)")?.focus({ preventScroll: true });
+        });
+        listen(newMenu, "keydown", event => {
+            if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) return;
+            const buttons = [...newMenu.querySelectorAll("button:not(:disabled)")];
+            if (!buttons.length) return;
+            event.preventDefault();
+            const index = buttons.indexOf(document.activeElement);
+            const next = event.key === "Home" ? 0 : event.key === "End" ? buttons.length - 1
+                : (index + (event.key === "ArrowDown" ? 1 : -1) + buttons.length) % buttons.length;
+            buttons[next].focus();
+        });
+        listen(newMenu, "click", event => {
+            if (event.target.closest("[data-new-chat]:not(:disabled)")) newMenu.hidePopover();
+        });
+        listen(window, "resize", positionNewMenu);
+        listen(window, "scroll", positionNewMenu, true);
+        if (window.visualViewport) listen(window.visualViewport, "resize", positionNewMenu);
+    }
     const notify = () => {
         save(state.settings);
         reference.invokeMethodAsync("LayoutChanged", { ...state.settings }).catch(() => { });
@@ -268,6 +304,8 @@ export function update(element, settings) {
     const state = instances.get(element);
     if (!state) return;
     state.settings = normalize(settings);
+    const newMenu = element.querySelector(".rgf-recroby-new-menu");
+    if (state.settings.isCollapsed && newMenu?.matches(":popover-open")) newMenu.hidePopover();
     save(state.settings);
     apply(element, state);
 }
@@ -280,6 +318,8 @@ function save(settings) {
 export function dispose(element) {
     const state = instances.get(element);
     if (!state) return;
+    const newMenu = element.querySelector(".rgf-recroby-new-menu");
+    if (newMenu?.matches(":popover-open")) newMenu.hidePopover();
     state.controller.abort(); state.observer.disconnect(); state.mutations.disconnect(); instances.delete(element);
 }
 

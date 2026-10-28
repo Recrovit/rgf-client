@@ -21,7 +21,17 @@ test("dock width fits the workspace and dock height depends on viewport rather t
 
 test("invalid browser preferences revert to defaults and cannot carry conversation secrets", () => {
     const result = normalize({ mode: 8, width: NaN, height: -300, isCollapsed: "false", messages: ["private"], conversationToken: "private" });
-    assert.equal(result.mode, 0); assert.equal(result.width, 440); assert.equal(result.height, 160);
+    assert.equal(result.mode, 2); assert.equal(result.width, 440); assert.equal(result.height, 160);
     assert.equal(result.isCollapsed, true);
     assert.equal(result.messages, undefined); assert.equal(result.conversationToken, undefined);
+});
+
+test("missing preferences use a collapsed right dock while valid saved modes remain unchanged", () => {
+    assert.equal(normalize().mode, 2);
+    assert.equal(normalize().isCollapsed, true);
+    for (const mode of [null, -1, 4, "0", 1.5]) assert.equal(normalize({ mode }).mode, 2);
+    for (const mode of [0, 1, 2, 3]) {
+        assert.equal(normalize({ mode, isCollapsed: false }).mode, mode);
+        assert.equal(normalize({ mode, isCollapsed: false }).isCollapsed, false);
+    }
 });

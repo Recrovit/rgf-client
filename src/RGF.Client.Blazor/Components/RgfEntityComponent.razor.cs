@@ -6,6 +6,7 @@ using Recrovit.RecroGridFramework.Abstraction.Contracts.Constants;
 using Recrovit.RecroGridFramework.Abstraction.Contracts.Services;
 using Recrovit.RecroGridFramework.Abstraction.Extensions;
 using Recrovit.RecroGridFramework.Abstraction.Models;
+using Recrovit.RecroGridFramework.Client.AI;
 using Recrovit.RecroGridFramework.Client.Blazor.Parameters;
 using Recrovit.RecroGridFramework.Client.Events;
 using Recrovit.RecroGridFramework.Client.Handlers;
@@ -51,6 +52,12 @@ public partial class RgfEntityComponent : ComponentBase, IDisposable
     private RgfDynamicDialog _dynamicDialog { get; set; } = null!;
 
     public IRgManager? Manager { get; set; }
+
+    // RGF-DOC: rgf.client.recroby.integration
+    /// <summary>Stable identity and current initialized manager for this Grid's Recroby conversations.</summary>
+    public RgfRecrobyGridContext RecrobyGridContext { get; } = new();
+
+    private bool _disposed;
 
     public List<IDisposable> Disposables { get; private set; } = [];
 
@@ -117,7 +124,7 @@ public partial class RgfEntityComponent : ComponentBase, IDisposable
         }
     }
 
-    private async Task CreateManagerAsync(CancellationToken cancellationToken)
+    private async Task<bool> CreateManagerAsync(CancellationToken cancellationToken)
     {
         _logger.LogDebug("CreateManager | EntityName:{EntityName} - {HashCode}", EntityParameters.EntityName, this.GetHashCode());
 
@@ -138,10 +145,18 @@ public partial class RgfEntityComponent : ComponentBase, IDisposable
             };
         }
 
-        Manager = new RgManager(gridRequest, _serviceProvider);
-        Manager.RefreshEntity += Refresh;
-        Manager.FormViewKey.OnAfterChange(this, OnChangeFormViewKey);
-        Disposables.Add(Manager.NotificationManager.Subscribe<RgfUserMessageEventArgs>(OnUserMessage));
+        cancellationToken.ThrowIfCancellationRequested();
+        if (_disposed) return false;
+        var manager = new RgManager(gridRequest, _serviceProvider);
+        Manager = manager;
+        void EnsureCurrent()
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (_disposed || !ReferenceEquals(Manager, manager)) throw new OperationCanceledException(cancellationToken);
+        }
+        manager.RefreshEntity += recreate => { if (!_disposed && ReferenceEquals(Manager, manager)) Refresh(recreate); };
+        manager.FormViewKey.OnAfterChange(this, OnChangeFormViewKey);
+        Disposables.Add(manager.NotificationManager.Subscribe<RgfUserMessageEventArgs>(OnUserMessage));
         EntityParameters.ToolbarParameters.EventDispatcher.Subscribe(
             [RgfToolbarEventKind.Refresh, RgfToolbarEventKind.Add, RgfToolbarEventKind.Edit, RgfToolbarEventKind.Read, RgfToolbarEventKind.Delete, RgfToolbarEventKind.Select],
             OnGridToolbarCommandAsync, true);
@@ -151,55 +166,58 @@ public partial class RgfEntityComponent : ComponentBase, IDisposable
 
         if (EntityParameters.DeferredInitialization)
         {
-            EntityParameters.Manager = Manager;
+            EntityParameters.Manager = manager;
         }
         else
         {
-            var success = await ((RgManager)Manager).InitializeAsync(gridRequest);
-            cancellationToken.ThrowIfCancellationRequested();
+            var success = await manager.InitializeAsync(gridRequest);
+            EnsureCurrent();
 
             if (success)
             {
-                EntityParameters.Manager = Manager;
+                EntityParameters.Manager = manager;
                 if (EntityParameters.FormOnly || EntityParameters.AutoOpenForm)
                 {
-                    if (Manager.ListHandler.ItemCount.Value == 1)
+                    if (manager.ListHandler.ItemCount.Value == 1)
                     {
-                        var data = await Manager.ListHandler.GetDataListAsync();
-                        cancellationToken.ThrowIfCancellationRequested();
+                        var data = await manager.ListHandler.GetDataListAsync();
+                        EnsureCurrent();
 
-                        var rowIndexAndKey = Manager.ListHandler.GetRowIndexAndKey(data[0]);
-                        Manager.SelectedItems.Value = new Dictionary<int, RgfEntityKey> { { rowIndexAndKey.Key, rowIndexAndKey.Value } };
+                        var rowIndexAndKey = manager.ListHandler.GetRowIndexAndKey(data[0]);
+                        manager.SelectedItems.Value = new Dictionary<int, RgfEntityKey> { { rowIndexAndKey.Key, rowIndexAndKey.Value } };
                     }
                     else if (EntityParameters.FormOnly)
                     {
                         EntityParameters.FormOnly = false;
-                        _logger.LogError("formOnly => ItemCount={ItemCount}", Manager.ListHandler.ItemCount.Value);
+                        _logger.LogError("formOnly => ItemCount={ItemCount}", manager.ListHandler.ItemCount.Value);
                     }
-                    if (Manager.SelectedItems.Value.Count == 1)
+                    if (manager.SelectedItems.Value.Count == 1)
                     {
-                        await Manager.OnToolbarCommandAsync(new RgfEventArgs<RgfToolbarEventArgs>(this, new(RgfToolbarEventKind.Read)));
-                        cancellationToken.ThrowIfCancellationRequested();
+                        await manager.OnToolbarCommandAsync(new RgfEventArgs<RgfToolbarEventArgs>(this, new(RgfToolbarEventKind.Read)));
+                        EnsureCurrent();
                     }
                 }
                 NormalizeDisplayMode();
                 await InitResourcesAsync();
-                cancellationToken.ThrowIfCancellationRequested();
+                EnsureCurrent();
                 _initialized = true;
 
-                var eventArgs = new RgfEntityEventArgs(RgfEntityEventKind.Initialized, Manager);
+                var eventArgs = new RgfEntityEventArgs(RgfEntityEventKind.Initialized, manager);
                 await EntityParameters.EventDispatcher.DispatchEventAsync(eventArgs.EventKind, new RgfEventArgs<RgfEntityEventArgs>(this, eventArgs));
-                cancellationToken.ThrowIfCancellationRequested();
+                EnsureCurrent();
 
+                RecrobyGridContext.SetManager(manager);
                 _logger.LogDebug("Initialized | EntityName:{EntityName}", EntityParameters.EntityName);
+                return true;
             }
             else
             {
-                var eventArgs = new RgfEntityEventArgs(RgfEntityEventKind.Destroy, Manager);
+                var eventArgs = new RgfEntityEventArgs(RgfEntityEventKind.Destroy, manager);
                 await EntityParameters.EventDispatcher.DispatchEventAsync(eventArgs.EventKind, new RgfEventArgs<RgfEntityEventArgs>(this, eventArgs));
-                cancellationToken.ThrowIfCancellationRequested();
+                EnsureCurrent();
             }
         }
+        return false;
     }
 
     private Task OnToggleDisplayModeAsync(IRgfEventArgs<RgfToolbarEventArgs> args)
@@ -316,7 +334,9 @@ public partial class RgfEntityComponent : ComponentBase, IDisposable
     private void Refresh(bool recreate)
     {
         _logger.LogDebug("Refresh | EntityName:{EntityName}", EntityParameters.EntityName);
-        _ = InvokeAsync(() => RefreshAsync(recreate));
+        var manager = Manager;
+        _ = InvokeAsync(() => !_disposed && ReferenceEquals(Manager, manager)
+            ? RefreshAsync(recreate) : Task.CompletedTask);
     }
 
     private async Task RefreshAsync(bool recreate)
@@ -332,12 +352,16 @@ public partial class RgfEntityComponent : ComponentBase, IDisposable
                 StateHasChanged();
                 DisposeManager();
                 _createManagerCancellationTokenSource = new CancellationTokenSource();
-                await CreateManagerAsync(_createManagerCancellationTokenSource.Token);
+                if (!await CreateManagerAsync(_createManagerCancellationTokenSource.Token)) return;
             }
+            if (_disposed || Manager is null) return;
+            var currentManager = Manager;
             _initialized = true;
             NormalizeDisplayMode();
             var eventArgs = new RgfEntityEventArgs(RgfEntityEventKind.Initialized, Manager!);
             await EntityParameters.EventDispatcher.DispatchEventAsync(eventArgs.EventKind, new RgfEventArgs<RgfEntityEventArgs>(this, eventArgs));
+            if (!_disposed && ReferenceEquals(Manager, currentManager) && currentManager.ListHandler.Initialized)
+                RecrobyGridContext.SetManager(currentManager);
             StateHasChanged();
         }
         catch (OperationCanceledException)
@@ -368,6 +392,7 @@ public partial class RgfEntityComponent : ComponentBase, IDisposable
 
     public void Dispose()
     {
+        _disposed = true;
         EntityParameters?.UnsubscribeFromAll(this);
         if (Disposables != null)
         {
@@ -379,14 +404,21 @@ public partial class RgfEntityComponent : ComponentBase, IDisposable
 
     private void DisposeManager()
     {
-        if (Manager != null)
+        var manager = Manager;
+        var cancellation = _createManagerCancellationTokenSource;
+        _createManagerCancellationTokenSource = null;
+        // RGF-DOC: rgf.client.recroby.integration
+        if (manager != null) RecrobyGridContext.ClearManager(manager);
+        Manager = null;
+        if (EntityParameters != null && ReferenceEquals(EntityParameters.Manager, manager)) EntityParameters.Manager = null;
+        cancellation?.Cancel();
+        cancellation?.Dispose();
+        if (manager != null)
         {
             EntityParameters?.UnsubscribeFromAll(this);
             _logger.LogDebug("Dispose Manager | EntityName:{EntityName} - {HashCode}", this.EntityName, this.GetHashCode());
-            EntityParameters?.UnsubscribeFromAll(Manager);
-            _createManagerCancellationTokenSource?.Cancel();
-            Manager.Dispose();
-            Manager = null;
+            EntityParameters?.UnsubscribeFromAll(manager);
+            manager.Dispose();
         }
     }
 }

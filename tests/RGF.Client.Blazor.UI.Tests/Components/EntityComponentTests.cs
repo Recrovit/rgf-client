@@ -1,4 +1,6 @@
 ﻿using Bunit;
+using Recrovit.RecroGridFramework.Client.AI;
+using Recrovit.RecroGridFramework.Client.Blazor.UI.Components.AI;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.DependencyInjection;
 using Recrovit.RecroGridFramework.Abstraction.Contracts.API;
@@ -21,6 +23,92 @@ namespace Recrovit.RecroGridFramework.Client.Blazor.UI.Tests.Components;
 [Collection(RgfBlazorUiStaticStateCollection.Name)]
 public sealed class EntityComponentTests
 {
+    [Fact]
+    public void FailedInitializationDoesNotPublishGridManager()
+    {
+        using var context = CreateTestContext(true);
+        var api = (PendingRgfApiService)context.Services.GetRequiredService<IRgfApiService>();
+        api.FailGridRequest = true;
+        var cut = RenderWorkspace(context, CreateEntityParameters(RfgDisplayMode.Grid));
+        Assert.Null(cut.Instance.RecrobyGridContext.Manager);
+        Assert.Empty(cut.FindAll(".toolbar"));
+    }
+
+    [Fact]
+    public async Task RecrobyToolbarRetainsGridContextThroughReinitializationAndDisposal()
+    {
+        using var context = CreateTestContext(true);
+        RgfBlazorConfiguration.RegisterComponent<Recrovit.RecroGridFramework.Client.Blazor.UI.Components.MenuComponent>(RgfBlazorConfiguration.ComponentType.Menu);
+        context.ComponentFactories.AddStub<Recrovit.RecroGridFramework.Client.Blazor.UI.Components.MenuComponent>();
+        context.ComponentFactories.AddStub<Recrovit.RecroGridFramework.Client.Blazor.UI.Components.GridComponent>();
+        context.ComponentFactories.AddStub<Recrovit.RecroGridFramework.Client.Blazor.UI.Components.FilterComponent>();
+        context.ComponentFactories.AddStub<Recrovit.RecroGridFramework.Client.Blazor.UI.Components.PagerComponent>();
+        context.ComponentFactories.AddStub<Recrovit.RecroGridFramework.Client.Blazor.UI.Components.FormComponent>();
+        context.Services.AddScoped<RgfRecrobyWorkspaceService>();
+        var entity = CreateEntityParameters(RfgDisplayMode.Grid);
+        var cut = context.Render<RgfRecrobyWorkspace>(p => p.Add(c => c.ChildContent, builder =>
+        {
+            builder.OpenComponent<Recrovit.RecroGridFramework.Client.Blazor.UI.Components.EntityComponent>(0);
+            builder.AddAttribute(1, "EntityParameters", entity);
+            builder.CloseComponent();
+        }));
+        var component = cut.FindComponent<RgfEntityComponent>().Instance;
+        var gridContext = component.RecrobyGridContext;
+        var firstManager = component.Manager!;
+        Assert.Same(firstManager, gridContext.Manager);
+        Assert.Equal("Orders", gridContext.EntityName);
+        cut.Find(".btn-toolbar .bi-robot").ParentElement!.Click();
+        Assert.Equal("Orders", cut.Find(".rgf-recroby-context").TextContent);
+        var session = cut.FindComponents<RgfAiChatComponent>().Last().Instance.Session;
+        cut.Find(".btn-toolbar .bi-robot").ParentElement!.Click();
+        Assert.Equal(2, cut.FindComponents<RgfAiChatComponent>().Count);
+        var api = (PendingRgfApiService)context.Services.GetRequiredService<IRgfApiService>();
+        var gate = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        api.GridResponseGate = gate;
+        var ui = cut.FindComponent<Recrovit.RecroGridFramework.Client.Blazor.UI.Components.EntityComponent>();
+        ui.Render(p => p.Add(c => c.EntityParameters, new RgfEntityParameters("Pending", firstManager.SessionParams)));
+        Assert.Null(gridContext.Manager);
+        Assert.Same(gridContext, component.RecrobyGridContext);
+        api.GridResponseGate = null;
+        ui.Render(p => p.Add(c => c.EntityParameters, new RgfEntityParameters("Replacement", firstManager.SessionParams)));
+        cut.WaitForAssertion(() => Assert.NotNull(gridContext.Manager));
+        var replacement = gridContext.Manager;
+        Assert.NotSame(firstManager, replacement);
+        gate.SetResult(true);
+        await cut.InvokeAsync(() => { });
+        gridContext.ClearManager(firstManager);
+        Assert.Same(replacement, gridContext.Manager);
+        Assert.Same(session, cut.FindComponents<RgfAiChatComponent>().Last().Instance.Session);
+        cut.Find(".btn-toolbar .bi-robot").ParentElement!.Click();
+        Assert.Equal(2, cut.FindComponents<RgfAiChatComponent>().Count);
+        cut.Render(p => p.Add(c => c.ChildContent, "<main>Grid removed</main>"));
+        Assert.Null(gridContext.Manager);
+        Assert.Equal("Orders", gridContext.DisplayName);
+        cut.Find("[data-action=new]").Click();
+        Assert.Equal("Orders (unavailable)", cut.Find(".rgf-recroby-context").TextContent);
+        Assert.Equal(3, cut.FindComponents<RgfAiChatComponent>().Count);
+        Assert.Empty(cut.FindComponents<RgfAiChatComponent>().Last().Instance.Session.Conversation.Messages);
+    }
+
+    [Fact]
+    public void RecrobyToolbarRequiresWorkspaceAndTechnicalChartGridCannotPublishIt()
+    {
+        using var context = CreateTestContext(true);
+        RgfBlazorConfiguration.RegisterComponent<Recrovit.RecroGridFramework.Client.Blazor.UI.Components.MenuComponent>(RgfBlazorConfiguration.ComponentType.Menu);
+        context.ComponentFactories.AddStub<Recrovit.RecroGridFramework.Client.Blazor.UI.Components.MenuComponent>();
+        context.ComponentFactories.AddStub<Recrovit.RecroGridFramework.Client.Blazor.UI.Components.GridComponent>();
+        context.ComponentFactories.AddStub<Recrovit.RecroGridFramework.Client.Blazor.UI.Components.FilterComponent>();
+        context.ComponentFactories.AddStub<Recrovit.RecroGridFramework.Client.Blazor.UI.Components.PagerComponent>();
+        context.ComponentFactories.AddStub<Recrovit.RecroGridFramework.Client.Blazor.UI.Components.FormComponent>();
+        var entity = CreateEntityParameters(RfgDisplayMode.Grid);
+        var standalone = context.Render<Recrovit.RecroGridFramework.Client.Blazor.UI.Components.EntityComponent>(p => p.Add(c => c.EntityParameters, entity));
+        Assert.Empty(standalone.FindAll(".btn-toolbar .bi-robot"));
+        var technical = new RgfEntityParameters("RGRecroChart") { DeferredInitialization = true, IsEmbeddedEntity = true };
+        var chartGrid = context.Render<RgfEntityComponent>(p => p.Add(c => c.EntityParameters, technical));
+        Assert.Null(chartGrid.Instance.RecrobyGridContext.Manager);
+        Assert.Empty(chartGrid.FindAll(".bi-robot"));
+    }
+
     [Fact]
     public async Task WorkspaceChart_DraftActionsRetainOneControllerAndRenderer_AndOpenExistingEditor()
     {
@@ -747,6 +835,7 @@ public sealed class EntityComponentTests
         public TaskCompletionSource<bool>? ChartResponseGate { get; set; }
         public List<RgfGridRequest> ChartRequests { get; } = [];
         public bool FailChartRequest { get; set; }
+        public bool FailGridRequest { get; set; }
         private int _activeChartRequests;
         public int MaxConcurrentChartRequests { get; private set; }
         private TaskCompletionSource _chartRequestStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -843,7 +932,7 @@ public sealed class EntityComponentTests
                         Success = true,
                         Result = (ResultType)(object)new RgfResult<RgfGridResult>
                         {
-                            Success = true,
+                            Success = !FailGridRequest,
                             Messages = new(),
                             Result = new RgfGridResult
                             {

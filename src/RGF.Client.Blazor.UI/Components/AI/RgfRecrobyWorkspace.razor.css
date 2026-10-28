@@ -1,4 +1,4 @@
-.rgf-recroby-workspace {
+﻿.rgf-recroby-workspace {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: auto;
@@ -109,3 +109,9 @@
 }
 
 .rgf-recroby-title-editor { flex: 1 1 0; min-width: 0; width: 0; }
+
+.rgf-recroby-context { flex-shrink: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rgf-recroby-new-chat { flex-shrink: 0; }
+.rgf-recroby-new-menu { position: fixed; inset: auto; margin: 0; padding: .25rem; border: 1px solid var(--bs-border-color, #ccc); border-radius: .375rem; background: var(--bs-body-bg, white); color: var(--bs-body-color, #212529); overflow: auto; }
+.rgf-recroby-new-menu .dropdown-item { white-space: normal; }
+.rgf-recroby-choice-context { max-width: 40%; overflow-wrap: anywhere; color: var(--bs-secondary-color); }

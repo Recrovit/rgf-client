@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Components;
+﻿using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.JSInterop;
@@ -29,8 +29,8 @@ public enum RgfRecrobyWindowMode
 /// <summary>Browser UI preferences only; contains no conversation data.</summary>
 public sealed class RgfRecrobyLayoutSettings
 {
-    /// <summary>Requested desktop window mode, normalized by the browser module.</summary>
-    public RgfRecrobyWindowMode Mode { get; set; }
+    /// <summary>Requested desktop window mode; defaults to DockRight and is normalized by the browser module.</summary>
+    public RgfRecrobyWindowMode Mode { get; set; } = RgfRecrobyWindowMode.DockRight;
     /// <summary>Whether only the edge tab is visible; defaults to true.</summary>
     public bool IsCollapsed { get; set; } = true;
     /// <summary>Floating horizontal position in CSS pixels; defaults to 48.</summary>
@@ -67,8 +67,12 @@ public partial class RgfRecrobyWorkspace : IAsyncDisposable
     private bool _focusTitleEditor;
     private bool HasMultipleTypes => _conversations.Select(c => c.RecrobyType).Distinct().Skip(1).Any();
     private static string TypeLabel(string type) => type == "general" ? "General chat" : type;
+    private static string ContextLabel(Conversation conversation) => conversation.GridContext is { } context
+        ? context.DisplayName + (context.Manager is null ? " (unavailable)" : string.Empty)
+        : TypeLabel(conversation.RecrobyType);
     private string ConversationLabel(Conversation conversation) => HasMultipleTypes
-        ? $"{TypeLabel(conversation.RecrobyType)}: {conversation.Title}" : conversation.Title;
+        || conversation.GridContext is not null
+        ? $"{ContextLabel(conversation)}: {conversation.Title}" : conversation.Title;
 
     private void BeginRename()
     {
@@ -264,14 +268,28 @@ public partial class RgfRecrobyWorkspace : IAsyncDisposable
 
     protected override void OnInitialized()
     {
-        NewConversation();
+        NewGeneralConversation();
         _workspaceRegistration = Services.GetService<RgfRecrobyWorkspaceService>()?.RegisterWorkspace(
             async operation =>
             {
                 var result = false;
                 await InvokeAsync(() => result = operation());
                 return result;
-            }, OpenExternalConversation, CloseOwnerAsync);
+            }, OpenExternalConversation, CloseOwnerAsync, OpenGridConversation);
+    }
+
+    private bool OpenGridConversation(RgfRecrobyGridContext context)
+    {
+        if (_disposed) return false;
+        if (_active is not { Closing: false } || !ReferenceEquals(_active.GridContext, context))
+        {
+            var existing = _conversations.FirstOrDefault(c => !c.Closing && ReferenceEquals(c.GridContext, context));
+            if (existing is not null) SelectConversation(existing);
+            else CreateConversation(context);
+        }
+        _layout.IsCollapsed = false;
+        StateHasChanged();
+        return true;
     }
 
     private bool OpenExternalConversation(object owner, string type, string contextKey, string title,
@@ -311,11 +329,16 @@ public partial class RgfRecrobyWorkspace : IAsyncDisposable
     }
 
     private void NewConversation()
+        => CreateConversation(_active?.GridContext);
+
+    private void NewGeneralConversation() => CreateConversation(null);
+
+    private void CreateConversation(RgfRecrobyGridContext? context)
     {
         CancelRename();
         CloseSwitcher(_switcherOpen);
         // Resolve the API only when sending a turn, so an unconfigured backend cannot break startup.
-        _active = new Conversation(new RgfAiConversationSession(new LazyTransport(Services)));
+        _active = new Conversation(new RgfAiConversationSession(new LazyTransport(Services))) { GridContext = context };
         var conversation = _active;
         conversation.StateChangedHandler = () => ConversationStateChanged(conversation);
         conversation.Session.StateChanged += conversation.StateChangedHandler;
@@ -331,7 +354,7 @@ public partial class RgfRecrobyWorkspace : IAsyncDisposable
         if (_editing == conversation) CancelRename();
         _conversations.Remove(conversation);
         if (_active == conversation) _active = _conversations.LastOrDefault();
-        if (!_disposed && _conversations.Count == 0) NewConversation();
+        if (!_disposed && _conversations.Count == 0) NewGeneralConversation();
     }
 
     // The type identifies the general Recroby independently of its displayed title.
@@ -347,6 +370,7 @@ public partial class RgfRecrobyWorkspace : IAsyncDisposable
         public RgfRecrobyComponent? Component { get; set; }
         public object? Owner { get; init; }
         public string? ContextKey { get; init; }
+        public RgfRecrobyGridContext? GridContext { get; init; }
     }
 
     private sealed class LazyTransport(IServiceProvider services) : IRgfAiTransport

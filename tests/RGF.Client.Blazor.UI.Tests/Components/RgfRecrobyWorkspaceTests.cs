@@ -1,4 +1,4 @@
-using Bunit;
+﻿using Bunit;
 using Microsoft.Extensions.DependencyInjection;
 using Recrovit.RecroGridFramework.Abstraction.Contracts.Services;
 using Recrovit.RecroGridFramework.Client.AI;
@@ -12,6 +12,83 @@ namespace Recrovit.RecroGridFramework.Client.Blazor.UI.Tests.Components;
 
 public sealed class RgfRecrobyWorkspaceTests
 {
+    [Fact]
+    public async Task GridChatsReuseReferenceIdentityAndInheritOnlyContext()
+    {
+        using var context = Context();
+        var service = context.Services.GetRequiredService<RgfRecrobyWorkspaceService>();
+        var cut = context.Render<RgfRecrobyWorkspace>();
+        Assert.Equal("DockRight", cut.Find(".rgf-recroby-workspace").GetAttribute("data-mode"));
+        Assert.True(cut.Find("section").HasAttribute("hidden"));
+        Assert.Equal("General chat", cut.Find(".rgf-recroby-context").TextContent);
+        Assert.True(cut.Find("[data-new-chat]").HasAttribute("disabled"));
+        var grid = new RgfRecrobyGridContext();
+        Assert.True(await service.OpenOrActivateGridAsync(grid));
+        Assert.Equal(2, cut.FindComponents<RgfAiChatComponent>().Count);
+        var first = cut.FindComponents<RgfAiChatComponent>().Last().Instance.Session;
+        Assert.False(cut.Find("section").HasAttribute("hidden"));
+        Assert.Equal("DockRight", cut.Find(".rgf-recroby-workspace").GetAttribute("data-mode"));
+        Assert.True(await service.OpenOrActivateGridAsync(grid));
+        Assert.Equal(2, cut.FindComponents<RgfAiChatComponent>().Count);
+        Assert.Same(first, cut.FindComponents<RgfAiChatComponent>().Last().Instance.Session);
+        first.Conversation.AddUserMessage("Private history");
+        first.Conversation.ApplyResponse(new() { Success = true, ConversationId = "private-id", ConversationToken = "private-token",
+            WorkflowStatus = "WaitingForInput", ResponseMode = RgfAiResponseMode.ChoiceOnly,
+            Choices = [new() { Code = "private", UserText = "Private choice" }], Message = "Pending" });
+        cut.Find("[data-action=new]").Click();
+        var second = cut.FindComponents<RgfAiChatComponent>().Last().Instance.Session;
+        Assert.NotSame(first, second);
+        Assert.Empty(second.Conversation.Messages);
+        Assert.Null(second.Conversation.ConversationId);
+        Assert.Null(second.Conversation.ConversationToken);
+        Assert.False(second.Conversation.IsPendingWorkflow);
+        Assert.False(second.IsProcessing);
+        Assert.True(await service.OpenOrActivateGridAsync(grid));
+        Assert.Equal("true", cut.FindAll("[data-action=select]")[2].GetAttribute("aria-pressed"));
+        cut.FindAll("[data-new-chat]")[1].Click();
+        Assert.Equal("General chat", cut.Find(".rgf-recroby-context").TextContent);
+        Assert.True(await service.OpenOrActivateGridAsync(grid));
+        Assert.Equal("true", cut.FindAll("[data-action=select]")[1].GetAttribute("aria-pressed"));
+        var otherGrid = new RgfRecrobyGridContext();
+        Assert.True(await service.OpenOrActivateGridAsync(otherGrid));
+        Assert.Equal(5, cut.FindComponents<RgfAiChatComponent>().Count);
+        cut.FindAll("[data-new-chat]")[0].Click();
+        Assert.Equal(6, cut.FindComponents<RgfAiChatComponent>().Count);
+        Assert.Contains("unavailable", cut.Find(".rgf-recroby-context").TextContent);
+        while (cut.FindComponents<RgfAiChatComponent>().Count > 1)
+            await cut.FindAll(".rgf-recroby-choice > .btn-close")[0].ClickAsync(new());
+        await cut.Find(".rgf-recroby-choice > .btn-close").ClickAsync(new());
+        Assert.Equal("General chat", cut.Find(".rgf-recroby-context").TextContent);
+        Assert.Empty(cut.FindComponent<RgfAiChatComponent>().Instance.Session.Conversation.Messages);
+    }
+
+    [Fact]
+    public async Task GridOpenRequiresUniqueGridAdapterAndRechecksQueuedDispatch()
+    {
+        var service = new RgfRecrobyWorkspaceService();
+        var grid = new RgfRecrobyGridContext();
+        Assert.False(service.CanOpenGrid);
+        Assert.False(await service.OpenOrActivateGridAsync(grid));
+        using (service.RegisterWorkspace(op => Task.FromResult(op()), (_, _, _, _, _) => true, _ => Task.CompletedTask))
+            Assert.False(await service.OpenOrActivateGridAsync(grid));
+        Func<bool>? queued = null;
+        var completion = new TaskCompletionSource<bool>();
+        var calls = 0;
+        using var registration = service.RegisterWorkspace(op => { queued = op; return completion.Task; },
+            (_, _, _, _, _) => true, _ => Task.CompletedTask, _ => { calls++; return true; });
+        Assert.True(service.CanOpenGrid);
+        var pending = service.OpenOrActivateGridAsync(grid);
+        using var second = service.RegisterWorkspace(op => Task.FromResult(op()), (_, _, _, _, _) => true, _ => Task.CompletedTask);
+        Assert.False(service.CanOpenGrid);
+        Assert.False(await service.OpenOrActivateGridAsync(grid));
+        completion.SetResult(queued!());
+        Assert.False(await pending);
+        Assert.Equal(0, calls);
+        second.Dispose();
+        registration.Dispose();
+        Assert.False(await service.OpenOrActivateGridAsync(grid));
+    }
+
     [Fact]
     public async Task ContinuationChoicesRemainWithTheirConversationAndUseSharedChat()
     {
@@ -148,7 +225,7 @@ public sealed class RgfRecrobyWorkspaceTests
         Assert.NotSame(first.Instance.Session, chats[1].Instance.Session);
         chats[1].Find("textarea").Change("Draft two");
         Assert.Equal(2, cut.FindAll("[data-action=select]").Count);
-        Assert.Single(cut.FindAll(".rgf-recroby-conversation-bar > [data-action=new]"));
+        Assert.Single(cut.FindAll(".rgf-recroby-conversation-bar .rgf-recroby-new-chat > [data-action=new]"));
         Assert.Equal("New chat", cut.Find(".rgf-recroby-title").TextContent);
         Assert.Empty(cut.FindAll("button button"));
         cut.Find("[data-action=switch]").Click();

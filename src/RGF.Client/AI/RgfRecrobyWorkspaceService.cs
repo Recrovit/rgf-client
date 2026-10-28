@@ -34,6 +34,34 @@ public sealed class RgfRecrobyWorkspaceService : IRgfRecrobyWorkspaceService
     /// <inheritdoc />
     public IRgfRecrobyOwner CreateOwner() => new Owner(this);
 
+    /// <summary>Whether exactly one registered Workspace supports Grid conversations in this scope.</summary>
+    public bool CanOpenGrid
+    {
+        get { lock (_sync) return _workspaces.Count == 1 && _workspaces.Single().OpenGrid is not null; }
+    }
+
+    /// <summary>Opens or activates a Grid conversation and expands the Workspace without changing its layout mode.</summary>
+    /// <param name="context">The stable Grid instance context, compared by reference.</param>
+    /// <returns>False without side effects when no unique usable Workspace exists.</returns>
+    public Task<bool> OpenOrActivateGridAsync(RgfRecrobyGridContext context)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        Registration workspace;
+        lock (_sync)
+        {
+            if (!CanOpenGrid) return Task.FromResult(false);
+            workspace = _workspaces.Single();
+        }
+        return workspace.Dispatch(() =>
+        {
+            lock (_sync)
+            {
+                if (_workspaces.Count != 1 || !_workspaces.Contains(workspace)) return false;
+                return workspace.OpenGrid!(context);
+            }
+        });
+    }
+
     /// <summary>Registers a UI adapter; dispose the registration before releasing its UI state.
     /// Multiple simultaneous adapters reject opens until there is a unique target.</summary>
     /// <param name="dispatch">Awaits execution of an operation on the UI dispatcher.</param>
@@ -43,11 +71,22 @@ public sealed class RgfRecrobyWorkspaceService : IRgfRecrobyWorkspaceService
     public IDisposable RegisterWorkspace(Func<Func<bool>, Task<bool>> dispatch,
         Func<object, string, string, string, Func<RgfAiConversationSession>, bool> open,
         Func<object, Task> close)
+        => RegisterWorkspace(dispatch, open, close, null);
+
+    /// <summary>Registers the existing owner adapter with optional Grid conversation support.</summary>
+    /// <param name="dispatch">Awaits execution on the UI dispatcher.</param>
+    /// <param name="open">Opens or activates an external owner conversation.</param>
+    /// <param name="close">Awaits closure of the owner's conversations.</param>
+    /// <param name="openGrid">Opens or activates a Grid conversation, or null for an owner-only adapter.</param>
+    /// <returns>The detachment handle, invalidating owners bound to this adapter.</returns>
+    public IDisposable RegisterWorkspace(Func<Func<bool>, Task<bool>> dispatch,
+        Func<object, string, string, string, Func<RgfAiConversationSession>, bool> open,
+        Func<object, Task> close, Func<RgfRecrobyGridContext, bool>? openGrid)
     {
         ArgumentNullException.ThrowIfNull(dispatch);
         ArgumentNullException.ThrowIfNull(open);
         ArgumentNullException.ThrowIfNull(close);
-        var registration = new Registration(this, dispatch, open, close);
+        var registration = new Registration(this, dispatch, open, close, openGrid);
         lock (_sync) _workspaces.Add(registration);
         return registration;
     }
@@ -55,8 +94,9 @@ public sealed class RgfRecrobyWorkspaceService : IRgfRecrobyWorkspaceService
     private sealed class Registration(RgfRecrobyWorkspaceService service,
         Func<Func<bool>, Task<bool>> dispatch,
         Func<object, string, string, string, Func<RgfAiConversationSession>, bool> open,
-        Func<object, Task> close) : IDisposable
+        Func<object, Task> close, Func<RgfRecrobyGridContext, bool>? openGrid) : IDisposable
     {
+        public Func<RgfRecrobyGridContext, bool>? OpenGrid { get; } = openGrid;
         public Func<Func<bool>, Task<bool>> Dispatch { get; } = dispatch;
         public Func<object, string, string, string, Func<RgfAiConversationSession>, bool> Open { get; } = open;
         public Func<object, Task> Close { get; } = close;

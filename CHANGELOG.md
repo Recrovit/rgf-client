@@ -1,10 +1,12 @@
-# Release History
+﻿# Release History
 
 This file contains the consolidated release history for the `rgf-client` solution and its published packages.
 
 ## [Unreleased]
 
 ### Features Added
+
+- Open or resume Recroby from each Grid toolbar, with multiple independent chats per Grid and context-only inheritance for new chats. Grid labels remain available after the Grid closes. Recroby now starts right-docked and collapsed when no saved layout exists; saved user layouts are preserved.
 
 - Added a reusable secure Markdown viewer with an original-text toggle and per-conversation Recroby response formats. New Recroby conversations default to Minimal; server-marked Markdown replies support independent view switching without generating another response. Every assistant reply offers one-click copying of its unchanged original text, with Copy above the optional view toggle and accessible success/failure feedback.
 
