@@ -1,5 +1,6 @@
 #nullable enable
 
+using Recrovit.RecroGridFramework.Abstraction.Contracts.API;
 using System.Text.Json.Serialization;
 
 namespace Recrovit.RecroGridFramework.Abstraction.Contracts.AI;
@@ -8,6 +9,10 @@ namespace Recrovit.RecroGridFramework.Abstraction.Contracts.AI;
 /// <summary>A conversation turn with one or more messages and optional execution settings.</summary>
 public class RgfAiRequest
 {
+    /// <summary>Optional current Grid snapshot. All values are untrusted client input, never authorization evidence.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public RgfGridRequest? GridRequest { get; set; }
+
     /// <summary>Optional user message structure; null preserves existing generation behavior. A pending run retains its original format.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public RgfAiResponseFormat? ResponseFormat { get; set; }

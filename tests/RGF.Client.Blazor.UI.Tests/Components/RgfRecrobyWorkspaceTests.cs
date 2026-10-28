@@ -10,7 +10,7 @@ using Recrovit.RecroGridFramework.Client.Blazor.UI.Tests.Testing;
 
 namespace Recrovit.RecroGridFramework.Client.Blazor.UI.Tests.Components;
 
-public sealed class RgfRecrobyWorkspaceTests
+public sealed partial class RgfRecrobyWorkspaceTests
 {
     [Fact]
     public void GridContextNotifiesOnlyAfterActualStateChanges()

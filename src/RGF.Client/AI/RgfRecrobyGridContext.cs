@@ -1,3 +1,5 @@
+using Recrovit.RecroGridFramework.Abstraction.Contracts.API;
+using Recrovit.RecroGridFramework.Abstraction.Models;
 using Recrovit.RecroGridFramework.Client.Handlers;
 
 namespace Recrovit.RecroGridFramework.Client.AI;
@@ -17,6 +19,40 @@ public sealed class RgfRecrobyGridContext
 
     /// <summary>Raised after the manager reference or retained display data changes.</summary>
     public event Action? Changed;
+
+    /// <summary>Captures the current manager's session, entity and applied filter/sort without loading data.</summary>
+    /// <returns>An independent allowlisted snapshot, or null while the manager is unavailable.</returns>
+    public RgfGridRequest? CreateGridRequest()
+    {
+        var manager = Manager;
+        if (manager is null) return null;
+        var settings = manager.ListHandler.GetGridSettings();
+        var applied = RgfGridSettings.DeepCopy(new RgfGridSettings
+        {
+            Conditions = settings.Conditions,
+            Sort = settings.Sort
+        })!;
+        var created = manager.CreateGridRequest(request =>
+        {
+            request.EntityName = manager.EntityDesc.EntityName;
+            request.ListParam = new RgfListParam { UserFilter = applied.Conditions, Sort = applied.Sort };
+        });
+        // Event handlers can replace the request or add unrelated Grid-operation data.
+        var snapshot = RgfGridSettings.DeepCopy(new RgfGridSettings
+        {
+            Conditions = created.ListParam?.UserFilter,
+            Sort = created.ListParam?.Sort
+        })!;
+        var result = RgfGridRequest.Create(new RgfSessionParams
+        {
+            SessionId = created.SessionId,
+            GridId = created.GridId,
+            Language = created.Language
+        });
+        result.EntityName = created.EntityName;
+        result.ListParam = new RgfListParam { UserFilter = snapshot.Conditions, Sort = snapshot.Sort };
+        return result;
+    }
 
     /// <summary>Publishes a successfully initialized manager and its display data from the owning Grid.</summary>
     /// <param name="manager">The current manager whose initialization has completed.</param>

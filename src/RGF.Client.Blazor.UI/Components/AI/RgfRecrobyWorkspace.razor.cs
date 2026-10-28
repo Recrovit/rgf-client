@@ -356,7 +356,7 @@ public partial class RgfRecrobyWorkspace : IAsyncDisposable
         CancelRename();
         CloseSwitcher(_switcherOpen);
         // Resolve the API only when sending a turn, so an unconfigured backend cannot break startup.
-        _active = new Conversation(new RgfAiConversationSession(new LazyTransport(Services))) { GridContext = context };
+        _active = new Conversation(new RgfAiConversationSession(new LazyTransport(Services, context))) { GridContext = context };
         var conversation = _active;
         conversation.StateChangedHandler = () => ConversationStateChanged(conversation);
         conversation.Session.StateChanged += conversation.StateChangedHandler;
@@ -414,10 +414,14 @@ public partial class RgfRecrobyWorkspace : IAsyncDisposable
         public RgfRecrobyGridContext? GridContext { get; init; }
     }
 
-    private sealed class LazyTransport(IServiceProvider services) : IRgfAiTransport
+    private sealed class LazyTransport(IServiceProvider services, RgfRecrobyGridContext? gridContext) : IRgfAiTransport
     {
         public Task<Recrovit.RecroGridFramework.Abstraction.Contracts.AI.RgfAiResponse> SendAsync(
             Recrovit.RecroGridFramework.Abstraction.Contracts.AI.RgfAiRequest request, CancellationToken cancellationToken = default)
-            => new RgfAiApiTransport(services.GetRequiredService<IRgfApiService>()).SendAsync(request, cancellationToken);
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            request.GridRequest = gridContext?.CreateGridRequest();
+            return new RgfAiApiTransport(services.GetRequiredService<IRgfApiService>()).SendAsync(request, cancellationToken);
+        }
     }
 }

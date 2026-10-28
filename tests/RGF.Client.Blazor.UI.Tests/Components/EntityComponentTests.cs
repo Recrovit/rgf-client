@@ -646,6 +646,20 @@ public sealed class EntityComponentTests
             await cut.InvokeAsync(() => chart.SetDataStatus(RgfProcessingStatus.Valid));
             await cut.InvokeAsync(() => entity.Manager.ListHandler.RefreshRowAsync(new RgfDynamicDictionary()));
             Assert.Equal(RgfProcessingStatus.Invalid, chart.DataStatus);
+            var gridContext = new RgfRecrobyGridContext();
+            gridContext.SetManager(entity.Manager);
+            entity.Manager.CreateGridRequestCreated += (_, args) =>
+            {
+                args.Request.Language = "snapshot-event";
+                args.Request.CustomParams = new() { ["private"] = "discard" };
+            };
+            var requestCount = requests;
+            var snapshot = gridContext.CreateGridRequest()!;
+            Assert.Equal(requestCount + 1, requests);
+            Assert.Equal("snapshot-event", snapshot.Language);
+            Assert.Equal(entity.Manager.EntityDesc.EntityName, snapshot.EntityName);
+            Assert.Null(snapshot.CustomParams);
+            Assert.Equal("saved-filter", Assert.Single(snapshot.ListParam.UserFilter).Param1?.ToString());
         }
         else
         {
