@@ -21,6 +21,10 @@ public partial class RgfAiChatComponent : IDisposable
     [Parameter]
     public bool ShowSendErrors { get; set; }
 
+    /// <summary>Uses theme-aware subtle user messages and transparent responses; defaults to false.</summary>
+    [Parameter]
+    public bool UseSubtleMessageStyle { get; set; } = false;
+
     /// <summary>Shows Cancel and cancels this component's manual turn on disposal; defaults to false and does not own external turns.</summary>
     [Parameter] public bool AllowCancellation { get; set; }
 

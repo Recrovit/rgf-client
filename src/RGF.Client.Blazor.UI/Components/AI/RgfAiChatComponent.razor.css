@@ -10,6 +10,21 @@
 
 .rgf-ai-plain, .alert { white-space: pre-wrap; }
 
+.chat-box.rgf-ai-subtle {
+    background: var(--bs-body-bg);
+}
+
+.message.rgf-ai-user-subtle {
+    background: var(--bs-primary-bg-subtle);
+    color: var(--bs-primary-text-emphasis);
+}
+
+.message.rgf-ai-response-subtle {
+    background: transparent;
+    color: var(--bs-body-color);
+    border: 1px solid var(--bs-border-color);
+}
+
 .message {
     min-width: 0;
     max-width: 90%;
@@ -40,6 +55,25 @@
     width: 2rem;
     margin: 0;
     color: #212529;
+}
+
+.message.rgf-ai-response-subtle.rgf-ai-copy ::deep .rgf-markdown-toolbar {
+    color: var(--bs-body-color);
+}
+
+.message.rgf-ai-response-subtle.rgf-ai-copy ::deep .rgf-markdown-toolbar .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    padding: 0;
+    border: 0;
+}
+
+.message.rgf-ai-response-subtle.rgf-ai-copy ::deep .rgf-markdown-toolbar .btn:is(:hover, :active, .active) {
+    background-color: var(--bs-secondary-bg);
+    box-shadow: none;
 }
 
 .rgf-ai-choice {
