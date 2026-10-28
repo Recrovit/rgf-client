@@ -24,6 +24,131 @@ namespace Recrovit.RecroGridFramework.Client.Blazor.UI.Tests.Components;
 public sealed class EntityComponentTests
 {
     [Fact]
+    public async Task DeferredInitializationRetainsReplacementManagerUntilRecreationActivatesGrid()
+    {
+        using var context = CreateTestContext(true);
+        var api = (PendingRgfApiService)context.Services.GetRequiredService<IRgfApiService>();
+        var entity = CreateEntityParameters(RfgDisplayMode.Grid);
+        entity.DeferredInitialization = true;
+        var initialized = new List<IRgManager>();
+        entity.EventDispatcher.Subscribe(RgfEntityEventKind.Initialized, args => { initialized.Add(args.Args.Manager); });
+
+        var cut = RenderWorkspace(context, entity);
+        var firstManager = Assert.IsType<RgManager>(entity.Manager);
+        var gridContext = cut.Instance.RecrobyGridContext;
+        Assert.Same(firstManager, cut.Instance.Manager);
+        Assert.Null(firstManager.ListHandler);
+        Assert.Null(gridContext.Manager);
+        Assert.Empty(api.GridRequests);
+        Assert.Empty(initialized);
+        Assert.Empty(cut.FindAll(".rgf-entity-grid, .toolbar"));
+        Assert.Empty(cut.FindComponents<StatefulView>());
+
+        var replacement = new RgfEntityParameters("Replacement", firstManager.SessionParams)
+        {
+            DeferredInitialization = true,
+            DisplayMode = RfgDisplayMode.Grid
+        };
+        replacement.EventDispatcher.Subscribe(RgfEntityEventKind.Initialized, args => { initialized.Add(args.Args.Manager); });
+        cut.Render(p => p.Add(c => c.EntityParameters, replacement));
+
+        cut.WaitForAssertion(() =>
+        {
+            Assert.NotNull(replacement.Manager);
+            Assert.NotSame(firstManager, replacement.Manager);
+            Assert.Same(replacement.Manager, cut.Instance.Manager);
+        });
+        var manager = Assert.IsType<RgManager>(replacement.Manager);
+        Assert.Null(manager.ListHandler);
+        Assert.Same(gridContext, cut.Instance.RecrobyGridContext);
+        Assert.Null(gridContext.Manager);
+        Assert.Empty(api.GridRequests);
+        Assert.Empty(initialized);
+        Assert.Empty(cut.FindAll(".rgf-entity-grid, .toolbar"));
+        Assert.Empty(cut.FindComponents<StatefulView>());
+
+        var refreshed = new List<bool>();
+        manager.RefreshEntity += recreate => refreshed.Add(recreate);
+        Assert.True(await cut.InvokeAsync(() => manager.RecreateAsync()));
+
+        cut.WaitForAssertion(() =>
+        {
+            Assert.True(Assert.IsAssignableFrom<IRgListHandler>(manager.ListHandler).Initialized);
+            Assert.Same(manager, replacement.Manager);
+            Assert.Same(manager, cut.Instance.Manager);
+            Assert.Same(manager, gridContext.Manager);
+            Assert.Same(manager, Assert.Single(initialized));
+            Assert.False(Assert.Single(refreshed));
+            Assert.Single(api.GridRequests);
+            Assert.Single(cut.FindAll(".rgf-entity-grid"));
+            Assert.Single(cut.FindAll(".toolbar"));
+            Assert.Single(cut.FindComponents<StatefulView>());
+        });
+    }
+
+    [Fact]
+    public async Task FailedRefreshDoesNotPublishReplacementManagerOrActivateGrid()
+    {
+        using var context = CreateTestContext(true);
+        var api = (PendingRgfApiService)context.Services.GetRequiredService<IRgfApiService>();
+        var entity = CreateEntityParameters(RfgDisplayMode.Grid);
+        var initialized = new List<IRgManager>();
+        entity.EventDispatcher.Subscribe(RgfEntityEventKind.Initialized, args => { initialized.Add(args.Args.Manager); });
+        var cut = RenderWorkspace(context, entity);
+        var firstManager = Assert.IsType<RgManager>(entity.Manager);
+        var gridContext = cut.Instance.RecrobyGridContext;
+        Assert.True(firstManager.ListHandler.Initialized);
+        Assert.Same(firstManager, cut.Instance.Manager);
+        Assert.Same(firstManager, gridContext.Manager);
+        Assert.Same(firstManager, Assert.Single(initialized));
+        Assert.Single(cut.FindAll(".rgf-entity-grid"));
+        Assert.Single(cut.FindComponents<StatefulView>());
+
+        var gate = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        api.GridResponseGate = gate;
+        api.FailGridRequest = true;
+        var replacement = new RgfEntityParameters("Replacement", firstManager.SessionParams)
+        {
+            DisplayMode = RfgDisplayMode.Grid
+        };
+        replacement.EventDispatcher.Subscribe(RgfEntityEventKind.Initialized, args => { initialized.Add(args.Args.Manager); });
+        var destroyed = new List<IRgManager>();
+        replacement.EventDispatcher.Subscribe(RgfEntityEventKind.Destroy, args => { destroyed.Add(args.Args.Manager); });
+        cut.Render(p => p.Add(c => c.EntityParameters, replacement));
+        await api.GridResponseStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), Xunit.TestContext.Current.CancellationToken);
+
+        Assert.NotSame(firstManager, cut.Instance.Manager);
+        Assert.Null(firstManager.ListHandler);
+        Assert.Same(gridContext, cut.Instance.RecrobyGridContext);
+        Assert.Null(gridContext.Manager);
+        Assert.Empty(destroyed);
+        Assert.Empty(cut.FindAll(".rgf-entity-grid, .toolbar"));
+
+        gate.SetResult(true);
+        cut.WaitForAssertion(() =>
+        {
+            var failedManager = Assert.Single(destroyed);
+            Assert.NotSame(firstManager, failedManager);
+            Assert.False(failedManager.ListHandler.Initialized);
+            Assert.Null(gridContext.Manager);
+            Assert.Same(firstManager, Assert.Single(initialized));
+            Assert.Equal(2, api.GridRequests.Count);
+            Assert.Empty(cut.FindAll(".rgf-entity-grid, .toolbar"));
+            Assert.Empty(cut.FindComponents<StatefulView>());
+        });
+
+        // A later parameter/render pass must not treat the failed manager as an initialized Grid.
+        cut.Render();
+        await cut.InvokeAsync(() => { });
+        Assert.NotSame(firstManager, cut.Instance.Manager);
+        Assert.Null(gridContext.Manager);
+        Assert.Same(firstManager, Assert.Single(initialized));
+        Assert.Empty(cut.FindAll(".rgf-entity-grid, .toolbar"));
+        Assert.Empty(cut.FindComponents<StatefulView>());
+        Assert.False(context.Renderer.UnhandledException.IsCompleted);
+    }
+
+    [Fact]
     public void FailedInitializationDoesNotPublishGridManager()
     {
         using var context = CreateTestContext(true);
