@@ -435,7 +435,7 @@ src/Directory.Build.targets
 /.codex/config.toml
 /.codex/rules/default.rules
 /.agents/rgf-docs/guidelines.md
-**/AGENTS.md
+**/AGENTS.md*
 
-/docs/
+/rgf-docs/
 /src/**/docs/
