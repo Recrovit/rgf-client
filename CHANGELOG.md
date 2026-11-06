@@ -6,6 +6,8 @@ This file contains the consolidated release history for the `rgf-client` solutio
 
 ### Features Added
 
+- Grid-linked Recroby Create conversations automatically replace and activate the current Grid filter with the validated result. The chat describes the generated filter and the existing RGF Toast system reports the load.
+
 - Grid-linked Recroby conversations now send the current applied filter and sort snapshot with each turn, independently per Grid and conversation; temporarily unavailable Grids preserve their chats.
 
 - Open or resume Recroby from each Grid toolbar, with multiple independent chats per Grid and context-only inheritance for new chats. Grid labels remain available after the Grid closes. Recroby now starts right-docked and collapsed when no saved layout exists; saved user layouts are preserved.

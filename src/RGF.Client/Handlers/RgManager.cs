@@ -235,6 +235,9 @@ public class RgManager : IRgManager
                     filterSettings = result.FilterSettings;
                 }
             }
+            // A concurrent caller may have initialized and updated the filter during the API request.
+            if (_filterHandler is not null) return _filterHandler;
+            ObjectDisposedException.ThrowIf(ListHandler is null, this);
             string condition = EntityDesc.Options.GetStringValue("RGO_FilterParams");
             _filterHandler = new RgFilterHandler(this, EntityDesc, xmlFilter, condition, filterSettings);
             ListHandler.InitFilter(_filterHandler.StoreFilter());

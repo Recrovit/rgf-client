@@ -13,6 +13,10 @@ public class RgfAiResponse : RgfAiMessage
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public RgfAiResponseFormat? ResponseFormat { get; set; }
 
+    /// <summary>Optional server-validated filter replacement for the Grid that initiated the turn.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public RgfAiFilterAction? FilterAction { get; set; }
+
     /// <summary>Creates a response with Assistant role; success defaults to false and identity to an empty string.</summary>
     public RgfAiResponse()
     {

@@ -3,6 +3,7 @@ using Recrovit.RecroGridFramework.Client.AI;
 using Recrovit.RecroGridFramework.Client.Blazor.UI.Components.AI;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.DependencyInjection;
+using Recrovit.RecroGridFramework.Abstraction.Contracts.AI;
 using Recrovit.RecroGridFramework.Abstraction.Contracts.API;
 using Recrovit.RecroGridFramework.Abstraction.Contracts.Services;
 using Recrovit.RecroGridFramework.Abstraction.Infrastructure.API;
@@ -23,6 +24,191 @@ namespace Recrovit.RecroGridFramework.Client.Blazor.UI.Tests.Components;
 [Collection(RgfBlazorUiStaticStateCollection.Name)]
 public sealed class EntityComponentTests
 {
+    [Fact]
+    public async Task RecrobyLoadsTheCompleteFilterAndKeepsItsResetState()
+    {
+        using var context = CreateTestContext(true);
+        context.Services.AddScoped<RgfRecrobyWorkspaceService>();
+        var workspace = context.Render<RgfRecrobyWorkspace>();
+        var api = (PendingRgfApiService)context.Services.GetRequiredService<IRgfApiService>();
+        api.GridProperties = [new() { Id = 8, Alias = "Number", ColTitle = "Number", ColPos = 1, Sort = 1 }];
+        var entity = CreateEntityParameters(RfgDisplayMode.Grid);
+        var grid = RenderWorkspace(context, entity);
+        var manager = entity.Manager!;
+        var list = manager.ListHandler;
+        var handler = await manager.GetFilterHandlerAsync();
+        var previous = new RgfFilter.Condition { Id = 9, Alias = "Old", Param1 = "previous" };
+        Assert.True(handler.InitFilter(JsonSerializer.Serialize(new[] { previous })));
+        list.ApplyFilterState(handler.StoreFilter(), 41);
+        var quick = new RgfProperty { Id = 10, Alias = "Quick" };
+        await handler.SetQuickFilterAsync(quick, "quick");
+        Assert.Contains(handler.Conditions, condition => condition.IsQuickFilter);
+        var sort = list.GetGridSettings().Sort;
+        Assert.Equal(new[] { 8, 1 }, Assert.Single(sort!));
+        var conditions = new RgfFilter.Condition[]
+        {
+            new()
+            {
+                LogicalOperator = RgfFilter.LogicalOperator.And,
+                Conditions =
+                [
+                    new() { Id = 1, Alias = "OrderDate", QueryOperator = RgfFilter.QueryOperator.IntervalE,
+                        Param1 = new DateTime(2026, 11, 6, 13, 14, 15).AddTicks(7), Param2 = "2026-11-07T00:00:00.0000000" },
+                    new() { Id = 2, Alias = "Amount", LogicalOperator = RgfFilter.LogicalOperator.Or,
+                        QueryOperator = RgfFilter.QueryOperator.Equal, Param1 = 123456789012345678.000000123m },
+                    new() { Id = 3, Alias = "Approved", QueryOperator = RgfFilter.QueryOperator.Equal, Param1 = true },
+                    new() { Id = 4, Alias = "Codes", QueryOperator = RgfFilter.QueryOperator.In, Param1 = new[] { "A", "B" } }
+                ]
+            }
+        };
+        api.RecrobyResponse = request => Task.FromResult(FilterReply(request, conditions));
+        var gridContext = grid.Instance.RecrobyGridContext;
+        await context.Services.GetRequiredService<RgfRecrobyWorkspaceService>().OpenOrActivateGridAsync(gridContext);
+        var session = workspace.FindComponent<RgfAiChatComponent>().Instance.Session;
+        api.GridRequests.Clear();
+        var toasts = ((FakeEventNotificationService)context.Services.GetRequiredService<IRgfEventNotificationService>()).Toasts;
+        toasts.Clear();
+        api.FailGridRequest = true;
+        var refreshGate = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        api.GridResponseGate = refreshGate;
+
+        var token = Xunit.TestContext.Current.CancellationToken;
+        try
+        {
+            await session.SendAsync("Generate filter", cancellationToken: token).WaitAsync(TimeSpan.FromSeconds(5), token);
+            await api.GridResponseStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), token);
+            Assert.True(list.IsLoading.Value);
+            var message = Assert.IsType<RgfAiResponse>(session.Conversation.Messages.Last());
+            Assert.Equal("Generated filter summary", message.Message);
+            Assert.Null(message.FilterAction);
+        }
+        finally { refreshGate.SetResult(true); }
+        grid.WaitForAssertion(() => Assert.False(list.IsLoading.Value));
+
+        var refresh = Assert.Single(api.GridRequests).ListParam;
+        Assert.Equal(41, refresh.SQLTimeout);
+        Assert.Equal(sort, refresh.Sort);
+        AssertConditions(refresh.UserFilter);
+        AssertConditions(list.GetGridSettings().Conditions!);
+        AssertConditions(handler.Conditions);
+        Assert.DoesNotContain(handler.Conditions, condition => condition.IsQuickFilter);
+        Assert.All(Assert.Single(handler.Conditions).Conditions, condition => Assert.True(condition.ClientId > 0));
+        Assert.Equal("Refresh", Assert.Single(toasts).Body);
+        Assert.NotEmpty(Assert.Single(handler.Conditions).Conditions);
+        handler.Conditions[0].Conditions[0].Param1 = "unconfirmed edit";
+        Assert.True(handler.ResetFilter());
+        AssertConditions(handler.Conditions);
+        AssertConditions(list.GetGridSettings().Conditions!);
+
+        entity.DialogTemplate = _ => builder => { };
+        var dialog = context.Render<RgfFilterComponent>(parameters => parameters
+            .Add(component => component.EntityParameters, entity)
+            .Add(component => component.FilterTemplate, _ => builder => { })
+            .Add(component => component.FooterTemplate, _ => builder => { }));
+        await dialog.InvokeAsync(() => entity.ToolbarParameters.EventDispatcher.DispatchEventAsync(RgfToolbarEventKind.ShowFilter,
+            new RgfEventArgs<RgfToolbarEventArgs>(this, new RgfToolbarEventArgs(RgfToolbarEventKind.ShowFilter))));
+        Assert.True(dialog.Instance.IsFilterActive);
+        AssertConditions(dialog.Instance.Condition!.Conditions);
+        dialog.Instance.Condition.Conditions[0].Conditions.Clear();
+        await dialog.InvokeAsync(() => dialog.Instance.OnCancel());
+        AssertConditions(handler.Conditions);
+        AssertConditions(list.GetGridSettings().Conditions!);
+        await workspace.InvokeAsync(() => workspace.Render());
+        Assert.Single(api.GridRequests);
+
+        void AssertConditions(IEnumerable<RgfFilter.Condition> actual) =>
+            Assert.True(JsonElement.DeepEquals(JsonSerializer.SerializeToElement(conditions), JsonSerializer.SerializeToElement(actual)));
+    }
+
+    [Fact]
+    public async Task RecrobyKeepsTheLatestGridTurnAndRejectsAReplacedManager()
+    {
+        using var context = CreateTestContext(true);
+        context.Services.AddScoped<RgfRecrobyWorkspaceService>();
+        var workspace = context.Render<RgfRecrobyWorkspace>();
+        var api = (PendingRgfApiService)context.Services.GetRequiredService<IRgfApiService>();
+        var services = context.Services.GetRequiredService<RgfRecrobyWorkspaceService>();
+        using var manager = new RgManager(new() { SessionId = "session", GridId = "grid" }, context.Services);
+        Assert.True(await manager.InitializeAsync(manager.CreateGridRequest(request => request.EntityName = "Orders")));
+        var gridContext = new RgfRecrobyGridContext();
+        gridContext.SetManager(manager);
+        await services.OpenOrActivateGridAsync(gridContext);
+        var first = workspace.FindComponent<RgfAiChatComponent>().Instance.Session;
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        api.RecrobyResponse = async request =>
+        {
+            if (request.CurrentUserMessage == "older")
+            {
+                started.SetResult();
+                await release.Task;
+            }
+            return FilterReply(request, [new() { Id = 1, Alias = "Name", QueryOperator = RgfFilter.QueryOperator.Equal,
+                Param1 = request.CurrentUserMessage }]);
+        };
+        var older = first.SendAsync("older", cancellationToken: Xunit.TestContext.Current.CancellationToken);
+        await started.Task.WaitAsync(TimeSpan.FromSeconds(5), Xunit.TestContext.Current.CancellationToken);
+        workspace.Find("[data-action=new]").Click();
+        var second = workspace.FindComponents<RgfAiChatComponent>().Last().Instance.Session;
+        Assert.NotSame(first, second);
+        api.GridRequests.Clear();
+        await second.SendAsync("newer", cancellationToken: Xunit.TestContext.Current.CancellationToken);
+        release.SetResult();
+        await older;
+        Assert.Single(api.GridRequests);
+        Assert.Equal("newer", Assert.Single(manager.ListHandler.GetGridSettings().Conditions!).Param1.ToString());
+
+        using var replacement = new RgManager(new(manager.SessionParams), context.Services);
+        Assert.True(await replacement.InitializeAsync(replacement.CreateGridRequest(request => request.EntityName = "Orders")));
+        api.RecrobyResponse = async request =>
+        {
+            await workspace.InvokeAsync(() => gridContext.SetManager(replacement));
+            return FilterReply(request, [new() { Id = 1, Param1 = "old manager" }]);
+        };
+        api.GridRequests.Clear();
+        var toasts = ((FakeEventNotificationService)context.Services.GetRequiredService<IRgfEventNotificationService>()).Toasts;
+        toasts.Clear();
+        await second.SendAsync("replace", cancellationToken: Xunit.TestContext.Current.CancellationToken);
+        Assert.Empty(api.GridRequests);
+        Assert.Empty(replacement.ListHandler.GetGridSettings().Conditions ?? []);
+        Assert.Equal("newer", Assert.Single(manager.ListHandler.GetGridSettings().Conditions!).Param1.ToString());
+        Assert.Equal(RgfToastType.Error, Assert.Single(toasts).ToastType);
+        Assert.Equal("Generated filter summary", second.Conversation.Messages.Last().Message);
+
+        api.RecrobyResponse = request =>
+        {
+            var reply = FilterReply(request, [new() { Id = 1, Param1 = "different entity" }]);
+            reply.FilterAction = reply.FilterAction! with { EntityId = 999 };
+            return Task.FromResult(reply);
+        };
+        toasts.Clear();
+        await second.SendAsync("mismatch", cancellationToken: Xunit.TestContext.Current.CancellationToken);
+        Assert.Empty(api.GridRequests);
+        Assert.Equal(RgfToastType.Error, Assert.Single(toasts).ToastType);
+
+        api.RecrobyResponse = async request =>
+        {
+            await workspace.InvokeAsync(() => gridContext.ClearManager(replacement));
+            return FilterReply(request, [new() { Id = 1, Param1 = "closed Grid" }]);
+        };
+        toasts.Clear();
+        await second.SendAsync("close", cancellationToken: Xunit.TestContext.Current.CancellationToken);
+        Assert.Empty(api.GridRequests);
+        Assert.Equal(RgfToastType.Error, Assert.Single(toasts).ToastType);
+    }
+
+    private static RgfAiResponse FilterReply(RgfAiRequest request, RgfFilter.Condition[] conditions)
+    {
+        var options = new JsonSerializerOptions(JsonSerializerDefaults.Web);
+        var reply = new RgfAiResponse
+        {
+            Success = true, Message = "Generated filter summary",
+            FilterAction = new(RgfAiFilterOperation.Replace, request.GridRequest!.SessionId,
+                request.GridRequest.GridId, 101, conditions)
+        };
+        return JsonSerializer.Deserialize<RgfAiResponse>(JsonSerializer.Serialize(reply, options), options)!;
+    }
+
     [Fact]
     public async Task DeferredInitializationRetainsReplacementManagerUntilRecreationActivatesGrid()
     {
@@ -971,6 +1157,16 @@ public sealed class EntityComponentTests
 
     private sealed class PendingRgfApiService(bool complete) : IRgfApiService
     {
+        public Func<RgfAiRequest, Task<RgfAiResponse>>? RecrobyResponse { get; set; }
+        public List<RgfProperty> GridProperties { get; set; } = [];
+
+        private async Task<IRgfApiResponse<T>> RespondToRecrobyAsync<T>(IRgfApiRequest request) where T : class
+        {
+            var json = await request.Content.ReadAsStringAsync();
+            var input = JsonSerializer.Deserialize<RgfAiRequest>(json, new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
+            return new ApiResponse<T> { Success = true, Result = (T)(object)await RecrobyResponse!(input) };
+        }
+
         public TaskCompletionSource<bool>? GridResponseGate { get; set; }
         public TaskCompletionSource GridResponseStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public List<RgfGridRequest> GridRequests { get; } = [];
@@ -1061,6 +1257,8 @@ public sealed class EntityComponentTests
                     Success = true, Result = (ResultType)(object)new RgfResult<List<RgfChartSettings>> { Success = true, Messages = new(), Result = [] }
                 });
             }
+            if (typeof(ResultType) == typeof(RgfAiResponse) && RecrobyResponse is not null)
+                return RespondToRecrobyAsync<ResultType>(request);
             if (typeof(ResultType) == typeof(RgfResult<RgfGridResult>) &&
                 string.Equals(request.Uri, "/rgf/api/entity/RecroGrid", StringComparison.Ordinal))
             {
@@ -1078,7 +1276,7 @@ public sealed class EntityComponentTests
                             Messages = new(),
                             Result = new RgfGridResult
                             {
-                                EntityDesc = new RgfEntity { EntityName = "Orders", EntityVersion = "1", MenuTitle = "Orders", Title = "Orders", Permissions = new RgfPermissions(true), CRUD = "CRUD", Properties = [], Options = gridRequest.ListParam?.SQLTimeout is int timeout ? new() { ["RGO_SQLTimeout"] = timeout } : [] },
+                                EntityDesc = new RgfEntity { EntityId = 101, EntityName = "Orders", EntityVersion = "1", MenuTitle = "Orders", Title = "Orders", Permissions = new RgfPermissions(true), CRUD = "CRUD", Properties = GridProperties, Options = gridRequest.ListParam?.SQLTimeout is int timeout ? new() { ["RGO_SQLTimeout"] = timeout } : [] },
                                 Data = [], DataColumns = [], Options = new() { ["RGO_MaxItem"] = 0 }
                             }
                         }
@@ -1093,15 +1291,21 @@ public sealed class EntityComponentTests
 
     private sealed class FakeEventNotificationService : IRgfEventNotificationService
     {
-        public IRgfNotificationManager GetNotificationManager(string scope) => new FakeNotificationManager();
+        public List<RgfToastEventArgs> Toasts { get; } = [];
+
+        public IRgfNotificationManager GetNotificationManager(string scope) => new FakeNotificationManager(Toasts);
 
         public bool RemoveNotificationManager(string scope) => true;
     }
 
-    private sealed class FakeNotificationManager : IRgfNotificationManager
+    private sealed class FakeNotificationManager(List<RgfToastEventArgs> toasts) : IRgfNotificationManager
     {
         public IRgfObservableEvent<TArgs> GetObservableEvents<TArgs>() where TArgs : EventArgs => throw new NotSupportedException();
-        public Task RaiseEventAsync<TArgs>(TArgs args, object sender) where TArgs : EventArgs => Task.CompletedTask;
+        public Task RaiseEventAsync<TArgs>(TArgs args, object sender) where TArgs : EventArgs
+        {
+            if (args is RgfToastEventArgs toast) toasts.Add(toast);
+            return Task.CompletedTask;
+        }
         public IRgfObserver<IRgfEventArgs<TArgs>> Subscribe<TArgs>(Action<IRgfEventArgs<TArgs>> handler) where TArgs : EventArgs => new FakeObserver<IRgfEventArgs<TArgs>>();
         public IRgfObserver<IRgfEventArgs<TArgs>> Subscribe<TArgs>(Func<IRgfEventArgs<TArgs>, Task> handler) where TArgs : EventArgs => new FakeObserver<IRgfEventArgs<TArgs>>();
         public void Dispose() { }

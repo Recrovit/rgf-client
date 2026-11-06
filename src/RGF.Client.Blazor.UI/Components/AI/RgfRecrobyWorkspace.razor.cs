@@ -1,12 +1,18 @@
 ﻿using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.JSInterop;
 using Recrovit.RecroGridFramework.Abstraction.Contracts.AI;
 using Recrovit.RecroGridFramework.Abstraction.Contracts.Services;
+using Recrovit.RecroGridFramework.Abstraction.Models;
 using Recrovit.RecroGridFramework.Client.AI;
 using Recrovit.RecroGridFramework.Client.AI.Transport;
+using Recrovit.RecroGridFramework.Client.Events;
+using Recrovit.RecroGridFramework.Client.Handlers;
 using System.Globalization;
+using System.Runtime.CompilerServices;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 
 namespace Recrovit.RecroGridFramework.Client.Blazor.UI.Components.AI;
@@ -62,6 +68,7 @@ public partial class RgfRecrobyWorkspace : IAsyncDisposable
 
     private readonly List<Conversation> _conversations = [];
     private readonly HashSet<RgfRecrobyGridContext> _gridContexts = new(ReferenceEqualityComparer.Instance);
+    private readonly ConditionalWeakTable<IRgManager, GridTurns> _gridTurns = new();
     private Conversation? _active;
     private Conversation? _editing;
     private string _editTitle = string.Empty;
@@ -356,7 +363,7 @@ public partial class RgfRecrobyWorkspace : IAsyncDisposable
         CancelRename();
         CloseSwitcher(_switcherOpen);
         // Resolve the API only when sending a turn, so an unconfigured backend cannot break startup.
-        _active = new Conversation(new RgfAiConversationSession(new LazyTransport(Services, context))) { GridContext = context };
+        _active = new Conversation(new RgfAiConversationSession(new LazyTransport(this, context))) { GridContext = context };
         var conversation = _active;
         conversation.StateChangedHandler = () => ConversationStateChanged(conversation);
         conversation.Session.StateChanged += conversation.StateChangedHandler;
@@ -414,14 +421,114 @@ public partial class RgfRecrobyWorkspace : IAsyncDisposable
         public RgfRecrobyGridContext? GridContext { get; init; }
     }
 
-    private sealed class LazyTransport(IServiceProvider services, RgfRecrobyGridContext? gridContext) : IRgfAiTransport
+    private sealed class GridTurns
     {
-        public Task<Recrovit.RecroGridFramework.Abstraction.Contracts.AI.RgfAiResponse> SendAsync(
-            Recrovit.RecroGridFramework.Abstraction.Contracts.AI.RgfAiRequest request, CancellationToken cancellationToken = default)
+        public long Latest;
+    }
+
+    private sealed class LazyTransport(RgfRecrobyWorkspace workspace, RgfRecrobyGridContext? gridContext) : IRgfAiTransport
+    {
+        public async Task<RgfAiResponse> SendAsync(RgfAiRequest request, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            request.GridRequest = gridContext?.CreateGridRequest();
-            return new RgfAiApiTransport(services.GetRequiredService<IRgfApiService>()).SendAsync(request, cancellationToken);
+            IRgManager? manager = null;
+            var entityId = 0;
+            GridTurns? turns = null;
+            long turn = 0;
+            await workspace.InvokeAsync(() =>
+            {
+                manager = gridContext?.Manager;
+                request.GridRequest = gridContext?.CreateGridRequest();
+                if (manager is null) return;
+                entityId = manager.EntityDesc.EntityId;
+                turns = workspace._gridTurns.GetValue(manager, static _ => new());
+                turn = ++turns.Latest;
+            });
+
+            var response = await new RgfAiApiTransport(workspace.Services.GetRequiredService<IRgfApiService>())
+                .SendAsync(request, cancellationToken);
+            if (response is not { Success: true, FilterAction: { } action }) return response;
+
+            // The conversation keeps response objects as history. Consume the action in this turn.
+            response.FilterAction = null;
+            await workspace.InvokeAsync(async () =>
+            {
+                if (workspace._disposed || cancellationToken.IsCancellationRequested || IsSuperseded()) return;
+
+                IRgListHandler? list = null;
+                try
+                {
+                    if (IsTargetCurrent())
+                    {
+                        var handler = await manager!.GetFilterHandlerAsync();
+                        if (workspace._disposed || cancellationToken.IsCancellationRequested || IsSuperseded()) return;
+                        if (IsTargetCurrent() && handler is not null &&
+                            handler.InitFilter(JsonSerializer.Serialize(action.Conditions)))
+                        {
+                            list = manager.ListHandler;
+                            // Keep editor changes separate from the applied conditions until the user accepts them.
+                            var applied = RgfGridSettings.DeepCopy(new RgfGridSettings { Conditions = handler.StoreFilter() })!;
+                            list.ApplyFilterState(applied.Conditions!, list.SQLTimeout);
+                        }
+                    }
+                }
+                catch (Exception error)
+                {
+                    list = null;
+                    workspace.LogGridError(error, "The Recroby filter could not be loaded.");
+                }
+
+                if (list is null)
+                {
+                    if (!workspace._disposed && !cancellationToken.IsCancellationRequested && !IsSuperseded())
+                        await workspace.ReportFilterLoadFailureAsync(manager);
+                }
+                else
+                    _ = workspace.RefreshAfterFilterLoadAsync(list);
+            });
+            cancellationToken.ThrowIfCancellationRequested();
+            return response;
+
+            bool IsSuperseded() => turns is not null && turns.Latest != turn;
+
+            bool IsTargetCurrent() => manager is not null && ReferenceEquals(gridContext?.Manager, manager) &&
+                manager.ListHandler is { Initialized: true } && request.GridRequest is { } sent &&
+                action is { Operation: RgfAiFilterOperation.Replace, Conditions.Length: > 0 } &&
+                !string.IsNullOrEmpty(action.SessionId) && !string.IsNullOrEmpty(action.GridId) && action.EntityId > 0 &&
+                action.SessionId == sent.SessionId && action.GridId == sent.GridId && action.EntityId == entityId &&
+                action.SessionId == manager.SessionParams.SessionId && action.GridId == manager.SessionParams.GridId &&
+                action.EntityId == manager.EntityDesc.EntityId;
         }
     }
+
+    private async Task ReportFilterLoadFailureAsync(IRgManager? manager)
+    {
+        try
+        {
+            var toast = manager?.ToastManager ?? Services.GetService<IRgfEventNotificationService>()
+                ?.GetNotificationManager(RgfToastEventArgs.NotificationManagerScope);
+            if (toast is not null)
+                await toast.RaiseEventAsync(new RgfToastEventArgs("Recroby",
+                    "The generated filter could not be loaded into the Grid.", RgfToastType.Error), this);
+        }
+        catch (Exception error)
+        {
+            LogGridError(error, "The Recroby filter error notification could not be shown.");
+        }
+    }
+
+    private async Task RefreshAfterFilterLoadAsync(IRgListHandler list)
+    {
+        try
+        {
+            await list.RefreshDataAsync(null, invalidateAggregates: false);
+        }
+        catch (Exception error)
+        {
+            LogGridError(error, "The Grid refresh raised an exception after the Recroby filter was loaded.");
+        }
+    }
+
+    private void LogGridError(Exception error, string message) =>
+        Services.GetService<ILogger<RgfRecrobyWorkspace>>()?.LogWarning(error, "{Message}", message);
 }
