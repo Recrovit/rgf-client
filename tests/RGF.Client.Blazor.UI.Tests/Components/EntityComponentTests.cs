@@ -370,6 +370,7 @@ public sealed class EntityComponentTests
         Assert.Equal("Orders", gridContext.EntityName);
         cut.Find(".btn-toolbar .bi-robot").ParentElement!.Click();
         Assert.Equal("Orders", cut.Find(".rgf-recroby-context").TextContent);
+        Assert.NotEmpty(cut.FindAll("header.bg-success-subtle"));
         var session = cut.FindComponents<RgfAiChatComponent>().Last().Instance.Session;
         cut.Find(".btn-toolbar .bi-robot").ParentElement!.Click();
         Assert.Single(cut.FindComponents<RgfAiChatComponent>());
@@ -381,6 +382,7 @@ public sealed class EntityComponentTests
         ui.Render(p => p.Add(c => c.EntityParameters, entity));
         Assert.Null(gridContext.Manager);
         Assert.Same(gridContext, component.RecrobyGridContext);
+        Assert.Empty(cut.FindAll("header.bg-success-subtle"));
         api.GridResponseGate = null;
         entity = new RgfEntityParameters("Replacement", firstManager.SessionParams);
         ui.Render(p => p.Add(c => c.EntityParameters, entity));
@@ -392,6 +394,8 @@ public sealed class EntityComponentTests
         gridContext.ClearManager(firstManager);
         Assert.Same(replacement, gridContext.Manager);
         Assert.Same(session, cut.FindComponents<RgfAiChatComponent>().Last().Instance.Session);
+        Assert.NotEmpty(cut.FindAll("header.bg-success-subtle"));
+        Assert.True(cut.Find(".btn-toolbar .bi-robot").ParentElement!.ClassList.Contains("btn-success"));
         cut.Find(".btn-toolbar .bi-robot").ParentElement!.Click();
         Assert.Single(cut.FindComponents<RgfAiChatComponent>());
         cut.Render(p => p.Add(c => c.ChildContent, "<main>Grid removed</main>"));
@@ -402,6 +406,167 @@ public sealed class EntityComponentTests
         Assert.Equal("Orders (unavailable)", cut.Find(".rgf-recroby-context").TextContent);
         Assert.Equal(2, cut.FindComponents<RgfAiChatComponent>().Count);
         Assert.Empty(cut.FindComponents<RgfAiChatComponent>().Last().Instance.Session.Conversation.Messages);
+    }
+
+    [Fact]
+    public async Task RecrobyToolbarTracksSelectionAndReconnectsOnlyTheActiveDetachedConversation()
+    {
+        using var context = CreateTestContext(true);
+        RgfBlazorConfiguration.RegisterComponent<Recrovit.RecroGridFramework.Client.Blazor.UI.Components.MenuComponent>(RgfBlazorConfiguration.ComponentType.Menu);
+        context.ComponentFactories.AddStub<Recrovit.RecroGridFramework.Client.Blazor.UI.Components.MenuComponent>();
+        context.ComponentFactories.AddStub<Recrovit.RecroGridFramework.Client.Blazor.UI.Components.GridComponent>();
+        context.ComponentFactories.AddStub<Recrovit.RecroGridFramework.Client.Blazor.UI.Components.FilterComponent>();
+        context.ComponentFactories.AddStub<Recrovit.RecroGridFramework.Client.Blazor.UI.Components.PagerComponent>();
+        context.ComponentFactories.AddStub<Recrovit.RecroGridFramework.Client.Blazor.UI.Components.FormComponent>();
+        context.Services.AddScoped<RgfRecrobyWorkspaceService>();
+        var a = CreateEntityParameters(RfgDisplayMode.Grid);
+        var b = CreateEntityParameters(RfgDisplayMode.Grid);
+        var cut = context.Render<RgfRecrobyWorkspace>(p => p.Add(c => c.ChildContent, Grids(true)));
+        var managers = cut.FindComponents<RgfEntityComponent>().Select(c => c.Instance.Manager!).ToArray();
+        Assert.Equal(managers[0].EntityDesc.EntityName, managers[1].EntityDesc.EntityName);
+        Assert.Equal(2, ToolbarSubscriptionCount());
+        ActiveSession().Conversation.AddUserMessage("General history");
+        AssertState(null);
+        Robot("a").Click();
+        AssertState("a");
+        var originalA = ActiveSession();
+        originalA.Conversation.AddUserMessage("First A chat");
+        var originalAPanel = ActivePanel();
+        cut.Find("[data-action=new]").Click();
+        var reconnect = ActiveSession();
+        reconnect.Conversation.ApplyResponse(new()
+        {
+            Success = true, Message = "Existing history", ConversationId = "retained-id", ConversationToken = "retained-token"
+        });
+        reconnect.Conversation.AiModelOverride = "retained-model";
+        reconnect.Conversation.AiReasoningEffortOverride = "retained-effort";
+        reconnect.Conversation.ResponseFormat = RgfAiResponseFormat.Normal;
+        var reconnectPanel = ActivePanel();
+        cut.Find("[data-action=rename]").Click();
+        cut.Find(".rgf-recroby-title-editor").Input("My Grid conversation");
+        cut.Find(".rgf-recroby-title-editor").KeyDown("Enter");
+        AssertState("a");
+        Select(originalAPanel);
+        AssertState("a");
+        Robot("b").Click();
+        AssertState("b");
+        ActiveSession().Conversation.AddUserMessage("Existing B chat");
+        var originalBPanel = ActivePanel();
+        Select(originalAPanel);
+        AssertState("a");
+        cut.FindAll("[data-action=select]")[0].Click();
+        AssertState(null);
+
+        // A response from another A chat can arrive after the active chat is reconnected.
+        var api = (PendingRgfApiService)context.Services.GetRequiredService<IRgfApiService>();
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var token = Xunit.TestContext.Current.CancellationToken;
+        api.RecrobyResponse = async request =>
+        {
+            started.SetResult();
+            await release.Task;
+            return FilterReply(request, [new() { Id = 1, Param1 = "A filter" }]);
+        };
+        var oldSend = originalA.SendAsync("Old turn", cancellationToken: token);
+        try
+        {
+            await started.Task.WaitAsync(TimeSpan.FromSeconds(5), token);
+            Select(reconnectPanel);
+            cut.Render(p => p.Add(c => c.ChildContent, Grids(false)));
+            Assert.Empty(cut.FindAll("#a .bi-robot"));
+            Assert.Equal(1, ToolbarSubscriptionCount());
+            AssertState(null);
+            Assert.Equal("Orders (unavailable)", cut.Find(".rgf-recroby-context").TextContent);
+            cut.Find("[aria-label='Collapse Recroby']").Click();
+            Robot("b").Click();
+            AssertState("b");
+            Assert.False(cut.Find("section[aria-label=Recroby]").HasAttribute("hidden"));
+            Assert.Equal(reconnectPanel, ActivePanel());
+            Assert.Same(reconnect, ActiveSession());
+            Assert.Equal(4, cut.FindComponents<RgfAiChatComponent>().Count);
+            Assert.Equal("My Grid conversation", cut.Find(".rgf-recroby-title").TextContent);
+            Assert.Equal("Existing history", Assert.Single(reconnect.Conversation.Messages).Message);
+            Assert.Contains("Orders (unavailable)", cut.Find($"[aria-controls='{originalAPanel}']").TextContent);
+            Assert.DoesNotContain("unavailable", cut.Find($"[aria-controls='{originalBPanel}']").TextContent);
+            api.GridRequests.Clear();
+        }
+        finally { release.TrySetResult(); }
+        await oldSend;
+        Assert.Empty(api.GridRequests);
+        Assert.Empty(managers[1].ListHandler.GetGridSettings().Conditions ?? []);
+        Assert.Null(Assert.IsType<RgfAiResponse>(originalA.Conversation.Messages.Last()).FilterAction);
+
+        managers[1].ListHandler.ApplyFilterState([new() { Id = 1, Alias = "B", Param1 = "B filter" }], null);
+        RgfAiRequest? sent = null;
+        api.RecrobyResponse = request =>
+        {
+            sent = request;
+            return Task.FromResult(new RgfAiResponse { Success = true, Message = "B reply" });
+        };
+        await reconnect.SendAsync("New turn", cancellationToken: token);
+        Assert.NotNull(sent);
+        Assert.Equal(managers[1].SessionParams.SessionId, sent.GridRequest!.SessionId);
+        Assert.Equal(managers[1].SessionParams.GridId, sent.GridRequest.GridId);
+        Assert.Equal("B", Assert.Single(sent.GridRequest.ListParam.UserFilter).Alias);
+        Assert.Equal("retained-id", sent.ConversationId);
+        Assert.Equal("retained-token", sent.ConversationToken);
+        Assert.Equal("retained-model", sent.AiModelOverride);
+        Assert.Equal("retained-effort", sent.AiReasoningEffortOverride);
+        Assert.Equal(RgfAiResponseFormat.Normal, sent.ResponseFormat);
+
+        await Close(reconnectPanel);
+        AssertState("b");
+        await Close(originalBPanel);
+        AssertState(null);
+        await cut.Instance.DisposeAsync();
+        Assert.Equal(0, ToolbarSubscriptionCount());
+
+        RenderFragment Grids(bool includeA) => builder =>
+        {
+            if (includeA)
+            {
+                builder.OpenElement(0, "div");
+                builder.AddAttribute(1, "id", "a");
+                builder.OpenComponent<Recrovit.RecroGridFramework.Client.Blazor.UI.Components.EntityComponent>(2);
+                builder.AddAttribute(3, "EntityParameters", a);
+                builder.CloseComponent();
+                builder.CloseElement();
+            }
+            builder.OpenElement(4, "div");
+            builder.AddAttribute(5, "id", "b");
+            builder.OpenComponent<Recrovit.RecroGridFramework.Client.Blazor.UI.Components.EntityComponent>(6);
+            builder.AddAttribute(7, "EntityParameters", b);
+            builder.CloseComponent();
+            builder.CloseElement();
+        };
+
+        AngleSharp.Dom.IElement Robot(string grid) => cut.Find($"#{grid} .btn-toolbar .bi-robot").ParentElement!;
+        string ActivePanel() => cut.Find(".rgf-recroby-conversation:not([hidden])").Id!;
+        RgfAiConversationSession ActiveSession()
+        {
+            var panels = cut.FindAll(".rgf-recroby-conversation").ToList();
+            var activeIndex = panels.FindIndex(panel => !panel.HasAttribute("hidden"));
+            return cut.FindComponents<RgfAiChatComponent>()[activeIndex].Instance.Session;
+        }
+        void Select(string panel) => cut.Find($"[data-action=select][aria-controls='{panel}']").Click();
+        Task Close(string panel) => cut.Find($"[data-action=select][aria-controls='{panel}'] + .btn-close").ClickAsync(new());
+        int ToolbarSubscriptionCount()
+        {
+            var field = typeof(RgfRecrobyWorkspace).GetField("ActiveGridContextChanged",
+                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!;
+            return ((Action?)field.GetValue(cut.Instance))?.GetInvocationList().Length ?? 0;
+        }
+        void AssertState(string? activeGrid)
+        {
+            Assert.Equal(activeGrid is not null, cut.Find("header[data-drag-handle]").ClassList.Contains("bg-success-subtle"));
+            Assert.Empty(cut.FindAll(".rgf-recroby-conversation-bar.bg-success-subtle"));
+            foreach (var grid in new[] { "a", "b" }.Where(grid => cut.FindAll($"#{grid}").Count != 0))
+            {
+                Assert.True(Robot(grid).ClassList.Contains(grid == activeGrid ? "btn-success" : "btn-secondary"));
+                Assert.Equal(grid == activeGrid ? "true" : "false", Robot(grid).GetAttribute("aria-pressed"));
+            }
+        }
     }
 
     [Fact]

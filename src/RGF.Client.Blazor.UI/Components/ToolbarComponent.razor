@@ -1,6 +1,7 @@
 ﻿@using Recrovit.RecroGridFramework.Client.AI
 @using Recrovit.RecroGridFramework.Client.Blazor.UI.Components.AI
 @using Microsoft.Extensions.DependencyInjection
+@implements IDisposable
 @* RGF-DOC: rgf.client.recroby.integration *@
 <RgfToolbarComponent @ref="_rgfToolbarRef" EntityParameters="EntityParameters">
     <ToolbarTemplate Context="RgfToolbar">
@@ -100,7 +101,8 @@
                             !Manager.EntityDesc.EntityName.Equals("RGRecroChart", StringComparison.OrdinalIgnoreCase))
                         {
                             <div class="btn-group me-2" role="group">
-                                <RgfButton IconName="bi-robot" CssClass="btn-secondary" Tooltip="Open Recroby"
+                                <RgfButton IconName="bi-robot" CssClass="@(IsRecrobyActive ? "btn-success" : "btn-secondary")" Tooltip="Open Recroby"
+                                           AdditionalAttributes="@(new() { ["aria-pressed"] = IsRecrobyActive ? "true" : "false" })"
                                            OnClick="async () => { await WorkspaceService.OpenOrActivateGridAsync(EntityComponent.RecrobyGridContext); }" />
                             </div>
                         }
@@ -178,6 +180,33 @@
 
     private RgfRecrobyWorkspaceService? WorkspaceService => Services.GetService<RgfRecrobyWorkspaceService>();
 
+    private RgfRecrobyWorkspace? _observedWorkspace;
+    private bool _disposed;
+    private bool IsRecrobyActive => EntityComponent?.RecrobyGridContext is { Manager: not null } context &&
+        ReferenceEquals(context, RecrobyWorkspace?.ActiveGridContext);
+
+    protected override void OnParametersSet()
+    {
+        if (ReferenceEquals(_observedWorkspace, RecrobyWorkspace)) return;
+        if (_observedWorkspace is not null) _observedWorkspace.ActiveGridContextChanged -= RefreshRecrobyState;
+        _observedWorkspace = RecrobyWorkspace;
+        if (_observedWorkspace is not null) _observedWorkspace.ActiveGridContextChanged += RefreshRecrobyState;
+    }
+
+    private void RefreshRecrobyState()
+    {
+        _ = InvokeAsync(() =>
+        {
+            if (!_disposed) StateHasChanged();
+        });
+    }
+
+    void IDisposable.Dispose()
+    {
+        _disposed = true;
+        if (_observedWorkspace is not null) _observedWorkspace.ActiveGridContextChanged -= RefreshRecrobyState;
+        _observedWorkspace = null;
+    }
 
     [Parameter, EditorRequired]
     public RgfEntityParameters EntityParameters { get; set; } = null!;

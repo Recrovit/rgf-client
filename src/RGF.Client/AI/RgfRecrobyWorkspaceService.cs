@@ -40,9 +40,9 @@ public sealed class RgfRecrobyWorkspaceService : IRgfRecrobyWorkspaceService
         get { lock (_sync) return _workspaces.Count == 1 && _workspaces.Single().OpenGrid is not null; }
     }
 
-    /// <summary>Opens or activates a Grid conversation and expands the Workspace without changing its layout mode.</summary>
+    /// <summary>Opens, activates or reconnects a Grid conversation and expands the Workspace without changing its layout mode.</summary>
     /// <param name="context">The stable Grid instance context, compared by reference.</param>
-    /// <returns>False without side effects when no unique usable Workspace exists.</returns>
+    /// <returns>True on successful activation or reconnection. False if no unique usable Workspace exists or reconnection is blocked.</returns>
     public Task<bool> OpenOrActivateGridAsync(RgfRecrobyGridContext context)
     {
         ArgumentNullException.ThrowIfNull(context);

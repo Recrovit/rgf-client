@@ -3,7 +3,7 @@
     <div class="rgf-recroby-content"><CascadingValue Value="this" IsFixed="true">@ChildContent</CascadingValue></div>
     <button type="button" class="rgf-recroby-launcher btn btn-primary" hidden="@(!_layout.IsCollapsed)" aria-label="Open Recroby" aria-expanded="false" @onclick="() => _layout.IsCollapsed = false"><i class="bi bi-robot" aria-hidden="true"></i> Recroby</button>
     <section class="rgf-recroby-panel card" aria-label="Recroby" hidden="@_layout.IsCollapsed">
-        <header class="card-header d-flex flex-wrap align-items-center gap-2" data-drag-handle>
+        <header class="card-header d-flex flex-wrap align-items-center gap-2 @(ActiveGridContext?.Manager is not null ? "bg-success-subtle" : null)" data-drag-handle>
             <strong><i class="bi bi-robot" aria-hidden="true"></i> Recroby</strong>
             <div class="dropdown ms-auto rgf-recroby-desktop-controls">
                 <button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false" title="Window layout" aria-label="Window layout"><i class="bi bi-window" aria-hidden="true"></i></button>
@@ -26,6 +26,12 @@
         @if (_active != null)
         {
             <div class="px-3 pt-1 small text-body-secondary rgf-recroby-context">@ContextLabel(_active)</div>
+        }
+        @if (_gridReconnectBlocked && ActiveGridContext is { Manager: null })
+        {
+            <div class="alert alert-warning mx-3 my-1 py-1" role="alert">
+                Finish or cancel the current Recroby workflow, then click the Grid's Recroby button again to reconnect this conversation.
+            </div>
         }
         <div class="card-header rgf-recroby-conversation-bar" @onkeydown="SwitcherKeyDown">
             @if (_editing != null)
