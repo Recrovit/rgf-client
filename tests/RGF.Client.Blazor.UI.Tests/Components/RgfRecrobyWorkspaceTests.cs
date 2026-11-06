@@ -405,6 +405,34 @@ public sealed partial class RgfRecrobyWorkspaceTests
     }
 
     [Fact]
+    public void CopyConversationFollowsTheActiveWorkspaceChat()
+    {
+        const string copy = ".rgf-recroby-conversation:not([hidden]) [data-action=copy-conversation]";
+        using var context = Context();
+        var api = new QueuedApi();
+        context.Services.AddSingleton<IRgfApiService>(api);
+        var cut = context.Render<RgfRecrobyWorkspace>();
+        cut.Find("[aria-label='Open Recroby']").Click();
+        var first = cut.FindComponent<RgfAiChatComponent>();
+        first.Instance.Session.Conversation.AddUserMessage("First");
+        first.Render();
+        cut.Find(copy).Click();
+        Assert.NotNull(cut.Find(copy).QuerySelector(".bi-check-lg"));
+
+        cut.Find("[data-action=new]").Click();
+        Assert.True(cut.Find(copy).HasAttribute("disabled"));
+        Assert.NotNull(cut.Find(copy).QuerySelector(".bi-copy"));
+        var second = cut.FindComponents<RgfAiChatComponent>()[1];
+        second.Instance.Session.Conversation.AddUserMessage("Second");
+        second.Render();
+        cut.Find(copy).Click();
+
+        Assert.Equal(new[] { "**User:**\n> First", "**User:**\n> Second" },
+            context.JSInterop.Invocations["navigator.clipboard.writeText"].Select(call => (string)Assert.Single(call.Arguments)!));
+        Assert.Empty(api.Requests);
+    }
+
+    [Fact]
     public async Task ExternalSessionsSupportConcurrentTurnsAndSurviveConversationSwitch()
     {
         using var context = Context();
@@ -437,7 +465,7 @@ public sealed partial class RgfRecrobyWorkspaceTests
         Assert.Empty(cut.FindAll("[role=alert]"));
         cut.Find("[aria-label='Open Recroby']").Click();
         cut.Find("textarea").Change("Hello");
-        await cut.FindComponent<RgfAiChatComponent>().Find("button").ClickAsync(new());
+        await cut.FindComponent<RgfAiChatComponent>().Find("[aria-label=Send]").ClickAsync(new());
         Assert.Equal("Hello", cut.Find(".rgf-recroby-title").TextContent);
         Assert.Single(cut.FindAll("[data-error-kind=transport]"));
         Assert.False(cut.FindComponent<RgfAiChatComponent>().Instance.Session.IsProcessing);
@@ -453,7 +481,7 @@ public sealed partial class RgfRecrobyWorkspaceTests
         var cut = context.Render<RgfRecrobyWorkspace>();
         var first = cut.FindComponent<RgfAiChatComponent>();
         first.Find("textarea").Change("Hello");
-        await first.Find("button").ClickAsync(new());
+        await first.Find("[aria-label=Send]").ClickAsync(new());
         cut.Find("[data-action=new]").Click();
         Assert.Single(first.FindAll($"[data-error-kind={errorKind}]"));
         Assert.Empty(cut.FindComponents<RgfAiChatComponent>()[1].FindAll("[role=alert]"));
@@ -468,11 +496,11 @@ public sealed partial class RgfRecrobyWorkspaceTests
         var cut = context.Render<RgfRecrobyWorkspace>();
         var first = cut.FindComponent<RgfAiChatComponent>();
         first.Find("textarea").Change("First");
-        var firstClick = first.Find("button").ClickAsync(new());
+        var firstClick = first.Find("[aria-label=Send]").ClickAsync(new());
         cut.Find("[data-action=new]").Click();
         var second = cut.FindComponents<RgfAiChatComponent>()[1];
         second.Find("textarea").Change("Second");
-        var secondClick = second.Find("button").ClickAsync(new());
+        var secondClick = second.Find("[aria-label=Send]").ClickAsync(new());
         Assert.Equal(2, api.Requests.Count);
         Assert.Equal(new[] { "First", "Second" }, cut.FindAll(".rgf-recroby-choice-title").Select(e => e.TextContent));
         cut.Find("[data-action=switch]").Click();

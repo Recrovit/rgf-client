@@ -13,6 +13,112 @@ namespace Recrovit.RecroGridFramework.Client.Blazor.UI.Tests.Components;
 
 public sealed class RgfAiChatComponentTests
 {
+    private const string CopyConversation = "[data-action=copy-conversation]";
+
+    [Fact]
+    public void ConversationCopyIsOptInAndDisabledWithoutExportableMessages()
+    {
+        using var context = CreateContext();
+        var session = new RgfAiConversationSession(new TestTransport());
+        var cut = context.Render<RgfAiChatComponent>(p => p.Add(c => c.Session, session));
+        Assert.Empty(cut.FindAll(CopyConversation));
+
+        cut.Render(p => p.Add(c => c.ShowCopyConversation, true));
+        var button = cut.Find(CopyConversation);
+        Assert.True(button.HasAttribute("disabled"));
+        Assert.Equal("Copy conversation", button.GetAttribute("title"));
+        Assert.Equal("Copy conversation", button.GetAttribute("aria-label"));
+        Assert.NotNull(button.QuerySelector(".bi-copy"));
+        Assert.Contains("chat-box", button.ParentElement!.PreviousElementSibling!.ClassList);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ConversationCopyPreservesOriginalMarkdownWithoutChangingHistory(bool multipleTurns)
+    {
+        using var context = CreateContext();
+        var transport = new TestTransport();
+        var session = new RgfAiConversationSession(transport);
+        session.Conversation.AddUserMessage("Szűrjél a megszüntetett termékekre");
+        session.Conversation.ApplyResponse(new()
+        {
+            Success = true, Message = "Első bekezdés\r\n\r\n- Lista\r```text\n  kód\n```\n",
+            ResponseFormat = RgfAiResponseFormat.Minimal, ConversationId = "private-id", ConversationToken = "private-token",
+            CreditUsage = new() { ChargedCredit = 25 }
+        });
+        var expected = "**User:**\n> Szűrjél a megszüntetett termékekre\n\n**Recroby:**\n> Első bekezdés\n>\n> - Lista\n> ```text\n>   kód\n> ```\n>";
+        if (multipleTurns)
+        {
+            session.Conversation.AddUserMessage("És utána?");
+            session.Conversation.ApplyResponse(Response("Kész."));
+            expected += "\n\n**User:**\n> És utána?\n\n**Recroby:**\n> Kész.";
+        }
+        var history = session.Conversation.Messages.Select(message => (message, message.Message)).ToArray();
+        var cut = context.Render<RgfAiChatComponent>(p => p.Add(c => c.Session, session).Add(c => c.ShowCopyConversation, true));
+
+        cut.Find(CopyConversation).Click();
+
+        var invocation = Assert.Single(context.JSInterop.Invocations["navigator.clipboard.writeText"]);
+        Assert.Equal(expected, Assert.Single(invocation.Arguments));
+        Assert.NotNull(cut.Find(CopyConversation).QuerySelector(".bi-check-lg"));
+        Assert.Equal("Conversation copied.", cut.Find(".rgf-ai-conversation-copy [role=status]").TextContent);
+        Assert.Equal(history, session.Conversation.Messages.Select(message => (message, message.Message)));
+        Assert.Empty(transport.Requests);
+    }
+
+    [Fact]
+    public async Task ConversationCopyDisablesConcurrentWritesAndClearsFailureFeedback()
+    {
+        using var context = CreateContext();
+        var clipboard = context.JSInterop.SetupVoid("navigator.clipboard.writeText", _ => true);
+        var session = new RgfAiConversationSession(new TestTransport());
+        session.Conversation.AddUserMessage("Question");
+        var cut = context.Render<RgfAiChatComponent>(p => p.Add(c => c.Session, session).Add(c => c.ShowCopyConversation, true));
+
+        var click = cut.Find(CopyConversation).ClickAsync(new MouseEventArgs());
+        cut.WaitForAssertion(() => Assert.True(cut.Find(CopyConversation).HasAttribute("disabled")));
+        await cut.Find(CopyConversation).ClickAsync(new MouseEventArgs());
+        Assert.Single(clipboard.Invocations);
+        clipboard.SetException(new Microsoft.JSInterop.JSException("Denied"));
+        await click;
+
+        Assert.False(cut.Find(CopyConversation).HasAttribute("disabled"));
+        Assert.Equal("Copy failed.", cut.Find(".rgf-ai-conversation-copy [role=status]").TextContent);
+        Assert.Empty(cut.FindAll("[role=alert]"));
+        cut.WaitForAssertion(() => Assert.Empty(cut.Find(".rgf-ai-conversation-copy [role=status]").TextContent),
+            TimeSpan.FromSeconds(5));
+    }
+
+    [Fact]
+    public async Task ConversationCopyUsesCurrentSessionAndIgnoresAnEarlierWriteCompletion()
+    {
+        using var context = CreateContext();
+        var clipboard = context.JSInterop.SetupVoid("navigator.clipboard.writeText", _ => true);
+        var transport = new TestTransport();
+        var first = new RgfAiConversationSession(transport);
+        first.Conversation.AddUserMessage("First");
+        var second = new RgfAiConversationSession(transport);
+        second.Conversation.AddUserMessage("Second");
+        var cut = context.Render<RgfAiChatComponent>(p => p.Add(c => c.Session, first).Add(c => c.ShowCopyConversation, true));
+
+        var click = cut.Find(CopyConversation).ClickAsync(new MouseEventArgs());
+        cut.Render(p => p.Add(c => c.Session, second));
+        clipboard.SetVoidResult();
+        await click;
+        Assert.NotNull(cut.Find(CopyConversation).QuerySelector(".bi-copy"));
+        Assert.Empty(cut.Find(".rgf-ai-conversation-copy [role=status]").TextContent);
+
+        cut.Find(CopyConversation).Click();
+
+        Assert.Equal(new[] { "**User:**\n> First", "**User:**\n> Second" },
+            clipboard.Invocations.Select(call => (string)Assert.Single(call.Arguments)!));
+        Assert.NotNull(cut.Find(CopyConversation).QuerySelector(".bi-check-lg"));
+        cut.Render(p => p.Add(c => c.Session, first));
+        Assert.Empty(cut.Find(".rgf-ai-conversation-copy [role=status]").TextContent);
+        Assert.Empty(transport.Requests);
+    }
+
     [Theory]
     [InlineData(null, false)]
     [InlineData(RgfAiResponseFormat.PlainText, false)]
@@ -247,10 +353,12 @@ public sealed class RgfAiChatComponentTests
         if (code == "AiProviderNotConfigured") code = RgfAiErrorCodes.AiProviderNotConfigured;
         var response = new RgfAiResponse { ErrorCode = code, Message = "<b>Hidden server detail</b>",
             CreditUsage = new() { ChargedCredit = 0 }, CreditState = new() };
-        var session = new RgfAiConversationSession(new TestTransport { Send = _ => Task.FromResult(response) });
-        var cut = context.Render<RgfAiChatComponent>(p => p.Add(c => c.Session, session).Add(c => c.ShowSendErrors, showErrors));
+        var transport = new TestTransport { Send = _ => Task.FromResult(response) };
+        var session = new RgfAiConversationSession(transport);
+        var cut = context.Render<RgfAiChatComponent>(p => p.Add(c => c.Session, session).Add(c => c.ShowSendErrors, showErrors)
+            .Add(c => c.ShowCopyConversation, true));
         cut.Find("textarea").Change("Question");
-        await cut.Find("button").ClickAsync(new MouseEventArgs());
+        await cut.Find("[aria-label=Send]").ClickAsync(new MouseEventArgs());
         Assert.Equal(visible ? 1 : 0, cut.FindAll(".rgf-ai-usage").Count);
         Assert.Equal(RgfAiMessageRole.User, Assert.Single(session.Conversation.Messages).Role);
         if (visible)
@@ -264,6 +372,13 @@ public sealed class RgfAiChatComponentTests
             else Assert.DoesNotContain("Hidden server detail", cut.Markup);
         }
         else Assert.DoesNotContain("Hidden server detail", cut.Markup);
+
+        cut.Find(CopyConversation).Click();
+        var expected = "**User:**\n> Question";
+        if (visible) expected += "\n\n**Recroby:**\n> " + cut.Find("[role=alert]").TextContent;
+        var invocation = Assert.Single(context.JSInterop.Invocations["navigator.clipboard.writeText"]);
+        Assert.Equal(expected, Assert.Single(invocation.Arguments));
+        Assert.Single(transport.Requests);
     }
 
     [Theory]

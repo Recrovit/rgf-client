@@ -10,8 +10,44 @@
 
 .rgf-ai-plain, .alert { white-space: pre-wrap; }
 
-.chat-box.rgf-ai-subtle {
+.chat-box.rgf-ai-subtle, .rgf-ai-conversation-frame.rgf-ai-subtle {
     background: var(--bs-body-bg);
+}
+
+.rgf-ai-conversation-frame {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+    border: 1px solid #ddd;
+    border-radius: 10px;
+    padding-bottom: 2.5rem;
+    background: #f8f9fa;
+}
+
+.rgf-ai-conversation-frame > .chat-box {
+    margin: 0;
+    border: 0;
+    background: transparent;
+}
+
+.rgf-ai-conversation-copy {
+    position: absolute;
+    right: .375rem;
+    bottom: .25rem;
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+}
+
+.rgf-ai-conversation-copy > .btn {
+    display: grid;
+    place-items: center;
+    width: 2rem;
+    height: 2rem;
+    padding: 0;
+    border: 0;
 }
 
 .chat-box.rgf-ai-subtle > .message ~ .message {
@@ -30,6 +66,7 @@
 }
 
 .message {
+    flex-shrink: 0;
     min-width: 0;
     max-width: 90%;
     padding: 10px;
@@ -50,6 +87,11 @@
     min-height: 2rem;
 }
 
+.message.rgf-ai-user-copy {
+    margin-right: 0;
+    margin-left: 2.5rem;
+}
+
 .message.rgf-ai-markdown { min-height: 4.25rem; }
 
 .message.rgf-ai-copy ::deep .rgf-markdown-toolbar {
@@ -61,11 +103,16 @@
     color: #212529;
 }
 
-.message.rgf-ai-response-subtle.rgf-ai-copy ::deep .rgf-markdown-toolbar {
+.message.rgf-ai-user-copy ::deep .rgf-markdown-toolbar {
+    left: auto;
+    right: calc(100% + .25rem);
+}
+
+.message.rgf-ai-copy:is(.rgf-ai-response-subtle, .rgf-ai-user-subtle) ::deep .rgf-markdown-toolbar {
     color: var(--bs-body-color);
 }
 
-.message.rgf-ai-response-subtle.rgf-ai-copy ::deep .rgf-markdown-toolbar .btn {
+.message.rgf-ai-copy:is(.rgf-ai-response-subtle, .rgf-ai-user-subtle) ::deep .rgf-markdown-toolbar .btn {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -75,7 +122,7 @@
     border: 0;
 }
 
-.message.rgf-ai-response-subtle.rgf-ai-copy ::deep .rgf-markdown-toolbar .btn:is(:hover, :active, .active) {
+.message.rgf-ai-copy:is(.rgf-ai-response-subtle, .rgf-ai-user-subtle) ::deep .rgf-markdown-toolbar .btn:is(:hover, :active, .active) {
     background-color: var(--bs-secondary-bg);
     box-shadow: none;
 }

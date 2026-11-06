@@ -1,7 +1,9 @@
 using Microsoft.AspNetCore.Components;
+using Microsoft.JSInterop;
 using Recrovit.RecroGridFramework.Abstraction.Contracts.AI;
 using Recrovit.RecroGridFramework.Client.AI;
 using Recrovit.RecroGridFramework.Client.Blazor.UI.Components.Base;
+using System.Text;
 
 namespace Recrovit.RecroGridFramework.Client.Blazor.UI.Components.AI;
 
@@ -31,6 +33,14 @@ public partial class RgfAiChatComponent : IDisposable
     /// <summary>Optional content below the input, beside the buttons, wrapping onto a new line when needed.</summary>
     [Parameter] public RenderFragment? InputFooter { get; set; }
 
+    /// <summary>Shows a button that copies the displayed conversation as Markdown. Defaults to false.</summary>
+    [Parameter] public bool ShowCopyConversation { get; set; }
+
+    /// <summary>Shows a copy button for each user message. Defaults to false.</summary>
+    [Parameter] public bool ShowUserMessageCopy { get; set; }
+
+    [Inject] private IJSRuntime JS { get; set; } = null!;
+
     private string InputId { get; } = RgfBaseComponent.GetNextId();
     private string Prompt { get; set; } = string.Empty;
     private RgfAiConversationSession? subscribedSession;
@@ -41,6 +51,19 @@ public partial class RgfAiChatComponent : IDisposable
     private RgfAiResponse? _failedResponse;
     private RgfAiResponse? _choiceResponse;
     private RgfAiChoice? _selectedChoice;
+    private bool _copyingConversation;
+    private bool? _copySucceeded;
+    private int _copyFeedbackVersion;
+    private RgfAiMessage? _copiedFirstMessage;
+
+    private bool ShowSendErrorInChatBox => _errorKind is "configuration" or "credit";
+    private string? VisibleSendError => ShowSendErrorInChatBox || ShowSendErrors || _errorKind == "continuation"
+        ? _sendError : null;
+    private bool CanCopyConversation => !_copyingConversation && (VisibleSendError is not null
+        || Session.Conversation.Messages.Any(message => message.Role is RgfAiMessageRole.User or RgfAiMessageRole.Assistant));
+    private bool? CopySucceeded => ReferenceEquals(_copiedFirstMessage, Session.Conversation.Messages.FirstOrDefault())
+        ? _copySucceeded : null;
+    private string? CopyStatus => CopySucceeded switch { true => "Conversation copied.", false => "Copy failed.", _ => null };
 
     private RgfAiResponse? PendingResponse => Session.Conversation.IsPendingWorkflow
         ? Session.Conversation.Messages.LastOrDefault() as RgfAiResponse : null;
@@ -100,6 +123,78 @@ public partial class RgfAiChatComponent : IDisposable
         _selectedChoice = null;
         Prompt = string.Empty;
         ClearSendError();
+        _copySucceeded = null;
+        _copiedFirstMessage = null;
+        _copyFeedbackVersion++;
+    }
+
+    // RGF-DOC: rgf.client.recroby.integration
+    private async Task CopyConversationAsync()
+    {
+        if (!ShowCopyConversation || !CanCopyConversation) return;
+
+        var messages = Session.Conversation.Messages;
+        var firstMessage = messages.FirstOrDefault();
+        var markdown = FormatConversationMarkdown(messages, VisibleSendError);
+        var feedbackVersion = ++_copyFeedbackVersion;
+        _copyingConversation = true;
+        _copySucceeded = null;
+        bool succeeded;
+        try
+        {
+            await JS.InvokeVoidAsync("navigator.clipboard.writeText", markdown);
+            succeeded = true;
+        }
+        catch (Exception exception) when (exception is JSException or InvalidOperationException or OperationCanceledException)
+        {
+            succeeded = false;
+        }
+        finally
+        {
+            _copyingConversation = false;
+        }
+
+        if (disposed || feedbackVersion != _copyFeedbackVersion) return;
+        _copiedFirstMessage = firstMessage;
+        _copySucceeded = succeeded;
+        _ = ClearCopyFeedbackAsync(feedbackVersion);
+    }
+
+    private async Task ClearCopyFeedbackAsync(int feedbackVersion)
+    {
+        await Task.Delay(TimeSpan.FromSeconds(2));
+        if (disposed || feedbackVersion != _copyFeedbackVersion) return;
+        _copySucceeded = null;
+        _copiedFirstMessage = null;
+        StateHasChanged();
+    }
+
+    private static string FormatConversationMarkdown(IReadOnlyList<RgfAiMessage> messages, string? visibleError)
+    {
+        var markdown = new StringBuilder();
+        foreach (var message in messages)
+        {
+            var heading = message.Role switch
+            {
+                RgfAiMessageRole.User => "**User:**",
+                RgfAiMessageRole.Assistant => "**Recroby:**",
+                _ => null
+            };
+            if (heading is not null) AppendMessage(heading, message.Message);
+        }
+        if (visibleError is not null) AppendMessage("**Recroby:**", visibleError);
+        return markdown.ToString();
+
+        void AppendMessage(string heading, string? message)
+        {
+            if (markdown.Length > 0) markdown.Append("\n\n");
+            markdown.Append(heading);
+            foreach (var line in (message ?? string.Empty).Replace("\r\n", "\n").Replace('\r', '\n').Split('\n'))
+            {
+                markdown.Append("\n>");
+                if (line.Length > 0) markdown.Append(' ').Append(line);
+            }
+        }
     }
 
     private void ClearSendError()

@@ -51,7 +51,10 @@ const html = `<!doctype html><html><head><meta charset="utf-8"><link rel="styles
 <div class="rgf-recroby-choice active"><button class="rgf-recroby-choice-select" data-action="select" aria-pressed="true"><span class="rgf-recroby-choice-title">Conversation 1</span><i aria-hidden="true">&#x2713;</i></button><button class="btn-close" aria-label="Close Conversation 1"></button></div>
 </div></div></div></div>
 <div class="rgf-recroby-conversation"><div class="container mt-4">
-<div class="chat-box d-flex flex-column">${"<div class='message'>Message</div>".repeat(40)}</div>
+<div class="rgf-ai-conversation-frame rgf-ai-subtle">
+<div class="chat-box d-flex flex-column rgf-ai-subtle">${"<div class='message'>Message</div>".repeat(40)}</div>
+<div class="rgf-ai-conversation-copy"><span role="status" class="visually-hidden"></span><button type="button" class="btn btn-sm btn-outline-secondary" data-action="copy-conversation" title="Copy conversation" aria-label="Copy conversation"><i class="bi bi-copy" aria-hidden="true"></i></button></div>
+</div>
 <div class="input-group mt-3"><textarea class="form-control"></textarea></div><div class="rgf-ai-actions"><button type="button" class="btn btn-sm btn-success m-1 align-self-start rgf-ai-action-icon" id="send" title="Send" aria-label="Send"><i class="bi bi-send" aria-hidden="true"></i></button>
 <div class="rgf-recroby-selectors">
 <button id="model-choice" class="btn btn-sm btn-outline-secondary" popovertarget="model-panel" aria-expanded="false"><i class="bi bi-cpu me-1" aria-hidden="true"></i>Provider / Model ▾</button>
@@ -456,6 +459,26 @@ try {
         document.querySelector('.rgf-recroby-title').textContent='VeryLongConversationTitle'.repeat(20);
         document.querySelector('.rgf-recroby-switcher').insertAdjacentHTML('afterbegin','<input type="search" class="form-control form-control-sm" aria-label="Search conversations">');
     })()`);
+    for (const [width, height] of [[1200, 800], [390, 700]]) {
+        await viewport(width, height);
+        for (const mode of [0, 1, 2, 3]) {
+            await layout({mode, isCollapsed:false, height:560, dockHeight:320});
+            const copy = await rect('[data-action=copy-conversation]');
+            const frame = await rect('.rgf-ai-conversation-frame');
+            const chat = await rect('.chat-box');
+            assert.ok(frame.right - copy.right > 0 && frame.right - copy.right < 10, 'copy sits at the right edge of the chat frame');
+            assert.ok(frame.bottom - copy.bottom > 0 && frame.bottom - copy.bottom < 10, 'copy sits at the bottom of the chat frame');
+            assert.ok(chat.bottom <= copy.y, 'the scroll viewport has space reserved for copy');
+            assert.ok(copy.bottom < (await rect('textarea')).y, 'copy stays above the input controls');
+            assert.equal(await evaluate(`(() => {
+                const chat = document.querySelector('.chat-box');
+                chat.scrollTop = chat.scrollHeight;
+                return chat.scrollTop > 0;
+            })()`), true, 'conversation can scroll');
+            assert.deepEqual(await rect('[data-action=copy-conversation]'), copy, 'copy stays fixed when messages scroll');
+            await evaluate("document.querySelector('.chat-box').scrollTop = 0");
+        }
+    }
     for (const [width,height] of [[1200,800],[800,400],[390,700],[390,260]]) {
         await viewport(width,height);
         for (const mode of [0,1,2,3]) {
@@ -824,11 +847,21 @@ try {
         usage.className = 'rgf-ai-usage';
         usage.textContent = 'Usage / Credit';
         document.querySelector('#markdown-message').after(usage);
+        const user = document.querySelector('#plain-message').cloneNode(true);
+        user.id = 'user-copy-message';
+        user.className = 'message rgf-ai-user-subtle align-self-end rgf-ai-copy rgf-ai-user-copy';
+        user.querySelector('.rgf-markdown-plain').textContent = 'A user message that wraps in a narrow conversation. '.repeat(8);
+        chat.append(user);
     })()`);
     for (const [width, height] of [[1200, 800], [800, 400], [390, 700]]) {
         await viewport(width, height);
         for (const mode of [0, 1, 2, 3]) {
             await layout({mode, isCollapsed:false, width:360, dockWidth:300});
+            assert.equal(await evaluate(`['#markdown-message', '#user-copy-message'].every(selector => {
+                const bubble = document.querySelector(selector);
+                const content = bubble.querySelector('.rgf-markdown-viewer');
+                return content.getBoundingClientRect().bottom <= bubble.getBoundingClientRect().bottom;
+            })`), true, 'wrapped message content stays inside both bubbles in mode ' + mode);
             for (const id of ['markdown-message', 'short-markdown', 'plain-message']) {
                 await evaluate(`document.querySelector('#${id}').scrollIntoView({block:'start'})`);
                 assert.equal(await evaluate(`(() => {
@@ -858,6 +891,13 @@ try {
                 return content.querySelector('pre').scrollWidth > content.querySelector('pre').clientWidth
                     && content.querySelector('table').scrollWidth > content.querySelector('table').clientWidth;
             })()`), true, 'wide Markdown retains internal scrolling');
+            await evaluate("document.querySelector('#user-copy-message').scrollIntoView({block:'nearest'})");
+            const user = await rect('#user-copy-message'), copy = await rect('#user-copy-message .rgf-markdown-copy');
+            const chat = await rect('.chat-box');
+            assert.ok(copy.x >= chat.x + 4 && copy.right <= user.x && copy.bottom <= user.bottom + 1,
+                'the user message copy button fits beside the bubble');
+            const userCopyStyle = await evaluate("markdownToggleStyles('#user-copy-message .rgf-markdown-copy')");
+            assert.ok(userCopyStyle.visible && userCopyStyle.contrast >= 4.5, 'the user copy button contrasts with the chat background');
         }
     }
     await cdp('Browser.grantPermissions', {origin:await evaluate('location.origin'), permissions:['clipboardReadWrite', 'clipboardSanitizedWrite']});
@@ -894,7 +934,7 @@ try {
     assert.equal(await evaluate("document.querySelector('#plain-message [role=alert]').textContent"), 'Copy failed');
     await evaluate(`navigator.clipboard.writeText = originalWriteText; document.querySelector('#short-markdown').nextElementSibling.remove(); document.querySelector('#short-markdown').remove(); document.querySelector('#plain-message').nextElementSibling.remove(); document.querySelector('#plain-message').remove(); document.querySelector('#markdown-message').nextElementSibling.remove()`);
     console.log('PASS: Copy-first toolbar geometry for short/long/plain replies, Usage, all docking/mobile layouts, native clipboard success/rejection');
-    await evaluate("document.querySelector('#markdown-message').remove()");
+    await evaluate("document.querySelector('#markdown-message').remove(); document.querySelector('#user-copy-message').remove()");
     await evaluate("document.querySelector('#model-choice').lastChild.textContent=' provider / ' + 'long-model-name-'.repeat(20) + ' ▾'");
     for (const [width, height] of [[1200, 800], [800, 400], [390, 700], [390, 260]]) {
         await viewport(width, height);

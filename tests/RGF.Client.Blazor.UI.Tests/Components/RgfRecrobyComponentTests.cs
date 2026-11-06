@@ -14,6 +14,51 @@ namespace Recrovit.RecroGridFramework.Client.Blazor.UI.Tests.Components;
 [Collection(RgfBlazorUiStaticStateCollection.Name)]
 public sealed class RgfRecrobyComponentTests
 {
+    [Fact]
+    public void UserMessagesHaveIndependentCopyButtonsAndStayPlainText()
+    {
+        using var context = SelectionContext(out var api);
+        var session = new RgfAiConversationSession(new SelectionTransport());
+        const string first = "  **Első üzenet**\n\n<b>szöveg</b>  ";
+        const string second = "Második üzenet";
+        session.Conversation.AddUserMessage(first);
+        session.Conversation.ApplyResponse(new() { Success = true, Message = "Reply" });
+        session.Conversation.AddUserMessage(second);
+        var cut = context.Render<RgfRecrobyComponent>(p => p.Add(c => c.Session, session));
+
+        var messages = cut.FindAll(".rgf-ai-user-copy");
+        Assert.Equal(2, messages.Count);
+        Assert.Equal(first, messages[0].QuerySelector(".rgf-markdown-plain")!.TextContent);
+        Assert.All(messages, message => Assert.Null(message.QuerySelector(".rgf-markdown-toggle, b, strong")));
+        messages[1].QuerySelector(".rgf-markdown-copy")!.Click();
+        Assert.NotNull(cut.FindAll(".rgf-ai-user-copy")[1].QuerySelector(".bi-check-lg"));
+        Assert.Null(cut.FindAll(".rgf-ai-user-copy")[0].QuerySelector(".bi-check-lg"));
+        cut.FindAll(".rgf-ai-user-copy")[0].QuerySelector(".rgf-markdown-copy")!.Click();
+
+        Assert.Equal(new[] { second, first }, context.JSInterop.Invocations["navigator.clipboard.writeText"]
+            .Select(call => (string)Assert.Single(call.Arguments)!));
+        Assert.Equal(new[] { first, "Reply", second }, session.Conversation.Messages.Select(message => message.Message));
+        Assert.Null(api.Request);
+    }
+
+    [Fact]
+    public void RecrobyEnablesConversationCopyByDefault()
+    {
+        using var context = SelectionContext(out var api);
+        var cut = context.Render<RgfRecrobyComponent>();
+        var button = cut.Find("[data-action=copy-conversation]");
+        Assert.True(button.HasAttribute("disabled"));
+        Assert.NotNull(cut.Find(".rgf-ai-conversation-frame").QuerySelector("[data-action=copy-conversation]"));
+
+        cut.FindComponent<RgfAiChatComponent>().Instance.Session.Conversation.AddUserMessage("Recroby question");
+        cut.Render();
+        cut.Find("[data-action=copy-conversation]").Click();
+
+        var invocation = Assert.Single(context.JSInterop.Invocations["navigator.clipboard.writeText"]);
+        Assert.Equal("**User:**\n> Recroby question", Assert.Single(invocation.Arguments));
+        Assert.Null(api.Request);
+    }
+
     [Theory]
     [InlineData(RgfAiResponseFormat.PlainText)]
     [InlineData(RgfAiResponseFormat.Minimal)]
@@ -146,7 +191,7 @@ public sealed class RgfRecrobyComponentTests
         var cut = context.Render<RgfRecrobyComponent>();
         Assert.Single(cut.FindAll("[popovertarget]"));
         cut.Find("textarea").Change("Hello");
-        await cut.Find("button").ClickAsync(new MouseEventArgs());
+        await cut.Find("[aria-label=Send]").ClickAsync(new MouseEventArgs());
         Assert.Single(cut.FindComponent<RgfAiChatComponent>().Instance.Session.Conversation.Messages.OfType<RgfAiResponse>());
         var renders = cut.RenderCount;
         api.Catalog.SetResult(new ApiResponse<RgfAiCatalogResponse> { Success = true, Result = new("", malformed ? null! : []) });
@@ -364,7 +409,7 @@ public sealed class RgfRecrobyComponentTests
         var cut = context.Render<RgfRecrobyComponent>();
         Assert.Single(cut.FindAll("[popovertarget]"));
         cut.Find("textarea").Change("Hello");
-        await cut.Find("button").ClickAsync(new MouseEventArgs());
+        await cut.Find("[aria-label=Send]").ClickAsync(new MouseEventArgs());
         Assert.Equal("No AI provider is configured. Configure an AI provider and model to use Recroby.",
             cut.Find("[data-error-kind=configuration]").TextContent);
         var state = cut.FindComponent<RgfAiChatComponent>().Instance.Session.Conversation;
@@ -404,7 +449,7 @@ public sealed class RgfRecrobyComponentTests
         Assert.Equal(cut.Instance.SendFailed, child.Instance.SendFailed);
         cut.Find("textarea").Change("Hello");
 
-        await cut.Find("button").ClickAsync(new MouseEventArgs());
+        await cut.Find("[aria-label=Send]").ClickAsync(new MouseEventArgs());
 
         if (useCallback) Assert.Same(error, received);
         else Assert.Null(received);
