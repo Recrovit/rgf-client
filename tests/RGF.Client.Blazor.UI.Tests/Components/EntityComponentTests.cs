@@ -1,4 +1,4 @@
-﻿using Bunit;
+using Bunit;
 using Recrovit.RecroGridFramework.Client.AI;
 using Recrovit.RecroGridFramework.Client.Blazor.UI.Components.AI;
 using Microsoft.AspNetCore.Components;
@@ -190,7 +190,7 @@ public sealed class EntityComponentTests
         await OpenFilter(editor, entity);
         var component = editor.FindComponent<RgfFilterComponent>().Instance;
         Assert.True(component.HasUnresolvedConditions);
-        Assert.Contains("Filter property unavailable", editor.Find("[role=alert]").TextContent);
+        Assert.Contains("FilterPropertyUnavailable", editor.Find("[role=alert]").TextContent);
         Assert.True(editor.Find("button.btn-primary").HasAttribute("disabled"));
         component.FilterSettings.SettingsName = "Cannot save";
         editor.Render();
@@ -206,6 +206,67 @@ public sealed class EntityComponentTests
         await editor.InvokeAsync(() => component.OnCancel());
         Assert.Equal(snapshot, JsonSerializer.Serialize(filter.Conditions));
         Assert.Equal(snapshot, JsonSerializer.Serialize(manager.ListHandler.CreateAggregateRequest(new()).ListParam.UserFilter));
+    }
+
+    [Theory]
+    [InlineData("eng", "Filter property unavailable: <Missing> (Id: 999). Remove this condition or cancel editing.")]
+    [InlineData("hun", "A szűrőmező nem érhető el: <Missing> (Id: 999). Töröld ezt a feltételt, vagy szakítsd meg a szerkesztést.")]
+    public async Task SavedFilterSelection_ValidatesImmediatelyAndCancelRestoresAppliedState(string language, string warning)
+    {
+        using var context = CreateTestContext(true);
+        context.Services.AddSingleton<IRecroDictService>(new FakeRecroDictService { WarningLanguage = language });
+        var api = (PendingRgfApiService)context.Services.GetRequiredService<IRgfApiService>();
+        api.FilterXml = "<columns><column alias=\"Order\" rgclass=\"rg-text\" /><column alias=\"Quick\" rgclass=\"rg-text\" /></columns>";
+        var quick = new RgfProperty { Id = 21, Alias = "Quick", ColPos = 1, ColTitle = "Quick", ListType = PropertyListType.String };
+        api.GridProperties = [new() { Id = 20, Alias = "Order", ColPos = 1, ColTitle = "Order", ListType = PropertyListType.String }, quick];
+        var entity = CreateEntityParameters(RfgDisplayMode.Grid);
+        using var grid = RenderWorkspace(context, entity);
+        var manager = entity.Manager!;
+        var filter = await manager.GetFilterHandlerAsync();
+        filter.ApplyFilterState([new() { Conditions = [new() { Id = 20, Alias = "Order", Param1 = "original" }] }], 67);
+        await grid.InvokeAsync(() => filter.SetQuickFilterAsync(quick, "quick"));
+        var snapshot = JsonSerializer.Serialize(filter.Conditions);
+        filter.PredefinedFilters.Add(new() { FilterSettingsId = 1, SettingsName = "Invalid", Conditions = [new() { Conditions = [new() { Id = 999, Alias = "<Missing>" }] }] });
+        filter.PredefinedFilters.Add(new() { FilterSettingsId = 2, SettingsName = "Valid", Conditions = [new() { Id = 20, Alias = "Order", Param1 = "selected" }] });
+        using var editor = RenderFilterEditor(context, entity);
+        await OpenFilter(editor, entity);
+        var component = editor.FindComponent<RgfFilterComponent>().Instance;
+        var requests = api.GridRequests.Count;
+        await editor.InvokeAsync(async () => {
+            Assert.True(component.OnSetPredefinedFilter(1, "Invalid"));
+            Assert.True(component.HasUnresolvedConditions);
+            Assert.Same(filter.Conditions, component.Condition!.Conditions);
+            Assert.Equal("<Missing>", component.Condition.Conditions[0].Conditions[0].Alias);
+            await component.OnOk();
+            await component.OnSavePredefinedFilter();
+        });
+        editor.Render();
+        Assert.Equal(warning, editor.Find("[role=alert]").TextContent.Trim());
+        Assert.DoesNotContain("<Missing>", editor.Markup);
+        Assert.True(editor.Find("button.btn-primary").HasAttribute("disabled"));
+        Assert.True(editor.Find(".bi-floppy").ParentElement!.HasAttribute("disabled"));
+        await editor.Find("div[tabindex='-1']").KeyUpAsync(new Microsoft.AspNetCore.Components.Web.KeyboardEventArgs { Key = "Enter" });
+        Assert.Equal(requests, api.GridRequests.Count);
+        Assert.Empty(api.SavedFilters);
+        await editor.InvokeAsync(() => {
+            Assert.True(component.OnSetPredefinedFilter(2, "Valid"));
+            Assert.False(component.HasUnresolvedConditions);
+            Assert.Same(filter.Conditions, component.Condition!.Conditions);
+            Assert.Equal("selected", Assert.Single(component.Condition.Conditions).Param1?.ToString());
+            Assert.True(component.OnSetPredefinedFilter(1, "Invalid"));
+            Assert.True(component.HasUnresolvedConditions);
+            Assert.Equal("<Missing>", component.Condition!.Conditions[0].Conditions[0].Alias);
+        });
+        await editor.InvokeAsync(() => component.OnCancel());
+        Assert.Equal(snapshot, JsonSerializer.Serialize(filter.Conditions));
+        Assert.Equal(snapshot, JsonSerializer.Serialize(manager.ListHandler.GetGridSettings().Conditions));
+        await OpenFilter(editor, entity);
+        await editor.InvokeAsync(async () => {
+            Assert.True(component.OnSetPredefinedFilter(2, "Valid"));
+            await component.OnOk();
+        });
+        Assert.Equal("selected", Assert.Single(api.GridRequests[^1].ListParam.UserFilter).Param1?.ToString());
+        Assert.True(api.GridRequests.Count > requests);
     }
 
     [Fact]
@@ -1958,6 +2019,7 @@ public sealed class EntityComponentTests
 
     private sealed class FakeRecroDictService : IRecroDictService
     {
+        public string WarningLanguage { get; set; } = "eng";
         public TaskCompletionSource<bool> ChartReady { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private readonly FakeDashboardRecroDictService _resources = new();
         public bool IsInitialized => true;
@@ -1970,7 +2032,9 @@ public sealed class EntityComponentTests
             return await _resources.GetDictionaryAsync(scope, language, authClient);
         }
         public string GetRgfUiString(string resourceKey) => resourceKey;
-        public string GetRgfUiString(string resourceKey, params object[] args) => resourceKey;
+        public string GetRgfUiString(string resourceKey, params object[] args) => resourceKey == "FilterPropertyUnavailable"
+            ? string.Format(WarningLanguage == "hun" ? "A szűrőmező nem érhető el: {0} (Id: {1}). Töröld ezt a feltételt, vagy szakítsd meg a szerkesztést." : "Filter property unavailable: {0} (Id: {1}). Remove this condition or cancel editing.", args)
+            : resourceKey;
     }
 
     private sealed class FakeRecroSecService(string userLanguage) : IRecroSecService

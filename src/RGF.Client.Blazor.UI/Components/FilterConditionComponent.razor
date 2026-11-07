@@ -1,4 +1,4 @@
-﻿<ul class="list-unstyled ps-4">
+<ul class="list-unstyled ps-4">
     @for (int idx = 0; idx < Condition.Conditions?.Count; idx++)
     {
         var item = Condition.Conditions[idx];
@@ -40,7 +40,7 @@
                 else if (FilterComponent.GetConditionProperty(item) is not { } prop)
                 {
                     <div class="alert alert-warning p-1 mb-0" role="alert">
-                        Filter property unavailable: @item.Alias (Id: @item.Id). Remove this condition or cancel editing.
+                        @RecroDict.GetRgfUiString("FilterPropertyUnavailable", item.Alias, item.Id)
                     </div>
                 }
                 else

@@ -131,7 +131,7 @@ public partial class RgfFilterComponent : ComponentBase, IDisposable
     }
 
     /// <summary>Indicates that the editor contains conditions unavailable in the current Filter metadata.</summary>
-    public bool HasUnresolvedConditions => Condition is not null && HasUnresolved(Condition.Conditions ?? []);
+    public bool HasUnresolvedConditions => FilterHandler is not null && HasUnresolved(FilterHandler.Conditions);
 
     private bool HasUnresolved(IEnumerable<RgfFilter.Condition> conditions) => conditions.Any(c =>
         c.Conditions is not null ? HasUnresolved(c.Conditions) : GetConditionProperty(c) is null);
@@ -262,13 +262,8 @@ public partial class RgfFilterComponent : ComponentBase, IDisposable
             {
                 Description = null;
                 FilterSettings = predefFilter;
-                Condition = new RgfFilter.Condition();
-                Task.Run(() =>
-                {
-                    Condition = new RgfFilter.Condition() { Conditions = FilterHandler.Conditions };
-                    StateHasChanged();
-                    _ = Manager.ToastManager.RaiseEventAsync(new RgfToastEventArgs(Manager.EntityDesc.MenuTitle, RgfToastEventArgs.ActionTemplate(_recroDict.GetRgfUiString("Load"), FilterSettings.SettingsName), RgfToastType.Success, delay: 2000), this);
-                });
+                Condition = new RgfFilter.Condition() { Conditions = FilterHandler.Conditions };
+                _ = Manager.ToastManager.RaiseEventAsync(new RgfToastEventArgs(Manager.EntityDesc.MenuTitle, RgfToastEventArgs.ActionTemplate(_recroDict.GetRgfUiString("Load"), FilterSettings.SettingsName), RgfToastType.Success, delay: 2000), this);
                 return true;
             }
         }
