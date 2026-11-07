@@ -1,7 +1,7 @@
 ﻿@* RGF-DOC: rgf.client.recroby.integration *@
 <div @ref="_element" class="rgf-recroby-workspace" style="--rgf-toast-anchor: @ToastAnchorName;" data-mode="@_layout.Mode" data-collapsed="@_layout.IsCollapsed.ToString().ToLowerInvariant()">
     <div class="rgf-recroby-content"><CascadingValue Value="this" IsFixed="true">@ChildContent</CascadingValue></div>
-    <button type="button" class="rgf-recroby-launcher btn btn-primary" hidden="@(!_layout.IsCollapsed)" aria-label="Open Recroby" aria-expanded="false" @onclick="() => _layout.IsCollapsed = false"><i class="bi bi-robot" aria-hidden="true"></i> Recroby</button>
+    <button type="button" class="rgf-recroby-launcher btn btn-primary" hidden="@(!_layout.IsCollapsed)" aria-label="Open Recroby" aria-expanded="false" @onclick="Open"><i class="bi bi-robot" aria-hidden="true"></i> Recroby</button>
     <section class="rgf-recroby-panel card" aria-label="Recroby" hidden="@_layout.IsCollapsed">
         <header class="card-header d-flex flex-wrap align-items-center gap-2 @(ActiveGridContext?.Manager is not null ? "bg-success-subtle" : null)" data-drag-handle>
             <strong><i class="bi bi-robot" aria-hidden="true"></i> Recroby</strong>

@@ -328,3 +328,7 @@ export function focusTitleEditor(element) {
     input?.focus({ preventScroll: true });
     input?.select();
 }
+
+export function focusUserMessage(element) {
+    element.querySelector(".rgf-recroby-panel:not([hidden]) .rgf-recroby-conversation:not([hidden]) textarea:not(:disabled)")?.focus({ preventScroll: true });
+}

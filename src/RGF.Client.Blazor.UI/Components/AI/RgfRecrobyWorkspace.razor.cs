@@ -86,6 +86,7 @@ public partial class RgfRecrobyWorkspace : IAsyncDisposable
     private Conversation? _editing;
     private string _editTitle = string.Empty;
     private bool _focusTitleEditor;
+    private bool _focusUserMessage;
     private bool HasMultipleTypes => _conversations.Select(c => c.RecrobyType).Distinct().Skip(1).Any();
     private static string TypeLabel(string type) => type == "general" ? "General chat" : type;
     private static string ContextLabel(Conversation conversation) => conversation.GridContext is { } context
@@ -186,6 +187,12 @@ public partial class RgfRecrobyWorkspace : IAsyncDisposable
         if (args.Key == "Escape" && _switcherOpen) CloseSwitcher();
     }
 
+    private void Open()
+    {
+        _layout.IsCollapsed = false;
+        _focusUserMessage = true;
+    }
+
     private void Collapse()
     {
         CloseSwitcher(false);
@@ -249,6 +256,12 @@ public partial class RgfRecrobyWorkspace : IAsyncDisposable
             {
                 _focusTitleEditor = false;
                 await _module.InvokeVoidAsync("focusTitleEditor", _element);
+            }
+            if (_focusUserMessage)
+            {
+                _focusUserMessage = false;
+                if (!_layout.IsCollapsed)
+                    await _module.InvokeVoidAsync("focusUserMessage", _element);
             }
         }
     }
@@ -356,7 +369,7 @@ public partial class RgfRecrobyWorkspace : IAsyncDisposable
             }
         }
         _gridReconnectBlocked = false;
-        _layout.IsCollapsed = false;
+        Open();
         StateHasChanged();
         return true;
     }
