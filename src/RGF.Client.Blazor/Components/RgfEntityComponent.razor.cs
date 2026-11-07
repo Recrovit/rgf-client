@@ -76,7 +76,6 @@ public partial class RgfEntityComponent : ComponentBase, IDisposable
     private bool IsChartWorkspace => _chartPresentationMode == RgfChartPresentationMode.Workspace;
     private bool _isTreeInitialized;
     private bool _pendingChartActivation;
-    private RfgDisplayMode _previousDisplayMode = RfgDisplayMode.Grid;
 
     private string? EntityName { get; set; }
 
@@ -224,7 +223,8 @@ public partial class RgfEntityComponent : ComponentBase, IDisposable
     {
         if (args.Args.Data?.TryGetValue(nameof(RgfToolbarEventKind.ToggleDisplayMode), out var mode) == true && mode is RfgDisplayMode displayMode)
         {
-            if (displayMode == RfgDisplayMode.Tree && TreeTemplate == null)
+            if (!Enum.IsDefined(displayMode) || EntityParameters.DisplayMode == displayMode ||
+                (displayMode == RfgDisplayMode.Tree && TreeTemplate == null))
             {
                 return Task.CompletedTask;
             }
@@ -234,6 +234,7 @@ public partial class RgfEntityComponent : ComponentBase, IDisposable
             }
             _isTreeInitialized |= displayMode == RfgDisplayMode.Tree;
             EntityParameters.DisplayMode = displayMode;
+            _pendingChartActivation = false;
             StateHasChanged();
         }
         return Task.CompletedTask;
@@ -253,9 +254,6 @@ public partial class RgfEntityComponent : ComponentBase, IDisposable
         args.Handled = true;
         if (IsChartWorkspace && EntityParameters.DisplayMode == RfgDisplayMode.Chart)
         {
-            EntityParameters.DisplayMode = _previousDisplayMode == RfgDisplayMode.Tree && TreeTemplate != null
-                ? RfgDisplayMode.Tree : RfgDisplayMode.Grid;
-            StateHasChanged();
             return Task.CompletedTask;
         }
         EnsureChartTemplate();
@@ -264,7 +262,6 @@ public partial class RgfEntityComponent : ComponentBase, IDisposable
             _isChartInitialized = true;
             if (IsChartWorkspace)
             {
-                _previousDisplayMode = EntityParameters.DisplayMode == RfgDisplayMode.Tree ? RfgDisplayMode.Tree : RfgDisplayMode.Grid;
                 EntityParameters.DisplayMode = RfgDisplayMode.Chart;
                 _pendingChartActivation = true;
             }

@@ -881,7 +881,7 @@ public sealed class EntityComponentTests
         Assert.Same(dataGrid, cut.FindComponent<AggregateEntityHost>().Instance);
         cut.WaitForAssertion(() => Assert.False(selection.Instance.Disabled), TimeSpan.FromSeconds(5));
         Assert.False(selection.Find("select").HasAttribute("disabled"));
-        await cut.InvokeAsync(() => ChartCommand(entity));
+        await cut.InvokeAsync(() => SelectMode(entity, RfgDisplayMode.Grid));
         await cut.InvokeAsync(() => handler.ApplyFilterState([new() { Id = 1, Param1 = "hidden" }], 53));
         // Drain the deferred source notification before asserting that no query started.
         await cut.InvokeAsync(async () => await Task.Delay(100));
@@ -947,7 +947,7 @@ public sealed class EntityComponentTests
                 chart.ChartSettings.SettingsName = "Retained";
                 chart.SetDataStatus(RgfProcessingStatus.Valid);
             });
-            await cut.InvokeAsync(() => ChartCommand(entity));
+            await cut.InvokeAsync(() => SelectMode(entity, initialMode == RfgDisplayMode.Tree ? RfgDisplayMode.Tree : RfgDisplayMode.Grid));
             Assert.Equal(initialMode == RfgDisplayMode.Chart ? RfgDisplayMode.Grid : initialMode, entity.DisplayMode);
             await cut.InvokeAsync(() => ChartCommand(entity));
             Assert.Same(chart, cut.FindComponent<RgfChartComponent>().Instance);
@@ -1096,7 +1096,7 @@ public sealed class EntityComponentTests
         await cut.InvokeAsync(() => ChartCommand(entity));
         var chart = cut.FindComponent<RgfChartComponent>().Instance;
         await cut.InvokeAsync(() => chart.SetDataStatus(RgfProcessingStatus.Valid));
-        await cut.InvokeAsync(() => ChartCommand(entity));
+        await cut.InvokeAsync(() => SelectMode(entity, RfgDisplayMode.Grid));
         entity.IsEmbeddedEntity = true;
         cut.Render();
         Assert.Equal(RgfChartPresentationMode.Workspace, entity.ChartParameters.PresentationMode);
@@ -1163,7 +1163,8 @@ public sealed class EntityComponentTests
         Assert.Contains("display:none", cut.Find(".rgf-entity-grid").GetAttribute("style"));
 
         await cut.InvokeAsync(() => ChartCommand(entity, menu: true));
-        Assert.Equal(initialMode == RfgDisplayMode.Tree ? RfgDisplayMode.Tree : RfgDisplayMode.Grid, entity.DisplayMode);
+        Assert.Equal(RfgDisplayMode.Chart, entity.DisplayMode);
+        await cut.InvokeAsync(() => SelectMode(entity, initialMode == RfgDisplayMode.Tree ? RfgDisplayMode.Tree : RfgDisplayMode.Grid));
         await cut.InvokeAsync(() => ChartCommand(entity));
 
         Assert.Same(grid, cut.FindComponents<StatefulView>().First().Instance);
@@ -1206,6 +1207,265 @@ public sealed class EntityComponentTests
         Assert.Equal(expectedMode, entity.DisplayMode);
     }
 
+    [Theory]
+    [InlineData("Grid", true, true, RfgDisplayMode.Grid)]
+    [InlineData("Tree", true, true, RfgDisplayMode.Tree)]
+    [InlineData("Chart", true, true, RfgDisplayMode.Chart)]
+    [InlineData("Tree", false, true, RfgDisplayMode.Grid)]
+    [InlineData("Chart", true, false, RfgDisplayMode.Grid)]
+    [InlineData("invalid", false, false, RfgDisplayMode.Grid)]
+    public async Task ViewSelector_NormalizesBackendInitialModeAndHidesUnsupportedViews(
+        string option, bool tree, bool chart, RfgDisplayMode expected)
+    {
+        using var context = CreateTestContext(true);
+        await context.Services.InitializeRgfUIAsync(loadResources: false);
+        context.ComponentFactories.AddStub<Recrovit.RecroGridFramework.Client.Blazor.UI.Components.MenuComponent>();
+        RgfBlazorConfiguration.UnregisterComponent(RgfBlazorConfiguration.ComponentType.Chart);
+        var api = (PendingRgfApiService)context.Services.GetRequiredService<IRgfApiService>();
+        api.DisplayModeOption = option;
+        var entity = CreateEntityParameters(RfgDisplayMode.Grid);
+        entity.DisplayMode = null;
+        entity.ChartParameters.SupportsWorkspace = true;
+        RenderFragment<RgfEntityParameters> empty = _ => builder => { };
+        var cut = context.Render<RgfEntityComponent>(p => p
+            .Add(c => c.EntityParameters, entity)
+            .Add(c => c.GridTemplate, empty)
+            .Add(c => c.TreeTemplate, tree ? empty : null)
+            .Add(c => c.ChartTemplate, chart ? empty : null)
+            .Add(c => c.FilterTemplate, empty)
+            .Add(c => c.FormTemplate, empty)
+            .Add(c => c.PagerTemplate, empty)
+            .Add(c => c.ToolbarTemplate, Toolbar));
+        Assert.Equal(expected, entity.DisplayMode);
+        Assert.Single(cut.FindAll(".btn-toolbar .bi-table"));
+        Assert.Equal(tree ? 1 : 0, cut.FindAll(".btn-toolbar .bi-bar-chart-steps").Count);
+        Assert.Equal(chart ? 1 : 0, cut.FindAll(".btn-toolbar .bi-graph-up").Count);
+        Assert.Single(cut.FindAll(".btn-toolbar button[aria-pressed=true]"));
+        if (!tree) await cut.InvokeAsync(() => SelectMode(entity, RfgDisplayMode.Tree));
+        if (!chart) await cut.InvokeAsync(() => ChartCommand(entity));
+        await cut.InvokeAsync(() => SelectMode(entity, (RfgDisplayMode)99));
+        Assert.Equal(expected, entity.DisplayMode);
+    }
+
+    [Theory]
+    [InlineData(RfgDisplayMode.Grid)]
+    [InlineData(RfgDisplayMode.Tree)]
+    public async Task ViewSelector_DialogChartNeverSelectsChartOrChangesUnderlyingView(RfgDisplayMode initialMode)
+    {
+        using var context = CreateTestContext(true);
+        await context.Services.InitializeRgfUIAsync(loadResources: false);
+        context.ComponentFactories.AddStub<Recrovit.RecroGridFramework.Client.Blazor.UI.Components.MenuComponent>();
+        var entity = CreateEntityParameters(initialMode);
+        entity.IsEmbeddedEntity = true;
+        var cut = RenderWorkspace(context, entity, standardChart: true);
+        cut.Render(p => p.Add(c => c.ToolbarTemplate, Toolbar));
+        var chartButton = cut.Find(".btn-toolbar .bi-graph-up").ParentElement!;
+        await chartButton.ClickAsync(new());
+        Assert.Equal(initialMode, entity.DisplayMode);
+        Assert.Equal("false", chartButton.GetAttribute("aria-pressed"));
+        Assert.Contains("btn-secondary", chartButton.ClassList);
+        await cut.InvokeAsync(() => cut.FindComponent<RgfChartComponent>().Instance.OnClose(null));
+        Assert.Equal(initialMode, entity.DisplayMode);
+        cut.Find(".btn-toolbar .bi-table").ParentElement!.Click();
+        Assert.Equal(RfgDisplayMode.Grid, entity.DisplayMode);
+        cut.Find(".btn-toolbar .bi-bar-chart-steps").ParentElement!.Click();
+        Assert.Equal(RfgDisplayMode.Tree, entity.DisplayMode);
+        await cut.InvokeAsync(() => SelectMode(entity, RfgDisplayMode.Chart));
+        Assert.Equal(RfgDisplayMode.Tree, entity.DisplayMode);
+        Assert.Equal("false", cut.Find(".btn-toolbar .bi-graph-up").ParentElement!.GetAttribute("aria-pressed"));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task SavedChart_ReplacesSharedFilterIncludingEmptyConditionsAndRetainsItOnReturn(bool empty)
+    {
+        using var context = CreateTestContext(true);
+        RgfBlazorConfiguration.RegisterEntityComponent<AggregateEntityHost>(string.Empty);
+        var entity = CreateEntityParameters(RfgDisplayMode.Grid);
+        entity.ChartParameters.SupportsWorkspace = true;
+        var cut = RenderWorkspace(context, entity, standardChart: true);
+        var manager = entity.Manager!;
+        var filter = await manager.GetFilterHandlerAsync();
+        await cut.InvokeAsync(() => filter.ApplyFilterState([new() { Id = 1, Param1 = "original" }], 41));
+        await cut.InvokeAsync(() => filter.SetQuickFilterAsync(new RgfProperty { Id = 3, Alias = "Quick" }, "quick"));
+        Assert.Contains(filter.Conditions, condition => condition.IsQuickFilter);
+        await cut.InvokeAsync(() => ChartCommand(entity));
+        var chart = cut.FindComponent<RgfChartComponent>().Instance;
+        var api = (PendingRgfApiService)context.Services.GetRequiredService<IRgfApiService>();
+        RgfFilter.Condition[] conditions = empty ? [] : [new() { Id = 2, Param1 = "saved" }];
+        chart.ChartSettingList.Add(new()
+        {
+            ChartSettingsId = 7, SettingsName = "Saved",
+            AggregationSettings = new() { Columns = [new() { Id = 0, Aggregate = "Count" }] },
+            ParentGridSettings = new() { Conditions = conditions, SQLTimeout = 67 }
+        });
+        var before = api.GridRequests.Count;
+        await cut.InvokeAsync(async () => Assert.True(await chart.OnSetChartSettingAsync(7, "Saved")));
+        Assert.Equal(before + 1, api.GridRequests.Count);
+        AssertFilter(api.GridRequests[^1].ListParam);
+        AssertConditions(filter.Conditions);
+        AssertConditions(manager.ListHandler.GetGridSettings().Conditions!);
+        await cut.InvokeAsync(async () => Assert.True(await chart.CreateChartDataAsyc()));
+        AssertFilter(Assert.Single(api.ChartRequests).ParentGridRequest.ListParam);
+        var dataSetManager = cut.FindComponent<AggregateEntityHost>().Instance.EntityParameters.Manager;
+        await cut.InvokeAsync(() => SelectMode(entity, RfgDisplayMode.Grid));
+        await cut.InvokeAsync(() => SelectMode(entity, RfgDisplayMode.Tree));
+        AssertConditions(filter.Conditions);
+        AssertFilter(manager.ListHandler.CreateAggregateRequest(chart.ChartSettings.AggregationSettings).ListParam);
+        Assert.Equal(before + 1, api.GridRequests.Count);
+        Assert.Same(manager, entity.Manager);
+        Assert.Same(dataSetManager, cut.FindComponent<AggregateEntityHost>().Instance.EntityParameters.Manager);
+
+        void AssertFilter(RgfListParam value)
+        {
+            Assert.Equal(67, value.SQLTimeout);
+            AssertConditions(value.UserFilter);
+        }
+        void AssertConditions(IEnumerable<RgfFilter.Condition> actual) => Assert.True(
+            JsonElement.DeepEquals(JsonSerializer.SerializeToElement(conditions), JsonSerializer.SerializeToElement(actual)));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task InitialSavedChart_LoadsSharedFilterAndTimeoutBeforeAggregation(bool empty)
+    {
+        using var context = CreateTestContext(true);
+        RgfBlazorConfiguration.RegisterEntityComponent<AggregateEntityHost>(string.Empty);
+        var api = (PendingRgfApiService)context.Services.GetRequiredService<IRgfApiService>();
+        api.SavedChartResponseGate = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        api.SavedCharts = [new()
+        {
+            ChartSettingsId = 7, SettingsName = "Initial saved", SeriesType = RgfChartSeriesType.Card,
+            AggregationSettings = new() { Columns = [new() { Id = 0, Aggregate = "Count" }] },
+            ParentGridSettings = new() { Conditions = empty ? [] : [new() { Id = 2, Param1 = "initial saved" }], SQLTimeout = 79 }
+        }];
+        var entity = CreateEntityParameters(RfgDisplayMode.Grid);
+        entity.ChartParameters.SupportsWorkspace = true;
+        var cut = RenderWorkspace(context, entity, standardChart: true, initialChartSettingsId: 7);
+        var filter = await entity.Manager!.GetFilterHandlerAsync();
+        await cut.InvokeAsync(() => filter.ApplyFilterState([new() { Id = 1, Param1 = "original" }], 41));
+        var before = api.GridRequests.Count;
+        await cut.InvokeAsync(() => ChartCommand(entity));
+        api.SavedChartResponseGate.SetResult(true);
+        cut.WaitForAssertion(() => Assert.Single(api.ChartRequests), TimeSpan.FromSeconds(5));
+        var chart = cut.FindComponent<RgfChartComponent>().Instance;
+        cut.WaitForAssertion(() => Assert.Equal(RgfProcessingStatus.Valid, chart.ChartStatus));
+        Assert.Equal(before + 1, api.GridRequests.Count);
+        Assert.Equal(7, chart.ChartSettings.ChartSettingsId);
+        Assert.Equal(empty ? 0 : 1, filter.Conditions.Count);
+        foreach (var request in new[] { api.GridRequests[^1], api.ChartRequests[^1].ParentGridRequest })
+        {
+            Assert.Equal(79, request.ListParam.SQLTimeout);
+            Assert.Equal(empty ? 0 : 1, request.ListParam.UserFilter.Length);
+            if (!empty) Assert.Equal("initial saved", Assert.Single(request.ListParam.UserFilter).Param1?.ToString());
+        }
+        await cut.InvokeAsync(() => SelectMode(entity, RfgDisplayMode.Grid));
+        Assert.Equal(empty ? 0 : 1, filter.Conditions.Count);
+        Assert.Equal(before + 1, api.GridRequests.Count);
+    }
+
+    private static RenderFragment Toolbar(RgfEntityParameters current) => builder =>
+    {
+        builder.OpenComponent<Recrovit.RecroGridFramework.Client.Blazor.UI.Components.ToolbarComponent>(0);
+        builder.AddAttribute(1, "EntityParameters", current);
+        builder.CloseComponent();
+    };
+
+    private static Task<bool> SelectMode(RgfEntityParameters entity, RfgDisplayMode mode)
+        => entity.ToolbarParameters.EventDispatcher.DispatchEventAsync(RgfToolbarEventKind.ToggleDisplayMode,
+            new RgfEventArgs<RgfToolbarEventArgs>(entity, new(RgfToolbarEventKind.ToggleDisplayMode,
+                new() { [nameof(RgfToolbarEventKind.ToggleDisplayMode)] = mode })));
+
+    [Fact]
+    public async Task ViewSelector_SelectsExplicitModesAndRetainsComponentsManagerAndSharedFilter()
+    {
+        using var context = CreateTestContext(true);
+        await context.Services.InitializeRgfUIAsync(loadResources: false);
+        context.ComponentFactories.AddStub<Recrovit.RecroGridFramework.Client.Blazor.UI.Components.MenuComponent>();
+        var entity = CreateEntityParameters(RfgDisplayMode.Grid);
+        var activations = 0;
+        entity.ChartParameters.EventDispatcher.Subscribe(RgfChartEventKind.WorkspaceActivated, _ => { activations++; });
+        var cut = RenderWorkspace(context, entity);
+        cut.Render(p => p
+            .Add(c => c.ToolbarTemplate, current => builder =>
+            {
+                builder.OpenComponent<Recrovit.RecroGridFramework.Client.Blazor.UI.Components.ToolbarComponent>(0);
+                builder.AddAttribute(1, "EntityParameters", current);
+                builder.CloseComponent();
+            })
+            .Add(c => c.TreeTemplate, _ => builder => { builder.OpenComponent<StatefulView>(0); builder.CloseComponent(); }));
+        var manager = entity.Manager!;
+        var filter = await manager.GetFilterHandlerAsync();
+        await cut.InvokeAsync(() => filter.ApplyFilterState([new() { Id = 1, Param1 = "shared" }], 43));
+        await cut.InvokeAsync(() => filter.SetQuickFilterAsync(new RgfProperty { Id = 3, Alias = "Quick" }, "quick"));
+        var filterSnapshot = JsonSerializer.SerializeToElement(filter.Conditions);
+        var grid = cut.FindComponents<StatefulView>().First().Instance;
+        cut.Find(".rgf-entity-grid input").Change("grid draft");
+        var api = (PendingRgfApiService)context.Services.GetRequiredService<IRgfApiService>();
+        var requests = api.GridRequests.Count;
+        var sourceChanges = 0;
+        manager.ListHandler.AggregateSourceChanged += () => sourceChanges++;
+        AssertSelection(RfgDisplayMode.Grid);
+        Click("bi-bar-chart-steps");
+        AssertSelection(RfgDisplayMode.Tree);
+        var tree = cut.FindComponents<StatefulView>().Last().Instance;
+        cut.Find(".rgf-entity-tree input").Change("tree draft");
+        Click("bi-graph-up");
+        AssertSelection(RfgDisplayMode.Chart);
+        var chart = cut.FindComponent<RgfChartComponent>().Instance;
+        chart.ChartSettings.SettingsName = "retained";
+        Assert.Equal(1, activations);
+        Click("bi-graph-up");
+        await cut.InvokeAsync(() => ChartCommand(entity, menu: true));
+        await cut.InvokeAsync(() => SelectMode(entity, RfgDisplayMode.Chart));
+        AssertSelection(RfgDisplayMode.Chart);
+        Assert.Equal(1, activations);
+        Click("bi-table");
+        AssertSelection(RfgDisplayMode.Grid);
+        Click("bi-table");
+        Click("bi-graph-up");
+        Click("bi-bar-chart-steps");
+        AssertSelection(RfgDisplayMode.Tree);
+        Click("bi-bar-chart-steps");
+        Click("bi-graph-up");
+        await cut.InvokeAsync(() => SelectMode(entity, RfgDisplayMode.Tree));
+        AssertSelection(RfgDisplayMode.Tree);
+        await cut.InvokeAsync(() => SelectMode(entity, RfgDisplayMode.Grid));
+        AssertSelection(RfgDisplayMode.Grid);
+        Assert.Same(manager, entity.Manager);
+        Assert.Same(grid, cut.FindComponents<StatefulView>().First().Instance);
+        Assert.Contains(cut.FindComponents<StatefulView>(), view => ReferenceEquals(tree, view.Instance));
+        Assert.Same(chart, cut.FindComponent<RgfChartComponent>().Instance);
+        Assert.Equal("retained", chart.ChartSettings.SettingsName);
+        Assert.Equal("grid draft", cut.Find(".rgf-entity-grid input").GetAttribute("value"));
+        Assert.Equal("tree draft", cut.Find(".rgf-entity-tree input").GetAttribute("value"));
+        Assert.Equal(requests, api.GridRequests.Count);
+        Assert.Equal(0, sourceChanges);
+        Assert.True(JsonElement.DeepEquals(filterSnapshot, JsonSerializer.SerializeToElement(filter.Conditions)));
+        var aggregate = manager.ListHandler.CreateAggregateRequest(chart.ChartSettings.AggregationSettings);
+        var appliedConditions = aggregate.ListParam.UserFilter.SelectMany(condition => condition.Conditions ?? [condition]).ToArray();
+        Assert.Equal("shared", Assert.Single(appliedConditions, condition => !condition.IsQuickFilter).Param1?.ToString());
+        Assert.Equal("quick", Assert.Single(appliedConditions, condition => condition.IsQuickFilter).Param1?.ToString());
+        Assert.Equal(43, aggregate.ListParam.SQLTimeout);
+
+        void Click(string icon) => cut.Find($".btn-toolbar .{icon}").ParentElement!.Click();
+        void AssertSelection(RfgDisplayMode mode)
+        {
+            var group = cut.Find(".btn-toolbar .bi-table").ParentElement!.ParentElement!;
+            Assert.Contains("btn-group", group.ClassList);
+            Assert.Equal(new[] { "bi-table", "bi-bar-chart-steps", "bi-graph-up" },
+                group.QuerySelectorAll("button i").Select(icon => icon.ClassList.Single(value => value != "bi")));
+            var active = Assert.Single(group.QuerySelectorAll("button.btn-success"));
+            Assert.Equal("true", active.GetAttribute("aria-pressed"));
+            Assert.Equal(1, group.QuerySelectorAll("button[aria-pressed=true]").Length);
+            Assert.All(group.QuerySelectorAll("button.btn-secondary"), button => Assert.Equal("false", button.GetAttribute("aria-pressed")));
+            Assert.Equal(mode, entity.DisplayMode);
+            Assert.Contains(mode switch { RfgDisplayMode.Grid => "bi-table", RfgDisplayMode.Tree => "bi-bar-chart-steps", _ => "bi-graph-up" }, active.InnerHtml);
+        }
+    }
+
     private static Task<bool> ChartCommand(RgfEntityParameters entity, bool menu = false)
         => menu
             ? entity.ToolbarParameters.MenuEventDispatcher.DispatchEventAsync(Recrovit.RecroGridFramework.Abstraction.Contracts.Constants.Menu.RecroChart,
@@ -1213,7 +1473,7 @@ public sealed class EntityComponentTests
             : entity.ToolbarParameters.EventDispatcher.DispatchEventAsync(RgfToolbarEventKind.RecroChart,
                 new RgfEventArgs<RgfToolbarEventArgs>(entity, new(RgfToolbarEventKind.RecroChart)));
 
-    private static IRenderedComponent<RgfEntityComponent> RenderWorkspace(BunitContext context, RgfEntityParameters entity, bool standardChart = false)
+    private static IRenderedComponent<RgfEntityComponent> RenderWorkspace(BunitContext context, RgfEntityParameters entity, bool standardChart = false, int? initialChartSettingsId = null)
     {
         entity.ChartParameters.SupportsWorkspace |= !standardChart;
         return context.Render<RgfEntityComponent>(parameters => parameters
@@ -1230,6 +1490,7 @@ public sealed class EntityComponentTests
                 {
                     builder.OpenComponent<Recrovit.RecroGridFramework.Client.Blazor.UI.Components.ChartComponent>(0);
                     builder.AddAttribute(1, "EntityParameters", current);
+                    builder.AddAttribute(2, "InitialChartSettingsId", initialChartSettingsId);
                     builder.CloseComponent();
                     return;
                 }
@@ -1324,6 +1585,19 @@ public sealed class EntityComponentTests
     {
         public Func<RgfAiRequest, Task<RgfAiResponse>>? RecrobyResponse { get; set; }
         public List<RgfProperty> GridProperties { get; set; } = [];
+        public string? DisplayModeOption { get; set; }
+        public List<RgfChartSettings> SavedCharts { get; set; } = [];
+        public TaskCompletionSource<bool>? SavedChartResponseGate { get; set; }
+
+        private async Task<IRgfApiResponse<T>> SavedChartResponse<T>() where T : class
+        {
+            if (SavedChartResponseGate != null) await SavedChartResponseGate.Task;
+            return new ApiResponse<T>
+            {
+                Success = true,
+                Result = (T)(object)new RgfResult<List<RgfChartSettings>> { Success = true, Messages = new(), Result = SavedCharts }
+            };
+        }
 
         private async Task<IRgfApiResponse<T>> RespondToRecrobyAsync<T>(IRgfApiRequest request) where T : class
         {
@@ -1394,12 +1668,19 @@ public sealed class EntityComponentTests
         }
         public Task<IRgfApiResponse<ResultType>> GetAsync<ResultType>(IRgfApiRequest request) where ResultType : class
         {
+            if (typeof(ResultType) == typeof(RgfResult<List<RgfChartSettings>>)) return SavedChartResponse<ResultType>();
             object result = typeof(ResultType) == typeof(RgfResult<Dictionary<string, string>>)
                 ? new RgfResult<Dictionary<string, string>> { Success = true, Messages = new(), Result = [] }
-                : typeof(ResultType) == typeof(RgfResult<List<RgfChartSettings>>)
-                ? new RgfResult<List<RgfChartSettings>> { Success = true, Messages = new(), Result = [] }
                 : throw new NotSupportedException($"Unsupported GET {typeof(ResultType)}");
             return Task.FromResult<IRgfApiResponse<ResultType>>(new ApiResponse<ResultType> { Success = true, Result = (ResultType)result });
+        }
+
+        private Dictionary<string, object> GridOptions(RgfGridRequest request)
+        {
+            var options = new Dictionary<string, object>();
+            if (request.ListParam?.SQLTimeout is int timeout) options["RGO_SQLTimeout"] = timeout;
+            if (DisplayModeOption != null) options["RGO_DisplayMode"] = DisplayModeOption;
+            return options;
         }
 
         public Task<IRgfApiResponse<ResultType>> PostAsync<ResultType>(IRgfApiRequest request) where ResultType : class
@@ -1415,13 +1696,7 @@ public sealed class EntityComponentTests
                     }
                 });
             }
-            if (typeof(ResultType) == typeof(RgfResult<List<RgfChartSettings>>))
-            {
-                return Task.FromResult<IRgfApiResponse<ResultType>>(new ApiResponse<ResultType>
-                {
-                    Success = true, Result = (ResultType)(object)new RgfResult<List<RgfChartSettings>> { Success = true, Messages = new(), Result = [] }
-                });
-            }
+            if (typeof(ResultType) == typeof(RgfResult<List<RgfChartSettings>>)) return SavedChartResponse<ResultType>();
             if (typeof(ResultType) == typeof(RgfAiResponse) && RecrobyResponse is not null)
                 return RespondToRecrobyAsync<ResultType>(request);
             if (typeof(ResultType) == typeof(RgfResult<RgfGridResult>) &&
@@ -1441,7 +1716,7 @@ public sealed class EntityComponentTests
                             Messages = new(),
                             Result = new RgfGridResult
                             {
-                                EntityDesc = new RgfEntity { EntityId = 101, EntityName = "Orders", EntityVersion = "1", MenuTitle = "Orders", Title = "Orders", Permissions = new RgfPermissions(true), CRUD = "CRUD", Properties = GridProperties, Options = gridRequest.ListParam?.SQLTimeout is int timeout ? new() { ["RGO_SQLTimeout"] = timeout } : [] },
+                                EntityDesc = new RgfEntity { EntityId = 101, EntityName = "Orders", EntityVersion = "1", MenuTitle = "Orders", Title = "Orders", Permissions = new RgfPermissions(true), CRUD = "CRUD", Properties = GridProperties, Options = GridOptions(gridRequest) },
                                 Data = [], DataColumns = [], Options = new() { ["RGO_MaxItem"] = 0 }
                             }
                         }

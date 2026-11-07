@@ -78,24 +78,32 @@
                                 }
                             </div>
                         }
-                        @if (EntityParameters.ParentEntityParameters?.Manager == null || EntityParameters.ParentEntityParameters.Manager.ValidFormKeyExists() == true || RgfToolbar.EnableChart)
-                        {
-                            <div class="btn-group me-2" role="group">
-                                @if (EntityParameters.ParentEntityParameters?.Manager == null || EntityParameters.ParentEntityParameters.Manager.ValidFormKeyExists() == true)
-                                {
-                                    <RgfButton IconName="bi-bar-chart-steps"
-                                               CssClass="@(EntityParameters.DisplayMode == RfgDisplayMode.Tree ? "btn-success" : "btn-secondary")"
-                                               Tooltip="TreeView"
-                                               OnClick="() => RgfToolbar.OnToolbarCommand(RgfToolbarEventKind.ToggleDisplayMode, new RgfDynamicDictionary() {{ nameof(RgfToolbarEventKind.ToggleDisplayMode), EntityParameters.DisplayMode == RfgDisplayMode.Tree ? RfgDisplayMode.Grid : RfgDisplayMode.Tree} })" />
-                                }
-                                @if (RgfToolbar.EnableChart)
-                                {
-                                    <RgfButton IconName="bi-graph-up" CssClass="@(EntityParameters.DisplayMode == RfgDisplayMode.Chart ? "btn-success" : "btn-secondary")"
-                                               Tooltip="RecroChart"
-                                               OnClick="() => RgfToolbar.OnToolbarCommand(RgfToolbarEventKind.RecroChart)" />
-                                }
-                            </div>
-                        }
+                        @* RGF-DOC: rgf.client.blazor-ui.entity-ui *@
+                        <div class="btn-group me-2" role="group">
+                            <RgfButton IconName="bi-table"
+                                       CssClass="@(EntityParameters.DisplayMode == RfgDisplayMode.Grid ? "btn-success" : "btn-secondary")"
+                                       Tooltip="@RecroDict.GetRgfUiString("GridView")"
+                                       AdditionalAttributes="@(new() { ["aria-pressed"] = EntityParameters.DisplayMode == RfgDisplayMode.Grid ? "true" : "false" })"
+                                       OnClick="() => RgfToolbar.OnToolbarCommand(RgfToolbarEventKind.ToggleDisplayMode, new RgfDynamicDictionary() { { nameof(RgfToolbarEventKind.ToggleDisplayMode), RfgDisplayMode.Grid } })" />
+                            @if (EntityComponent?.TreeTemplate != null &&
+                                (EntityParameters.ParentEntityParameters?.Manager == null || EntityParameters.ParentEntityParameters.Manager.ValidFormKeyExists() == true))
+                            {
+                                <RgfButton IconName="bi-bar-chart-steps"
+                                           CssClass="@(EntityParameters.DisplayMode == RfgDisplayMode.Tree ? "btn-success" : "btn-secondary")"
+                                           Tooltip="@RecroDict.GetRgfUiString("TreeView")"
+                                           AdditionalAttributes="@(new() { ["aria-pressed"] = EntityParameters.DisplayMode == RfgDisplayMode.Tree ? "true" : "false" })"
+                                           OnClick="() => RgfToolbar.OnToolbarCommand(RgfToolbarEventKind.ToggleDisplayMode, new RgfDynamicDictionary() { { nameof(RgfToolbarEventKind.ToggleDisplayMode), RfgDisplayMode.Tree } })" />
+                            }
+                            @if (Manager.EntityDesc.Options.GetBoolValue("RGO_ClientMode") != true &&
+                                (EntityComponent?.ChartTemplate != null || RgfToolbar.EnableChart))
+                            {
+                                <RgfButton IconName="bi-graph-up"
+                                           CssClass="@(IsChartSelected ? "btn-success" : "btn-secondary")"
+                                           Tooltip="@RecroDict.GetRgfUiString("Chart")"
+                                           AdditionalAttributes="@(new() { ["aria-pressed"] = IsChartSelected ? "true" : "false" })"
+                                           OnClick="() => RgfToolbar.OnToolbarCommand(RgfToolbarEventKind.RecroChart)" />
+                            }
+                        </div>
                         @if (RecrobyWorkspace != null && WorkspaceService?.CanOpenGrid == true &&
                             EntityComponent?.RecrobyGridContext.Manager != null &&
                             !Manager.EntityDesc.EntityName.Equals("RGRecroChart", StringComparison.OrdinalIgnoreCase))
@@ -210,6 +218,9 @@
 
     [Parameter, EditorRequired]
     public RgfEntityParameters EntityParameters { get; set; } = null!;
+
+    private bool IsChartSelected => EntityParameters.ChartParameters.PresentationMode == RgfChartPresentationMode.Workspace &&
+        EntityParameters.DisplayMode == RfgDisplayMode.Chart;
 
     private IRgManager Manager => EntityParameters.Manager!;
     private RgfToolbarParameters ToolbarParameters { get => EntityParameters.ToolbarParameters; }
