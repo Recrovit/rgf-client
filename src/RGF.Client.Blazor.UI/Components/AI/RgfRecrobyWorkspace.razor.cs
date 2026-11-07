@@ -70,6 +70,16 @@ public partial class RgfRecrobyWorkspace : IAsyncDisposable
     private readonly HashSet<RgfRecrobyGridContext> _gridContexts = new(ReferenceEqualityComparer.Instance);
     private readonly ConditionalWeakTable<IRgManager, GridTurns> _gridTurns = new();
     private Conversation? _active;
+    internal (string Provider, string Model)? NameDescriptionModelSelection
+    {
+        get
+        {
+            if (_disposed || _layout.IsCollapsed || _active?.Session.Conversation.AiModelOverride is not { } alias) return null;
+            var parts = alias.Split('/');
+            // Preserve malformed explicit choices so the server rejects them instead of using a default.
+            return parts.Length == 2 ? (parts[0], parts[1]) : ("", alias);
+        }
+    }
     internal RgfRecrobyGridContext? ActiveGridContext => _disposed ? null : _active?.GridContext;
     internal event Action? ActiveGridContextChanged;
     private bool _gridReconnectBlocked;

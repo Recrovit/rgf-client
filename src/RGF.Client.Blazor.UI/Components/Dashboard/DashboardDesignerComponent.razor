@@ -46,7 +46,7 @@
                                              IncludeEmptyItem="true"
                                              Tooltip="@RecroDict.GetRgfUiString("RoleVisibilitySettingTooltip")"
                                              Disabled="@(_state.IsReadonly || !Parameters.IsRoleSettingAllowed)" />
-                                <RgfInputText Label="@RecroDict.GetRgfUiDashboard("Description")"
+                                <RgfInputText Label="@RecroDict.GetRgfUiString("Description")"
                                               Value="@_state.Dashboard.Description"
                                               ValueExpression="@(() => _state.Dashboard.Description)"
                                               ValueChanged="OnDashboardDescriptionChangedAsync"

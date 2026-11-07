@@ -102,6 +102,12 @@ public static class RgfProxyEndpoints
             .RequireAuthorization()
             .DisableAuthRedirects()
             .WithSummary("Proxies authenticated Recroby turns to the downstream RGF API.");
+        endpoints.MapPost("/api/rgf/ai/name-description/generate", ProxyAuthorizedAsync)
+            .AsProxyEndpoint()
+            .WithForwardedRgfHeaders()
+            .RequireAuthorization()
+            .DisableAuthRedirects()
+            .WithSummary("Proxies authenticated AI name and description generation.");
         return endpoints;
     }
 

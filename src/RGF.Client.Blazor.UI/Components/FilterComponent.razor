@@ -1,4 +1,4 @@
-﻿<RgfFilterComponent @ref="_rgfFilterRef" EntityParameters="EntityParameters">
+<RgfFilterComponent @ref="_rgfFilterRef" EntityParameters="EntityParameters">
     <FilterTemplate Context="RgfFilterComp">
         <FilterConditionComponent FilterComponent="RgfFilterComp" Condition="RgfFilterComp.Condition" />
     </FilterTemplate>
@@ -15,6 +15,14 @@
                              DataSource="RgfFilterComp.FilterHandler.PredefinedFilters.Select(e=> new KeyValuePair<int?, string>(e.FilterSettingsId, e.SettingsName))"
                              InputChanged="OnInputChanged" />
             </div>
+            <div class="px-1">
+                <RgfButton IconName="bi-stars" CssClass="btn-outline-secondary" Tooltip="@RecroDict.GetRgfUiString("AiGenerateNameDescription")"
+                           Disabled="!RgfFilterComp.CanGenerateNameDescription" OnClick="_ => GenerateAsync(RgfFilterComp)" />
+            </div>
+            @if (RgfFilterComp.IsGeneratingNameDescription)
+            {
+                <span class="spinner-border spinner-border-sm" role="status" aria-label="@RecroDict.GetRgfUiString("Request")"></span>
+            }
             <div class="rg-predef-save">
                 <div class="ps-1" style="width:max-content;">
                     <RgfComboBox TValue="string" @bind-Value="RgfFilterComp.FilterSettings.RoleId" DataSource="RgfFilterComp.VisibleRoles"
@@ -23,13 +31,18 @@
                 </div>
                 <div class="px-1">
                     <RgfButton IconName="bi-floppy" CssClass="btn-success" Tooltip="@RecroDict.GetRgfUiString("SaveFilterSettings")"
-                               Disabled="RgfFilterComp.FilterSettings.IsReadonly == true || string.IsNullOrEmpty(RgfFilterComp.FilterSettings.SettingsName) || !RgfFilterComp.IsPublicFilterSettingAllowed && RgfFilterComp.FilterSettings.RoleId != null"
+                               Disabled="RgfFilterComp.FilterSettings.IsReadonly == true && !RgfFilterComp.IsSavingAsNewFilter || string.IsNullOrEmpty(RgfFilterComp.FilterSettings.SettingsName) || !RgfFilterComp.IsPublicFilterSettingAllowed && RgfFilterComp.FilterSettings.RoleId != null && !RgfFilterComp.IsSavingAsNewFilter"
                                OnClick="(arg) => RgfFilterComp.OnSavePredefinedFilter()" />
                     <RgfButton IconName="bi-trash" CssClass="btn-danger" Tooltip="@RecroDict.GetRgfUiString("DeleteSavedSettings")"
                                Disabled="RgfFilterComp.FilterSettings.IsReadonly == true || RgfFilterComp.FilterSettings.FilterSettingsId == null || !RgfFilterComp.IsPublicFilterSettingAllowed && RgfFilterComp.FilterSettings.RoleId != null"
                                OnClick="(arg) => RgfFilterComp.OnDeletePredefinedFilter()" />
                 </div>
             </div>
+        </div>
+        <div class="w-100 mt-2">
+            <label class="form-label" for="@DescriptionId">@RecroDict.GetRgfUiString("Description")</label>
+            <textarea id="@DescriptionId" class="form-control form-control-sm" rows="3" maxlength="4000"
+                      @bind="RgfFilterComp.Description" @bind:event="oninput" @onkeyup:stopPropagation="true"></textarea>
         </div>
         <div class="rg-filter-save">
             <div class="ps-1 checkbox-lg">
@@ -52,6 +65,14 @@
 
     [Parameter, EditorRequired]
     public RgfEntityParameters EntityParameters { get; set; } = null!;
+
+    [CascadingParameter] public AI.RgfRecrobyWorkspace? Workspace { get; set; }
+    private readonly string DescriptionId = "filter-description-" + Guid.NewGuid().ToString("N");
+    private Task GenerateAsync(RgfFilterComponent component)
+    {
+        var selection = Workspace?.NameDescriptionModelSelection;
+        return component.GenerateNameDescriptionAsync(selection?.Provider, selection?.Model);
+    }
 
     private IRgManager Manager => EntityParameters.Manager!;
     private RgfFilterParameters FilterParameters { get => EntityParameters.FilterParameters; }
