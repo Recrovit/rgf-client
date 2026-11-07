@@ -37,6 +37,12 @@
                         </RgfButton>
                     </div>
                 }
+                else if (FilterComponent.GetConditionProperty(item) is not { } prop)
+                {
+                    <div class="alert alert-warning p-1 mb-0" role="alert">
+                        Filter property unavailable: @item.Alias (Id: @item.Id). Remove this condition or cancel editing.
+                    </div>
+                }
                 else
                 {
                     <div class="p-1">
@@ -51,7 +57,6 @@
                     </div>
                     @if (!(new[] { RgfFilter.QueryOperator.IsNull, RgfFilter.QueryOperator.IsNotNull, RgfFilter.QueryOperator.Exists }.Contains(item.QueryOperator)))
                     {
-                        var prop = FilterComponent.RgfFilterProperties.Single(e => e.Id == item.Id);
                         <div class="p-1">
                             @switch (prop.ClientDataType)
                             {
@@ -178,7 +183,7 @@
 
     private Dictionary<int, string> Columns => FilterComponent.RgfFilterProperties.ToDictionary(p => p.Id, p => p.ColTitle);
     private Dictionary<RgfFilter.LogicalOperator, string> LogicalOperators => RgfFilter.GetLogicalOperators(RecroDict);
-    private Dictionary<RgfFilter.QueryOperator, string> GetQueryOperators(RgfFilter.Condition condition) => RgfFilter.GetQueryOperators(FilterComponent.RgfFilterProperties.SingleOrDefault(e => e.Id == condition.Id)?.Operators, RecroDict);
+    private Dictionary<RgfFilter.QueryOperator, string> GetQueryOperators(RgfFilter.Condition condition) => RgfFilter.GetQueryOperators(FilterComponent.GetConditionProperty(condition)?.Operators, RecroDict);
 
     private void OnAddCondition(RgfFilter.Condition condition) => FilterComponent.AddCondition(condition);
     private void OnRemoveCondition(RgfFilter.Condition condition) => FilterComponent.RemoveCondition(condition);

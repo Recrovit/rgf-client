@@ -24,6 +24,190 @@ namespace Recrovit.RecroGridFramework.Client.Blazor.UI.Tests.Components;
 [Collection(RgfBlazorUiStaticStateCollection.Name)]
 public sealed class EntityComponentTests
 {
+    [Theory]
+    [InlineData(false, false, false, false)]
+    [InlineData(true, false, false, false)]
+    [InlineData(true, true, false, false)]
+    [InlineData(true, true, true, false)]
+    [InlineData(true, true, false, true)]
+    [InlineData(true, true, true, true)]
+    public async Task SavedChart_FilterResolvesCurrentPermittedProperties(bool external, bool hidden, bool staleId, bool replaceEntity)
+    {
+        using var context = CreateTestContext(true);
+        RgfBlazorConfiguration.RegisterEntityComponent<AggregateEntityHost>(string.Empty);
+        var api = (PendingRgfApiService)context.Services.GetRequiredService<IRgfApiService>();
+        api.FilterXml = "<columns><column alias=\"Order\" rgclass=\"rg-text\" /></columns>";
+        var properties = new List<RgfProperty> { new() { Id = 20, Alias = "Order", ColTitle = "Order Data [Order]",
+            ColPos = hidden ? 0 : 1, ListType = PropertyListType.String, FormType = PropertyFormType.TextBox,
+            Options = external ? new() { ["RGO_AutoExternal"] = "Order/20" } : [] } };
+        if (!replaceEntity) api.GridProperties = properties;
+        var entity = CreateEntityParameters(RfgDisplayMode.Grid);
+        entity.ChartParameters.SupportsWorkspace = true;
+        var cut = RenderWorkspace(context, entity, standardChart: true);
+        var manager = entity.Manager!;
+        var filter = await manager.GetFilterHandlerAsync();
+        Assert.Equal(!replaceEntity && !hidden ? 1 : 0, filter.RgfFilterProperties.Length);
+        // Simulate metadata arriving after Filter initialization, through a real Grid refresh.
+        api.GridProperties = properties;
+        if (replaceEntity) await cut.InvokeAsync(() => manager.ListHandler.RefreshDataAsync());
+        await cut.InvokeAsync(() => ChartCommand(entity));
+        var chart = cut.FindComponent<RgfChartComponent>().Instance;
+        chart.ChartSettingList.Add(new()
+        {
+            ChartSettingsId = 7, SettingsName = "External",
+            AggregationSettings = new() { Columns = [new() { Id = 0, Aggregate = "Count" }] },
+            ParentGridSettings = new() { SQLTimeout = 67, Conditions = [new() {
+                Id = staleId ? 999 : 20, Alias = "Order", Param1 = "saved", QueryOperator = RgfFilter.QueryOperator.Equal }] }
+        });
+        await cut.InvokeAsync(async () => Assert.True(await chart.OnSetChartSettingAsync(7, "External")));
+        Assert.Equal(staleId ? 999 : 20, Assert.Single(chart.ChartSettings.ParentGridSettings!.Conditions!).Id);
+        await cut.InvokeAsync(() => SelectMode(entity, RfgDisplayMode.Grid));
+        Assert.Equal(20, Assert.Single(filter.RgfFilterProperties).Id);
+        Assert.Equal(20, Assert.Single(filter.Conditions).Id);
+        Assert.Equal("Order", Assert.Single(filter.Conditions).Alias);
+        Assert.Equal("saved", Assert.Single(filter.Conditions).Param1?.ToString());
+        Assert.Equal(20, Assert.Single(manager.ListHandler.GetGridSettings().Conditions!).Id);
+        var aggregate = manager.ListHandler.CreateAggregateRequest(chart.ChartSettings.AggregationSettings);
+        Assert.Equal(67, aggregate.ListParam.SQLTimeout);
+        Assert.Equal(20, Assert.Single(aggregate.ListParam.UserFilter).Id);
+        using var editor = RenderFilterEditor(context, entity);
+        await OpenFilter(editor, entity);
+        var component = editor.FindComponent<RgfFilterComponent>().Instance;
+        Assert.False(component.HasUnresolvedConditions);
+        Assert.Contains("Order Data [Order]", editor.Markup);
+        component.Condition!.Conditions[0].Param1 = "cancelled";
+        Assert.Equal("saved", Assert.Single(manager.ListHandler.GetGridSettings().Conditions!).Param1?.ToString());
+        await editor.InvokeAsync(() => component.OnCancel());
+        Assert.Equal("saved", Assert.Single(filter.Conditions).Param1?.ToString());
+        await OpenFilter(editor, entity);
+        component.Condition!.Conditions[0].Param1 = "edited";
+        component.FilterSettings.SettingsName = "Saved external Filter";
+        await editor.InvokeAsync(component.OnSavePredefinedFilter);
+        Assert.Equal("edited", Assert.Single(Assert.Single(api.SavedFilters).Conditions).Param1?.ToString());
+        await editor.Find("button.btn-primary").ClickAsync(new());
+        Assert.Equal("edited", Assert.Single(filter.Conditions).Param1?.ToString());
+        Assert.Equal("edited", Assert.Single(api.GridRequests[^1].ListParam.UserFilter).Param1?.ToString());
+        Assert.Equal(67, api.GridRequests[^1].ListParam.SQLTimeout);
+        aggregate = manager.ListHandler.CreateAggregateRequest(chart.ChartSettings.AggregationSettings);
+        Assert.Equal("edited", Assert.Single(aggregate.ListParam.UserFilter).Param1?.ToString());
+        Assert.Equal(67, aggregate.ListParam.SQLTimeout);
+        await cut.InvokeAsync(async () => Assert.True(await chart.CreateChartDataAsyc()));
+        Assert.Equal("edited", Assert.Single(api.ChartRequests[^1].ParentGridRequest.ListParam.UserFilter).Param1?.ToString());
+        Assert.Equal(67, api.ChartRequests[^1].ParentGridRequest.ListParam.SQLTimeout);
+        Assert.Equal(1, api.FilterRequests);
+    }
+
+    private static IRenderedComponent<Recrovit.RecroGridFramework.Client.Blazor.UI.Components.FilterComponent> RenderFilterEditor(BunitContext context, RgfEntityParameters entity)
+    {
+        entity.DialogTemplate = p => b => { b.AddContent(0, p.Content); b.AddContent(1, p.FooterTemplate); };
+        return context.Render<Recrovit.RecroGridFramework.Client.Blazor.UI.Components.FilterComponent>(p => p.Add(c => c.EntityParameters, entity));
+    }
+
+    private static Task OpenFilter(IRenderedComponent<Recrovit.RecroGridFramework.Client.Blazor.UI.Components.FilterComponent> editor, RgfEntityParameters entity)
+        => editor.InvokeAsync(() => entity.ToolbarParameters.EventDispatcher.DispatchEventAsync(RgfToolbarEventKind.ShowFilter,
+            new RgfEventArgs<RgfToolbarEventArgs>(entity, new(RgfToolbarEventKind.ShowFilter))));
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task FilterEditor_NestedAndQuickConditionsSurviveCancelAndMetadataMutation(bool closeDialog)
+    {
+        using var context = CreateTestContext(true);
+        var api = (PendingRgfApiService)context.Services.GetRequiredService<IRgfApiService>();
+        api.FilterXml = "<columns><column alias=\"Order\" rgclass=\"rg-text\" /><column alias=\"Quick\" rgclass=\"rg-text\" /><column alias=\"Unused\" rgclass=\"rg-text\" /></columns>";
+        var order = new RgfProperty { Id = 20, Alias = "Order", ColPos = 0, ColTitle = "Order Data [Order]", ListType = PropertyListType.String,
+            Options = new() { ["RGO_AutoExternal"] = "Order/20" } };
+        var quick = new RgfProperty { Id = 21, Alias = "Quick", ColPos = 1, ColTitle = "Quick", ListType = PropertyListType.String };
+        api.GridProperties = [order, quick, new() { Id = 22, Alias = "Unused", ColPos = 0, Options = new() { ["RGO_AutoExternal"] = "Order/22" } }];
+        var entity = CreateEntityParameters(RfgDisplayMode.Grid);
+        using var grid = RenderWorkspace(context, entity);
+        var manager = entity.Manager!;
+        var filter = await manager.GetFilterHandlerAsync();
+        Assert.Single(filter.RgfFilterProperties);
+        filter.ApplyFilterState([new() { LogicalOperator = RgfFilter.LogicalOperator.And, Conditions = [new() {
+            Id = 999, Alias = "Order", QueryOperator = RgfFilter.QueryOperator.IntervalE,
+            LogicalOperator = RgfFilter.LogicalOperator.Or, Param1 = "a", Param2 = "z" }] }], 71);
+        await grid.InvokeAsync(() => filter.SetQuickFilterAsync(quick, "quick"));
+        Assert.Equal(2, filter.RgfFilterProperties.Length);
+        Assert.DoesNotContain(filter.RgfFilterProperties, p => p.Id == 22);
+        var snapshot = JsonSerializer.Serialize(filter.Conditions);
+        using var editor = RenderFilterEditor(context, entity);
+        await OpenFilter(editor, entity);
+        var component = editor.FindComponent<RgfFilterComponent>().Instance;
+        Assert.False(component.HasUnresolvedConditions);
+        component.Condition!.Conditions[0].Conditions.Clear();
+        if (closeDialog)
+            await editor.InvokeAsync(() => entity.FilterParameters.DialogParameters.EventDispatcher.RaiseEventAsync(RgfDialogEventKind.Close, this));
+        else
+            await editor.InvokeAsync(() => component.OnCancel());
+        Assert.Equal(snapshot, JsonSerializer.Serialize(filter.Conditions));
+        Assert.Contains(filter.Conditions, c => c.IsQuickFilter);
+        Assert.Equal(snapshot, JsonSerializer.Serialize(manager.ListHandler.GetGridSettings().Conditions));
+        await editor.InvokeAsync(() => filter.SetQuickFilterAsync(quick, "updated"));
+        Assert.Equal("updated", Assert.Single(filter.Conditions, c => c.IsQuickFilter).Conditions.Single().Param1);
+        Assert.Equal("a", filter.Conditions[0].Conditions[0].Conditions[0].Param1);
+        // In-place changes also invalidate resolution; restoring metadata preserves the condition.
+        manager.EntityDesc.Properties.Remove(order);
+        Assert.DoesNotContain(filter.RgfFilterProperties, p => p.Id == 20);
+        await OpenFilter(editor, entity);
+        Assert.True(component.HasUnresolvedConditions);
+        manager.EntityDesc.Properties.Add(order);
+        Assert.False(component.HasUnresolvedConditions);
+        await editor.Find("div[tabindex='-1']").KeyUpAsync(new Microsoft.AspNetCore.Components.Web.KeyboardEventArgs { Key = "Enter" });
+        var request = manager.ListHandler.CreateAggregateRequest(new());
+        Assert.Equal(71, request.ListParam.SQLTimeout);
+        Assert.Equal(JsonSerializer.Serialize(filter.Conditions), JsonSerializer.Serialize(request.ListParam.UserFilter));
+        Assert.Equal(1, api.FilterRequests);
+    }
+
+    [Theory]
+    [InlineData("missing")]
+    [InlineData("denied")]
+    [InlineData("conflict")]
+    [InlineData("duplicate")]
+    [InlineData("no-alias")]
+    [InlineData("not-filterable")]
+    public async Task FilterEditor_UnresolvedConditionsCannotApplyOrSaveAndCancelPreservesSharedState(string variant)
+    {
+        using var context = CreateTestContext(true);
+        var api = (PendingRgfApiService)context.Services.GetRequiredService<IRgfApiService>();
+        api.FilterXml = "<columns><column alias=\"Order\" rgclass=\"rg-text\" /><column alias=\"Other\" rgclass=\"rg-text\" /></columns>";
+        if (variant == "not-filterable") api.FilterXml = "<columns><column alias=\"Order\" rgclass=\"unsupported\" /></columns>";
+        api.GridProperties = [new() { Id = 20, Alias = "Order", ColPos = 1, ColTitle = "Order" }, new() { Id = 21, Alias = "Other", ColPos = 1, ColTitle = "Other" }];
+        if (variant == "duplicate") api.GridProperties.Add(new() { Id = 22, Alias = "Order", ColPos = 1 });
+        if (variant == "denied") api.GridProperties.Add(new() { Id = 23, Alias = "Denied", ColPos = 1 });
+        var entity = CreateEntityParameters(RfgDisplayMode.Grid);
+        using var grid = RenderWorkspace(context, entity);
+        var manager = entity.Manager!;
+        var filter = await manager.GetFilterHandlerAsync();
+        var condition = new RgfFilter.Condition {
+            Id = variant == "conflict" ? 21 : variant == "denied" ? 23 : 999,
+            Alias = variant == "missing" ? "Missing" : variant == "no-alias" ? "" : variant == "denied" ? "Denied" : "Order",
+            Param1 = "original", QueryOperator = RgfFilter.QueryOperator.Equal };
+        filter.ApplyFilterState([condition], 67);
+        var snapshot = JsonSerializer.Serialize(filter.Conditions);
+        using var editor = RenderFilterEditor(context, entity);
+        await OpenFilter(editor, entity);
+        var component = editor.FindComponent<RgfFilterComponent>().Instance;
+        Assert.True(component.HasUnresolvedConditions);
+        Assert.Contains("Filter property unavailable", editor.Find("[role=alert]").TextContent);
+        Assert.True(editor.Find("button.btn-primary").HasAttribute("disabled"));
+        component.FilterSettings.SettingsName = "Cannot save";
+        editor.Render();
+        Assert.True(editor.Find(".bi-floppy").ParentElement!.HasAttribute("disabled"));
+        var requests = api.GridRequests.Count;
+        await editor.InvokeAsync(() => component.OnOk());
+        await editor.InvokeAsync(component.OnSavePredefinedFilter);
+        await editor.Find("div[tabindex='-1']").KeyUpAsync(new Microsoft.AspNetCore.Components.Web.KeyboardEventArgs { Key = "Enter" });
+        Assert.Equal(requests, api.GridRequests.Count);
+        Assert.Empty(api.SavedFilters);
+        Assert.Equal(snapshot, JsonSerializer.Serialize(filter.Conditions));
+        Assert.Equal(snapshot, JsonSerializer.Serialize(manager.ListHandler.GetGridSettings().Conditions));
+        await editor.InvokeAsync(() => component.OnCancel());
+        Assert.Equal(snapshot, JsonSerializer.Serialize(filter.Conditions));
+        Assert.Equal(snapshot, JsonSerializer.Serialize(manager.ListHandler.CreateAggregateRequest(new()).ListParam.UserFilter));
+    }
+
     [Fact]
     public async Task RecrobyLoadsTheCompleteFilterAndKeepsItsResetState()
     {
@@ -1583,6 +1767,9 @@ public sealed class EntityComponentTests
 
     private sealed class PendingRgfApiService(bool complete) : IRgfApiService
     {
+        public string FilterXml { get; set; } = "<columns />";
+        public int FilterRequests { get; private set; }
+        public List<RgfFilterSettings> SavedFilters { get; } = [];
         public Func<RgfAiRequest, Task<RgfAiResponse>>? RecrobyResponse { get; set; }
         public List<RgfProperty> GridProperties { get; set; } = [];
         public string? DisplayModeOption { get; set; }
@@ -1685,14 +1872,22 @@ public sealed class EntityComponentTests
 
         public Task<IRgfApiResponse<ResultType>> PostAsync<ResultType>(IRgfApiRequest request) where ResultType : class
         {
+            if (typeof(ResultType) == typeof(RgfResult<RgfFilterSetting>))
+            {
+                var gridRequest = JsonSerializer.Deserialize<RgfGridRequest>(request.Content.ReadAsStringAsync().GetAwaiter().GetResult(), new JsonSerializerOptions { PropertyNameCaseInsensitive = true })!;
+                SavedFilters.Add(gridRequest.FilterSettings!);
+                return Task.FromResult<IRgfApiResponse<ResultType>>(new ApiResponse<ResultType> { Success = true,
+                    Result = (ResultType)(object)new RgfResult<RgfFilterSetting> { Success = true, Result = new() { FilterSettingsId = 77 } } });
+            }
             if (typeof(ResultType) == typeof(RgfResult<RgfFilterResult>))
             {
+                FilterRequests++;
                 return Task.FromResult<IRgfApiResponse<ResultType>>(new ApiResponse<ResultType>
                 {
                     Success = true,
                     Result = (ResultType)(object)new RgfResult<RgfFilterResult>
                     {
-                        Success = true, Messages = new(), Result = new() { XmlFilter = "<columns />", FilterSettings = [] }
+                        Success = true, Messages = new(), Result = new() { XmlFilter = FilterXml, FilterSettings = [] }
                     }
                 });
             }

@@ -239,7 +239,7 @@ public class RgManager : IRgManager
             if (_filterHandler is not null) return _filterHandler;
             ObjectDisposedException.ThrowIf(ListHandler is null, this);
             string condition = EntityDesc.Options.GetStringValue("RGO_FilterParams");
-            _filterHandler = new RgFilterHandler(this, EntityDesc, xmlFilter, condition, filterSettings);
+            _filterHandler = new RgFilterHandler(this, xmlFilter, condition, filterSettings);
             ListHandler.InitFilter(_filterHandler.StoreFilter());
         }
         return _filterHandler!;

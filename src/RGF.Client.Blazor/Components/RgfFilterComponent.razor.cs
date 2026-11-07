@@ -122,6 +122,20 @@ public partial class RgfFilterComponent : ComponentBase, IDisposable
 
     public RgfFilterProperty[] RgfFilterProperties => FilterHandler.RgfFilterProperties;
 
+    /// <summary>Resolves an editor condition only when its current ID and alias agree.</summary>
+    public RgfFilterProperty? GetConditionProperty(RgfFilter.Condition condition)
+    {
+        var matches = RgfFilterProperties.Where(p => p.Id == condition.Id &&
+            (string.IsNullOrWhiteSpace(condition.Alias) || string.Equals(p.Alias, condition.Alias, StringComparison.OrdinalIgnoreCase))).ToArray();
+        return matches.Length == 1 ? matches[0] : null;
+    }
+
+    /// <summary>Indicates that the editor contains conditions unavailable in the current Filter metadata.</summary>
+    public bool HasUnresolvedConditions => Condition is not null && HasUnresolved(Condition.Conditions ?? []);
+
+    private bool HasUnresolved(IEnumerable<RgfFilter.Condition> conditions) => conditions.Any(c =>
+        c.Conditions is not null ? HasUnresolved(c.Conditions) : GetConditionProperty(c) is null);
+
     public IReadOnlyDictionary<string, string> VisibleRoles => new[] { new KeyValuePair<string, string>("", "") }.Concat(_recroSec.Roles).ToDictionary(kv => kv.Key, kv => kv.Value);
 
     public void AddCondition(RgfFilter.Condition condition) { FilterHandler.AddCondition(_logger, condition.ClientId); IsFilterActive = true; }
@@ -171,6 +185,9 @@ public partial class RgfFilterComponent : ComponentBase, IDisposable
     {
         _logger.LogDebug("OnShowFilter | EntityName:{EntityName}", EntityParameters.EntityName);
         FilterHandler = await Manager.GetFilterHandlerAsync();
+        // Capture the current shared filter, then detach the editable objects from applied requests.
+        FilterHandler.StoreFilter();
+        FilterHandler.ResetFilter();
         Condition = new RgfFilter.Condition() { Conditions = FilterHandler.Conditions };
         IsFilterActive = Manager.IsFiltered || !FilterHandler.Conditions.Any();
         Open();
@@ -196,7 +213,7 @@ public partial class RgfFilterComponent : ComponentBase, IDisposable
         StateHasChanged();
     }
 
-    private Task OnDialogCloseAsync(IRgfEventArgs<RgfDialogEventArgs> args) => CloseDialogAsync();
+    private Task OnDialogCloseAsync(IRgfEventArgs<RgfDialogEventArgs> args) => OnCancel();
 
     private async Task CloseDialogAsync()
     {
@@ -217,6 +234,7 @@ public partial class RgfFilterComponent : ComponentBase, IDisposable
 
     public virtual async Task OnOk(MouseEventArgs? args = null)
     {
+        if (HasUnresolvedConditions) return;
         _logger.LogDebug("OnOk | EntityName:{EntityName}", EntityParameters.EntityName);
         await CloseDialogAsync();
         var conditions = IsFilterActive ? FilterHandler.StoreFilter() : [];
@@ -265,6 +283,7 @@ public partial class RgfFilterComponent : ComponentBase, IDisposable
 
     public virtual async Task OnSavePredefinedFilter()
     {
+        if (HasUnresolvedConditions) return;
         if (IsSavingAsNewFilter)
         {
             FilterSettings = RgfFilterSettings.DeepCopy(FilterSettings);

@@ -49,10 +49,9 @@ public interface IRgFilterHandler
 
 internal class RgFilterHandler : IRgFilterHandler
 {
-    public RgFilterHandler(IRgManager manager, RgfEntity entity, string? xmlfilter = null, string? jsonConditions = null, List<RgfFilterSettings>? predefinedFilters = null)
+    public RgFilterHandler(IRgManager manager, string? xmlfilter = null, string? jsonConditions = null, List<RgfFilterSettings>? predefinedFilters = null)
     {
         _manager = manager;
-        _entity = entity;
         if (string.IsNullOrEmpty(xmlfilter) || !RgfFilter.Deserialize(xmlfilter, out _filter))
         {
             _filter = new RgfFilter();
@@ -61,10 +60,14 @@ internal class RgFilterHandler : IRgFilterHandler
         PredefinedFilters = predefinedFilters ?? new List<RgfFilterSettings>();
     }
 
-    private readonly RgfEntity _entity;
     private RgfFilter _filter;
-    private IEnumerable<RgfFilterProperty>? _rgfFilterProperties = null;
-    private string _jsonConditions = string.Empty;
+    private RgfFilterProperty[] _rgfFilterProperties = [];
+    private RgfEntity? _propertiesEntity;
+    private PropertyState[] _propertyState = [];
+    private (int Id, string Alias)[] _conditionState = [];
+    private sealed record PropertyState(RgfProperty Property, int Id, string Alias, string Title, int ColPos, bool External);
+    private List<RgfFilter.Condition> _storedConditions = [];
+    private List<RgfFilter.Condition> _storedQuickConditions = [];
     private readonly IRgManager _manager;
     private List<RgfFilter.Condition> _conditions = [];
     private List<RgfFilter.Condition> _conditionsQuickFilter = [];
@@ -74,13 +77,7 @@ internal class RgFilterHandler : IRgFilterHandler
     {
         get
         {
-            if (_rgfFilterProperties == null)
-            {
-                _rgfFilterProperties = _entity.Properties
-                    .Where(e => e.ColPos > 0 || true != e.Options?.ContainsKey("RGO_AutoExternal") || IsColumnFilteredRecursive(_conditions, e))
-                    .Join(_filter.Columns, prop => prop.Alias, col => col.Alias, (prop, col) => new RgfFilterProperty(prop, col), StringComparer.OrdinalIgnoreCase)
-                    .OrderBy(e => e.ColTitle);
-            }
+            EnsureFilterProperties();
             return [.. _rgfFilterProperties];
         }
     }
@@ -105,7 +102,8 @@ internal class RgFilterHandler : IRgFilterHandler
         {
             _conditions = value;
             _conditionsQuickFilter = [];
-            NormalizeConditionProperties(_conditions);
+            _propertiesEntity = null;
+            EnsureFilterProperties();
             _maxConditionId = InitClientId(new RgfFilter.Condition() { Conditions = _conditions }, 0);
         }
     }
@@ -171,18 +169,26 @@ internal class RgFilterHandler : IRgFilterHandler
 
     public void ApplyFilterState(IEnumerable<RgfFilter.Condition>? conditions, int? sqlTimeout)
     {
-        Conditions = conditions?.ToList() ?? [];
-        _manager.ListHandler.ApplyFilterState([.. Conditions], sqlTimeout);
+        Conditions = CloneConditions(conditions ?? []);
+        _manager.ListHandler.ApplyFilterState(StoreFilter(), sqlTimeout);
     }
 
-    public bool ResetFilter() => InitFilter(_jsonConditions);
+    public bool ResetFilter()
+    {
+        Conditions = CloneConditions(_storedConditions);
+        _conditionsQuickFilter = CloneConditions(_storedQuickConditions);
+        _propertiesEntity = null;
+        EnsureFilterProperties();
+        _maxConditionId = InitClientId(new() { Conditions = Conditions }, 0);
+        return true;
+    }
 
     public bool InitFilter(string? jsonConditions)
     {
         if (string.IsNullOrEmpty(jsonConditions))
         {
-            _jsonConditions = string.Empty;
             Conditions = [];
+            StoreFilter();
             return true;
         }
         try
@@ -190,8 +196,8 @@ internal class RgFilterHandler : IRgFilterHandler
             var conds = JsonSerializer.Deserialize<List<RgfFilter.Condition>>(jsonConditions, new JsonSerializerOptions() { PropertyNameCaseInsensitive = true });
             if (conds != null)
             {
-                _jsonConditions = jsonConditions;
                 Conditions = conds;
+                StoreFilter();
                 return true;
             }
         }
@@ -201,9 +207,26 @@ internal class RgFilterHandler : IRgFilterHandler
 
     public RgfFilter.Condition[] StoreFilter()
     {
-        _jsonConditions = JsonSerializer.Serialize(Conditions, new JsonSerializerOptions() { PropertyNameCaseInsensitive = true });
-        return Conditions.ToArray();
+        _storedConditions = CloneConditions(_conditions);
+        _storedQuickConditions = CloneConditions(_conditionsQuickFilter);
+        return CloneConditions(Conditions).ToArray();
     }
+
+    private static List<RgfFilter.Condition> CloneConditions(IEnumerable<RgfFilter.Condition> conditions)
+        => conditions.Select(condition => new RgfFilter.Condition
+        {
+            Id = condition.Id, Alias = condition.Alias, ClientId = condition.ClientId,
+            LogicalOperator = condition.LogicalOperator, QueryOperator = condition.QueryOperator,
+            Param1 = CloneValue(condition.Param1), Param2 = CloneValue(condition.Param2), IsQuickFilter = condition.IsQuickFilter,
+            Conditions = condition.Conditions is null ? null! : CloneConditions(condition.Conditions)
+        }).ToList();
+
+    private static object? CloneValue(object? value) => value switch
+    {
+        Array array => array.Clone(),
+        JsonElement element => element.Clone(),
+        _ => value
+    };
 
     private int InitClientId(RgfFilter.Condition condition, int prevId)
     {
@@ -489,29 +512,44 @@ internal class RgFilterHandler : IRgFilterHandler
     }
     #endregion
 
-    private void NormalizeConditionProperties(IEnumerable<RgfFilter.Condition> conditions)
+    // RGF-DOC: rgf.client.blazor.filtering
+    private void EnsureFilterProperties()
+    {
+        var entity = _manager.EntityDesc;
+        var state = entity.Properties.Select(p => new PropertyState(p, p.Id, p.Alias, p.ColTitle, p.ColPos,
+            p.Options?.ContainsKey("RGO_AutoExternal") == true)).ToArray();
+        var conditions = Leaves(Conditions).ToArray();
+        var conditionState = conditions.Select(c => (c.Id, c.Alias)).ToArray();
+        if (ReferenceEquals(entity, _propertiesEntity) && state.SequenceEqual(_propertyState) && conditionState.SequenceEqual(_conditionState)) return;
+
+        var allowed = entity.Properties
+            .Join(_filter.Columns ?? [], p => p.Alias, c => c.Alias, (p, c) => new RgfFilterProperty(p, c), StringComparer.OrdinalIgnoreCase)
+            .Where(p => p.Operators.Length > 0).ToArray();
+        NormalizeConditionProperties(conditions, entity, allowed);
+        _rgfFilterProperties = allowed.Where(p => p.ColPos > 0 || p.Options?.ContainsKey("RGO_AutoExternal") != true ||
+            conditions.Any(c => c.Id == p.Id && (string.IsNullOrWhiteSpace(c.Alias) || string.Equals(c.Alias, p.Alias, StringComparison.OrdinalIgnoreCase))))
+            .OrderBy(p => p.ColTitle).ToArray();
+        _propertiesEntity = entity;
+        _propertyState = state;
+        _conditionState = conditions.Select(c => (c.Id, c.Alias)).ToArray();
+    }
+
+    private static void NormalizeConditionProperties(IEnumerable<RgfFilter.Condition> conditions, RgfEntity entity, RgfFilterProperty[] allowed)
     {
         foreach (var condition in conditions)
         {
-            if (condition.Conditions?.Any() == true)
+            var byId = entity.Properties.Where(p => p.Id == condition.Id).ToArray();
+            // A current ID must agree with its alias; never redirect a conflicting or forbidden ID.
+            if (byId.Length == 0 && !string.IsNullOrWhiteSpace(condition.Alias))
             {
-                NormalizeConditionProperties(condition.Conditions);
-                continue;
-            }
-
-            var property = condition.Id > 0
-                ? RgfFilterProperties.FirstOrDefault(e => e.Id == condition.Id)
-                : !string.IsNullOrWhiteSpace(condition.Alias)
-                    ? RgfFilterProperties.FirstOrDefault(e => e.Alias.Equals(condition.Alias, StringComparison.OrdinalIgnoreCase))
-                    : null;
-
-            if (property != null)
-            {
-                condition.Id = property.Id;
-                condition.Alias = property.Alias;
+                var byAlias = allowed.Where(p => string.Equals(p.Alias, condition.Alias, StringComparison.OrdinalIgnoreCase)).ToArray();
+                if (byAlias.Length == 1) condition.Id = byAlias[0].Id;
             }
         }
     }
+
+    private static IEnumerable<RgfFilter.Condition> Leaves(IEnumerable<RgfFilter.Condition> conditions)
+        => conditions.SelectMany(c => c.Conditions is null ? [c] : Leaves(c.Conditions));
 }
 
 public class RgfFilterProperty : IRgfProperty

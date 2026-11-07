@@ -31,7 +31,7 @@
                 </div>
                 <div class="px-1">
                     <RgfButton IconName="bi-floppy" CssClass="btn-success" Tooltip="@RecroDict.GetRgfUiString("SaveFilterSettings")"
-                               Disabled="RgfFilterComp.FilterSettings.IsReadonly == true && !RgfFilterComp.IsSavingAsNewFilter || string.IsNullOrEmpty(RgfFilterComp.FilterSettings.SettingsName) || !RgfFilterComp.IsPublicFilterSettingAllowed && RgfFilterComp.FilterSettings.RoleId != null && !RgfFilterComp.IsSavingAsNewFilter"
+                               Disabled="RgfFilterComp.HasUnresolvedConditions || RgfFilterComp.FilterSettings.IsReadonly == true && !RgfFilterComp.IsSavingAsNewFilter || string.IsNullOrEmpty(RgfFilterComp.FilterSettings.SettingsName) || !RgfFilterComp.IsPublicFilterSettingAllowed && RgfFilterComp.FilterSettings.RoleId != null && !RgfFilterComp.IsSavingAsNewFilter"
                                OnClick="(arg) => RgfFilterComp.OnSavePredefinedFilter()" />
                     <RgfButton IconName="bi-trash" CssClass="btn-danger" Tooltip="@RecroDict.GetRgfUiString("DeleteSavedSettings")"
                                Disabled="RgfFilterComp.FilterSettings.IsReadonly == true || RgfFilterComp.FilterSettings.FilterSettingsId == null || !RgfFilterComp.IsPublicFilterSettingAllowed && RgfFilterComp.FilterSettings.RoleId != null"
@@ -53,7 +53,7 @@
                     <RgfButton CssClass="btn-secondary" MinWidth="5rem" Label="@RecroDict.GetRgfUiString("Cancel")" OnClick="RgfFilterComp.OnCancel" />
                 </div>
                 <div class="px-1">
-                    <RgfButton CssClass="btn-primary" MinWidth="5rem" Label="OK" OnClick="RgfFilterComp.OnOk" />
+                    <RgfButton CssClass="btn-primary" MinWidth="5rem" Label="OK" Disabled="RgfFilterComp.HasUnresolvedConditions" OnClick="RgfFilterComp.OnOk" />
                 </div>
             </div>
         </div>

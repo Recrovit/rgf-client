@@ -192,7 +192,8 @@ public sealed class RgfFilterGenerationTests
         {
             "get_Conditions" => Conditions,
             "get_PredefinedFilters" => PredefinedFilters,
-            "get_RgfFilterProperties" => Array.Empty<RgfFilterProperty>(),
+            "get_RgfFilterProperties" => new[] { new RgfFilterProperty(new() { Alias = "Name" }, new() { Alias = "Name", RgClass = "rg-text" }) },
+            "StoreFilter" => Conditions.ToArray(),
             "ResetFilter" => true,
             "SaveFilterSettingsAsync" => Save((RgfFilterSettings)args![0]!),
             _ => throw new NotSupportedException(method.Name)
