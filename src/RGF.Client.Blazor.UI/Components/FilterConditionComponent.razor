@@ -132,11 +132,11 @@
                                 }
                             </div>
                         }
-                        @if (new[] { RgfFilter.QueryOperator.Like, RgfFilter.QueryOperator.NotLike }.Contains(item.QueryOperator))
+                        @if (FilterComponent.AllowFilterToLower && item.QueryOperator is (RgfFilter.QueryOperator.Like or RgfFilter.QueryOperator.NotLike))
                         {
-                            <div class="p-1 checkbox-lg">
-                                <RgfCheckBox @bind-Value="item.ToLower" Label="ToLower" />
-                            </div>
+                            <RgfHtml TagName="div" CssClass="p-1 checkbox-lg" Tooltip="@RecroDict.GetRgfUiString("FilterIgnoreCaseTooltip")">
+                                <RgfCheckBox @bind-Value="item.ToLower" Label="@RecroDict.GetRgfUiString("FilterIgnoreCase")" />
+                            </RgfHtml>
                         }
                     }
                 }

@@ -1,11 +1,13 @@
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Forms;
 using Microsoft.AspNetCore.Components.Web;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Recrovit.RecroGridFramework.Abstraction.Contracts.AI;
 using Recrovit.RecroGridFramework.Abstraction.Contracts.Services;
 using Recrovit.RecroGridFramework.Abstraction.Infrastructure.Security;
 using Recrovit.RecroGridFramework.Abstraction.Models;
+using Recrovit.RecroGridFramework.Client.AI;
 using Recrovit.RecroGridFramework.Client.Blazor.Parameters;
 using Recrovit.RecroGridFramework.Client.Events;
 using Recrovit.RecroGridFramework.Client.Handlers;
@@ -24,6 +26,9 @@ public partial class RgfFilterComponent : ComponentBase, IDisposable
     [Inject]
     private IRecroSecService _recroSec { get; set; } = null!;
 
+    [Inject]
+    private IServiceProvider _serviceProvider { get; set; } = null!;
+
     public RgfFilterParameters FilterParameters { get; private set; } = default!;
 
     public RgfFilter.Condition? Condition { get; private set; }
@@ -31,6 +36,9 @@ public partial class RgfFilterComponent : ComponentBase, IDisposable
     public RgfFilterSettings FilterSettings { get; private set; } = new();
 
     // RGF-DOC: rgf.client.blazor.filtering
+    /// <summary>Whether to show the Ignore case checkbox for supported operators.</summary>
+    public bool AllowFilterToLower { get; private set; } = true;
+
     /// <summary>Editable description saved with the filter settings.</summary>
     public string? Remark { get => FilterSettings.Remark; set => FilterSettings.Remark = value ?? ""; }
     public bool IsGeneratingNameDescription => _generation is not null;
@@ -198,6 +206,8 @@ public partial class RgfFilterComponent : ComponentBase, IDisposable
     protected virtual async Task OnShowFilter(IRgfEventArgs<RgfToolbarEventArgs> args)
     {
         _logger.LogDebug("OnShowFilter | EntityName:{EntityName}", EntityParameters.EntityName);
+        var capabilities = _serviceProvider.GetService<RgfRecrobyCapabilityService>();
+        AllowFilterToLower = capabilities is null || await capabilities.GetAllowFilterToLowerAsync();
         if (!ReferenceEquals(_draftManager, Manager))
         {
             _draftManager = Manager;

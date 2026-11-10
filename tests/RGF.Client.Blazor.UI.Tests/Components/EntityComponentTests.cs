@@ -12,6 +12,7 @@ using Recrovit.RecroGridFramework.Abstraction.Infrastructure.Security;
 using Recrovit.RecroGridFramework.Abstraction.Models;
 using Recrovit.RecroGridFramework.Client.Blazor.Components;
 using Recrovit.RecroGridFramework.Client.Blazor.Parameters;
+using Recrovit.RecroGridFramework.Client.Blazor.UI.Components.Base;
 using Recrovit.RecroGridFramework.Client.Blazor.UI.Tests.Testing;
 using Recrovit.RecroGridFramework.Client.Events;
 using Recrovit.RecroGridFramework.Client.Handlers;
@@ -106,6 +107,77 @@ public sealed class EntityComponentTests
     private static Task OpenFilter(IRenderedComponent<Recrovit.RecroGridFramework.Client.Blazor.UI.Components.FilterComponent> editor, RgfEntityParameters entity)
         => editor.InvokeAsync(() => entity.ToolbarParameters.EventDispatcher.DispatchEventAsync(RgfToolbarEventKind.ShowFilter,
             new RgfEventArgs<RgfToolbarEventArgs>(entity, new(RgfToolbarEventKind.ShowFilter))));
+
+    [Theory]
+    [InlineData("{\"recrobyEnabled\":false,\"allowFilterToLower\":false}", false, false, "eng")]
+    [InlineData("{\"recrobyEnabled\":false,\"allowFilterToLower\":true}", true, false, "eng")]
+    [InlineData("{\"recrobyEnabled\":false}", true, false, "hun")]
+    [InlineData(null, true, true, "eng")]
+    public async Task FilterEditor_IgnoreCaseVisibilityPreservesConditionPayloads(string? capabilitiesJson,
+        bool visible, bool recrobyEnabled, string language)
+    {
+        using var context = CreateTestContext(true);
+        context.Services.AddScoped<RgfRecrobyCapabilityService>();
+        var dictionary = new FakeRecroDictService { WarningLanguage = language };
+        context.Services.AddSingleton<IRecroDictService>(dictionary);
+        var api = (PendingRgfApiService)context.Services.GetRequiredService<IRgfApiService>();
+        api.CapabilitiesJson = capabilitiesJson;
+        api.FilterXml = "<columns><column alias=\"Order\" rgclass=\"rg-text\" /></columns>";
+        api.GridProperties = [new() { Id = 20, Alias = "Order", ColTitle = "Order", ColPos = 1, ListType = PropertyListType.String }];
+        var entity = CreateEntityParameters(RfgDisplayMode.Grid);
+        using var grid = RenderWorkspace(context, entity);
+        var filter = await entity.Manager!.GetFilterHandlerAsync();
+        filter.ApplyFilterState([
+            new() { Id = 20, Alias = "Order", QueryOperator = RgfFilter.QueryOperator.Like, Param1 = "ABC", ToLower = true },
+            new() { Conditions = [
+                new() { Id = 20, Alias = "Order", QueryOperator = RgfFilter.QueryOperator.NotLike, Param1 = "DEF",
+                    Param2 = visible ? (object)false : null! },
+                new() { Id = 20, Alias = "Order", QueryOperator = RgfFilter.QueryOperator.Equal, Param1 = "GHI" }
+            ] }
+        ], 67);
+        var snapshot = JsonSerializer.Serialize(filter.Conditions);
+        using var editor = RenderFilterEditor(context, entity);
+        await OpenFilter(editor, entity);
+        var component = editor.FindComponent<RgfFilterComponent>().Instance;
+        var labels = editor.FindAll("ul.ps-4 .checkbox-lg label");
+        Assert.Equal(visible ? 2 : 0, labels.Count);
+        Assert.All(labels, label => Assert.Equal(dictionary.GetRgfUiString("FilterIgnoreCase"), label.TextContent));
+        var checkboxes = editor.FindComponents<RgfCheckBox>()
+            .Where(checkbox => checkbox.Instance.Label == dictionary.GetRgfUiString("FilterIgnoreCase")).ToArray();
+        Assert.Equal(labels.Count, checkboxes.Length);
+        var wrappers = editor.FindAll("ul.ps-4 div.checkbox-lg");
+        Assert.Equal(visible ? 2 : 0, wrappers.Count);
+        var tooltipText = dictionary.GetRgfUiString("FilterIgnoreCaseTooltip");
+        var tooltipWrappers = editor.FindComponents<RgfHtml>()
+            .Where(wrapper => wrapper.Instance.Tooltip == tooltipText).ToArray();
+        Assert.Equal(wrappers.Count, tooltipWrappers.Length);
+        Assert.All(tooltipWrappers, wrapper => Assert.Equal("div", wrapper.Instance.TagName));
+        var tooltipCalls = context.JSInterop.Invocations.Count(invocation =>
+            invocation.Identifier.EndsWith(".Base.tooltip") &&
+            invocation.Arguments.Count > 1 && invocation.Arguments[1] is RgfTooltipOptions options && options.Title == tooltipText);
+        Assert.True(visible ? tooltipCalls >= 2 : tooltipCalls == 0);
+        if (visible)
+        {
+            Assert.True(checkboxes[0].Instance.Value);
+            Assert.False(checkboxes[1].Instance.Value);
+            await wrappers[0].QuerySelector("input")!.ChangeAsync(false);
+            Assert.False(component.Condition!.Conditions[0].ToLower);
+            await wrappers[0].QuerySelector("input")!.ChangeAsync(true);
+            Assert.True(component.Condition.Conditions[0].ToLower);
+        }
+        Assert.Equal(snapshot, JsonSerializer.Serialize(component.Condition!.Conditions));
+        Assert.Equal(1, api.CapabilityRequests);
+
+        component.FilterSettings.SettingsName = "Case-sensitive settings";
+        await editor.InvokeAsync(component.OnSavePredefinedFilter);
+        Assert.Equal(snapshot, JsonSerializer.Serialize(Assert.Single(api.SavedFilters).Conditions));
+        await editor.InvokeAsync(() => component.OnOk());
+        Assert.Equal(snapshot, JsonSerializer.Serialize(api.GridRequests[^1].ListParam.UserFilter));
+        await OpenFilter(editor, entity);
+        Assert.Equal(recrobyEnabled, await context.Services.GetRequiredService<RgfRecrobyCapabilityService>()
+            .GetEnabledAsync(Xunit.TestContext.Current.CancellationToken));
+        Assert.Equal(capabilitiesJson is null ? 3 : 1, api.CapabilityRequests);
+    }
 
     [Theory]
     [InlineData(false)]
@@ -1891,6 +1963,8 @@ public sealed class EntityComponentTests
     {
         public string FilterXml { get; set; } = "<columns />";
         public int FilterRequests { get; private set; }
+        public string? CapabilitiesJson { get; set; }
+        public int CapabilityRequests { get; private set; }
         public List<RgfFilterSettings> SavedFilters { get; } = [];
         public Func<RgfAiRequest, Task<RgfAiResponse>>? RecrobyResponse { get; set; }
         public List<RgfProperty> GridProperties { get; set; } = [];
@@ -1977,6 +2051,14 @@ public sealed class EntityComponentTests
         }
         public Task<IRgfApiResponse<ResultType>> GetAsync<ResultType>(IRgfApiRequest request) where ResultType : class
         {
+            if (typeof(ResultType) == typeof(RgfCapabilitiesResponse))
+            {
+                Assert.Equal("/api/rgf/capabilities", request.Uri);
+                CapabilityRequests++;
+                return Task.FromResult<IRgfApiResponse<ResultType>>(CapabilitiesJson is { } json
+                    ? new ApiResponse<ResultType> { Success = true, Result = JsonSerializer.Deserialize<ResultType>(json, new JsonSerializerOptions(JsonSerializerDefaults.Web))! }
+                    : new ApiResponse<ResultType> { Success = false });
+            }
             if (typeof(ResultType) == typeof(RgfResult<List<RgfChartSettings>>)) return SavedChartResponse<ResultType>();
             object result = typeof(ResultType) == typeof(RgfResult<Dictionary<string, string>>)
                 ? new RgfResult<Dictionary<string, string>> { Success = true, Messages = new(), Result = [] }
@@ -2092,10 +2174,17 @@ public sealed class EntityComponentTests
             if (scope == "RGF.UI.Chart") await ChartReady.Task;
             return await _resources.GetDictionaryAsync(scope, language, authClient);
         }
-        public string GetRgfUiString(string resourceKey) => resourceKey;
-        public string GetRgfUiString(string resourceKey, params object[] args) => resourceKey == "FilterPropertyUnavailable"
-            ? string.Format(WarningLanguage == "hun" ? "A szűrőmező nem érhető el: {0} (Id: {1}). Töröld ezt a feltételt, vagy szakítsd meg a szerkesztést." : "Filter property unavailable: {0} (Id: {1}). Remove this condition or cancel editing.", args)
-            : resourceKey;
+        public string GetRgfUiString(string resourceKey) => (resourceKey, WarningLanguage) switch
+        {
+            ("FilterIgnoreCase", "hun") => "Kis- és nagybetűfüggetlen",
+            ("FilterIgnoreCase", _) => "Ignore case",
+            ("FilterIgnoreCaseTooltip", "hun") => "A szöveges összehasonlításhoz kisbetűs átalakítást használ. Az eredményt az adatbázis beállításai is befolyásolhatják.",
+            ("FilterIgnoreCaseTooltip", _) => "Uses lowercase conversion for text comparison. Results may also depend on database settings.",
+            ("FilterPropertyUnavailable", "hun") => "A szűrőmező nem érhető el: {0} (Id: {1}). Töröld ezt a feltételt, vagy szakítsd meg a szerkesztést.",
+            ("FilterPropertyUnavailable", _) => "Filter property unavailable: {0} (Id: {1}). Remove this condition or cancel editing.",
+            _ => resourceKey
+        };
+        public string GetRgfUiString(string resourceKey, params object[] args) => string.Format(GetRgfUiString(resourceKey), args);
     }
 
     private sealed class FakeRecroSecService(string userLanguage) : IRecroSecService

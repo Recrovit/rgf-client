@@ -3,10 +3,15 @@
 namespace Recrovit.RecroGridFramework.Abstraction.Contracts.AI;
 
 // RGF-DOC: rgf.client.recroby.integration
+// RGF-DOC: rgf.core.initialization
 
 /// <summary>The state of RGF features enabled by the backend.</summary>
 /// <param name="RecrobyEnabled">Backend feature enablement; required in JSON so a missing field is not interpreted as disabled.</param>
-public sealed record RgfCapabilitiesResponse([property: System.Text.Json.Serialization.JsonRequired] bool RecrobyEnabled);
+public sealed record RgfCapabilitiesResponse([property: System.Text.Json.Serialization.JsonRequired] bool RecrobyEnabled)
+{
+    /// <summary>Whether the Filter editor shows the Ignore case checkbox. Defaults to true when omitted.</summary>
+    public bool AllowFilterToLower { get; init; } = true;
+}
 
 /// <summary>Stable error codes for the shared AI protocol.</summary>
 public static class RgfAiErrorCodes

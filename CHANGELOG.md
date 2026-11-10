@@ -28,6 +28,10 @@ This file contains the consolidated release history for the `rgf-client` solutio
 - Added UI-independent AI conversation state with read-only presentation history, conversation continuation and model selection. Programmatic requests can be created without adding displayed chat messages; backend history remains authoritative.
 - Added independent AI conversation sessions with turn lifecycle, cancellation and configurable transports. Grid hosts can adapt existing CustomFunctions and final progress responses without taking ownership of progress connections.
 
+### Other Changes
+
+- The Blazor Filter editor uses a localized Ignore case checkbox and tooltip for Like and NotLike. The backend can hide the checkbox while preserving existing filter values.
+
 ### Bugs Fixed
 
 - Fixed saved Chart filters failing to display permitted external properties after Entity metadata changes or property ID changes. Unavailable conditions now remain visible and block applying or saving; cancelling preserves the shared Filter and QuickFilter state.
