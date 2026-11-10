@@ -69,8 +69,10 @@ internal sealed class FakeDashboardRecroDictService : IRecroDictService
 
     public Task InitializeAsync(string language = null!) => Task.CompletedTask;
 
+    public ConcurrentDictionary<string, string> RecrobyUi { get; } = new();
+
     public Task<ConcurrentDictionary<string, string>> GetDictionaryAsync(string scope, string language = null!, bool authClient = true)
-        => Task.FromResult(CreateScopeDictionary(scope));
+        => Task.FromResult(scope == "RGF.Recroby.UI" ? RecrobyUi : CreateScopeDictionary(scope));
 
     public string GetRgfUiString(string resourceKey)
         => resourceKey;

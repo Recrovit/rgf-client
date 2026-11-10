@@ -14,7 +14,7 @@ This file contains the consolidated release history for the `rgf-client` solutio
 
 - Grid-linked Recroby conversations now send the current applied filter and sort snapshot with each turn, independently per Grid and conversation; temporarily unavailable Grids preserve their chats.
 
-- Open or resume Recroby from each Grid toolbar, with multiple independent chats per Grid and context-only inheritance for new chats. Opening Recroby focuses the active conversation's message input. The active Grid's button and the Recroby header highlight a live connection. Closed Grids retain their labels, and another Grid's toolbar can reconnect the selected idle chat with its history and settings intact. Recroby starts right-docked and collapsed when no saved layout exists.
+- Connect the active Recroby chat to a Grid from its toolbar, with multiple independent chats per Grid and context-only inheritance for new chats. Opening Recroby focuses the active conversation's message input. The active Grid's button and the Recroby header highlight a live connection. Closed Grids retain their labels, and another Grid's toolbar can connect the selected idle chat with its history and settings intact. Recroby starts right-docked and collapsed when no saved layout exists.
 
 - Added a reusable secure Markdown viewer with an original-text toggle and per-conversation Recroby response formats. New Recroby conversations default to Minimal; server-marked Markdown replies support independent view switching without generating another response. Every assistant reply offers one-click copying of its unchanged original text, with Copy above the optional view toggle and accessible success/failure feedback.
 

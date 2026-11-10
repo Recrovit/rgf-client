@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.JSInterop;
 using Recrovit.RecroGridFramework.Abstraction.Contracts.AI;
 using Recrovit.RecroGridFramework.Abstraction.Contracts.Services;
+using Recrovit.RecroGridFramework.Abstraction.Infrastructure.Events;
 using Recrovit.RecroGridFramework.Abstraction.Models;
 using Recrovit.RecroGridFramework.Client.AI;
 using Recrovit.RecroGridFramework.Client.AI.Transport;
@@ -83,6 +84,12 @@ public partial class RgfRecrobyWorkspace : IAsyncDisposable
     internal RgfRecrobyGridContext? ActiveGridContext => _disposed ? null : _active?.GridContext;
     internal event Action? ActiveGridContextChanged;
     private bool _gridReconnectBlocked;
+    private bool _gridOwnerUnsupported;
+    private IReadOnlyDictionary<string, string>? _recrobyUi;
+    private IRecroSecService? _recroSec;
+    private int _dictionaryLoadVersion;
+    private string GridMessage(string key, string fallback) =>
+        _recrobyUi?.TryGetValue(key, out var value) == true && !string.IsNullOrWhiteSpace(value) ? value : fallback;
     private Conversation? _editing;
     private string _editTitle = string.Empty;
     private bool _focusTitleEditor;
@@ -211,6 +218,7 @@ public partial class RgfRecrobyWorkspace : IAsyncDisposable
     private void NotifyActiveConversationChanged()
     {
         _gridReconnectBlocked = false;
+        _gridOwnerUnsupported = false;
         if (!_disposed) ActiveGridContextChanged?.Invoke();
     }
 
@@ -293,6 +301,7 @@ public partial class RgfRecrobyWorkspace : IAsyncDisposable
     private async Task DisposeCoreAsync()
     {
         _disposed = true;
+        _recroSec?.LanguageChangedEvent?.Unsubscribe(OnLanguageChangedAsync);
         _workspaceRegistration?.Dispose();
         foreach (var context in _gridContexts) context.Changed -= GridContextChanged;
         _gridContexts.Clear();
@@ -335,40 +344,64 @@ public partial class RgfRecrobyWorkspace : IAsyncDisposable
             }, OpenExternalConversation, CloseOwnerAsync, OpenGridConversation);
     }
 
+    protected override Task OnInitializedAsync()
+    {
+        _recroSec = Services.GetService<IRecroSecService>();
+        _recroSec?.LanguageChangedEvent?.Subscribe(OnLanguageChangedAsync);
+        return LoadRecrobyUiAsync(_recroSec?.UserLanguage);
+    }
+
+    private Task OnLanguageChangedAsync(DataEventArgs<string> args) =>
+        InvokeAsync(() => LoadRecrobyUiAsync(args.Value));
+
+    private async Task LoadRecrobyUiAsync(string? language)
+    {
+        if (_disposed || Services.GetService<IRecroDictService>() is not { } recroDict) return;
+        var version = ++_dictionaryLoadVersion;
+        try
+        {
+            var dictionary = await recroDict.GetDictionaryAsync("RGF.Recroby.UI", language!, authClient: false);
+            if (_disposed || version != _dictionaryLoadVersion) return;
+            _recrobyUi = dictionary;
+        }
+        catch (Exception error)
+        {
+            if (_disposed || version != _dictionaryLoadVersion) return;
+            _recrobyUi = null;
+            LogGridError(error, "The Recroby UI dictionary could not be loaded.");
+        }
+        StateHasChanged();
+    }
+
     private bool OpenGridConversation(RgfRecrobyGridContext context)
     {
-        if (_disposed) return false;
-        if (_active is not { Closing: false } || !ReferenceEquals(_active.GridContext, context))
+        if (_disposed || _active is not { Closing: false } active || context.Manager is null) return false;
+        if (!ReferenceEquals(active.GridContext, context))
         {
-            if (_active is { Closing: false, Owner: null, GridBinding: { Context: { Manager: null } detached } binding } active)
+            if (active.Owner is not null || active.GridBinding is not { } binding)
             {
-                if (active.Session.IsProcessing || active.Session.Conversation.IsPendingWorkflow)
-                {
-                    CloseSwitcher(false);
-                    _layout.IsCollapsed = false;
-                    _gridReconnectBlocked = true;
-                    StateHasChanged();
-                    return false;
-                }
-                if (context.Manager is null) return false;
-                binding.Context = context;
-                ObserveGridContext(context);
-                UnobserveUnusedGridContext(detached);
-                NotifyActiveConversationChanged();
+                _gridReconnectBlocked = false;
+                _gridOwnerUnsupported = true;
+                Open();
+                StateHasChanged();
+                return false;
             }
-            else
+            if (active.Session.IsProcessing || active.Session.Conversation.IsPendingWorkflow)
             {
-                var existing = _conversations.FirstOrDefault(c => !c.Closing && ReferenceEquals(c.GridContext, context));
-                if (existing is not null)
-                {
-                    var previous = _active;
-                    SelectConversation(existing);
-                    RemoveEmptyConversation(previous);
-                }
-                else CreateConversation(context);
+                _gridOwnerUnsupported = false;
+                _gridReconnectBlocked = true;
+                Open();
+                StateHasChanged();
+                return false;
             }
+            var previous = binding.Context;
+            binding.Context = context;
+            ObserveGridContext(context);
+            if (previous is not null) UnobserveUnusedGridContext(previous);
+            NotifyActiveConversationChanged();
         }
         _gridReconnectBlocked = false;
+        _gridOwnerUnsupported = false;
         Open();
         StateHasChanged();
         return true;

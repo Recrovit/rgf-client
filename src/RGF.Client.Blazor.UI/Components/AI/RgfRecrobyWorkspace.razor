@@ -27,10 +27,12 @@
         {
             <div class="px-3 pt-1 small text-body-secondary rgf-recroby-context">@ContextLabel(_active)</div>
         }
-        @if (_gridReconnectBlocked && ActiveGridContext is { Manager: null })
+        @if (_gridReconnectBlocked || _gridOwnerUnsupported)
         {
             <div class="alert alert-warning mx-3 my-1 py-1" role="alert">
-                Finish or cancel the current Recroby workflow, then click the Grid's Recroby button again to reconnect this conversation.
+                @(_gridOwnerUnsupported
+                    ? GridMessage("RecrobyGridOwnerUnsupported", "This conversation does not support connecting to a Grid.")
+                    : GridMessage("RecrobyGridBusy", "Finish or cancel the current Recroby workflow, then click the Grid's Recroby button again to reconnect this conversation."))
             </div>
         }
         <div class="card-header rgf-recroby-conversation-bar" @onkeydown="SwitcherKeyDown">

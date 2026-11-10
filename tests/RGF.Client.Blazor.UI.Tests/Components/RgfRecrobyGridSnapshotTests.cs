@@ -71,6 +71,7 @@ public sealed partial class RgfRecrobyWorkspaceTests
         var firstSession = cut.FindComponents<RgfAiChatComponent>().Last().Instance.Session;
         api.Hold = true;
         var firstSend = firstSession.SendAsync("first", cancellationToken: Xunit.TestContext.Current.CancellationToken);
+        cut.Find("[data-action=new]").Click();
         await workspace.OpenOrActivateGridAsync(second);
         var secondSession = cut.FindComponents<RgfAiChatComponent>().Last().Instance.Session;
         var secondSend = secondSession.SendAsync("second", cancellationToken: Xunit.TestContext.Current.CancellationToken);

@@ -6,13 +6,14 @@
     max-width: 100%;
 }
 
-.rgf-recroby-selectors > button {
-    max-width: 100%;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    padding: .15rem .4rem;
-}
+    .rgf-recroby-selectors > button {
+        max-width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        padding: .15rem .4rem;
+        font-size: 80%;
+    }
 
 .rgf-recroby-selection-panel {
     position: fixed;
@@ -28,15 +29,17 @@
     overflow: auto;
 }
 
-.rgf-recroby-selection-panel:popover-open {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
-    gap: .5rem;
-    align-items: center;
-}
+    .rgf-recroby-selection-panel:popover-open {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+        gap: .5rem;
+        align-items: center;
+    }
 
-.rgf-recroby-selection-panel ::deep .form-label {
-    margin: .25rem 0;
-}
+    .rgf-recroby-selection-panel ::deep .form-label {
+        margin: .25rem 0;
+    }
 
-.rgf-recroby-selection-panel ::deep select { min-width: 0; }
+    .rgf-recroby-selection-panel ::deep select {
+        min-width: 0;
+    }

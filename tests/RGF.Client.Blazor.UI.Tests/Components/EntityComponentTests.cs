@@ -160,9 +160,9 @@ public sealed class EntityComponentTests
         {
             Assert.True(checkboxes[0].Instance.Value);
             Assert.False(checkboxes[1].Instance.Value);
-            await wrappers[0].QuerySelector("input")!.ChangeAsync(false);
+            await editor.InvokeAsync(() => checkboxes[0].Find("input").ChangeAsync(false));
             Assert.False(component.Condition!.Conditions[0].ToLower);
-            await wrappers[0].QuerySelector("input")!.ChangeAsync(true);
+            await editor.InvokeAsync(() => checkboxes[0].Find("input").ChangeAsync(true));
             Assert.True(component.Condition.Conditions[0].ToLower);
         }
         Assert.Equal(snapshot, JsonSerializer.Serialize(component.Condition!.Conditions));
@@ -805,6 +805,7 @@ public sealed class EntityComponentTests
         Assert.Equal(2, ToolbarSubscriptionCount());
         ActiveSession().Conversation.AddUserMessage("General history");
         AssertState(null);
+        cut.Find("[data-action=new]").Click();
         Robot("a").Click();
         AssertState("a");
         var originalA = ActiveSession();
@@ -826,6 +827,7 @@ public sealed class EntityComponentTests
         AssertState("a");
         Select(originalAPanel);
         AssertState("a");
+        cut.Find("[data-action=new]").Click();
         Robot("b").Click();
         AssertState("b");
         ActiveSession().Conversation.AddUserMessage("Existing B chat");
