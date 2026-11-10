@@ -31,8 +31,8 @@ public partial class RgfFilterComponent : ComponentBase, IDisposable
     public RgfFilterSettings FilterSettings { get; private set; } = new();
 
     // RGF-DOC: rgf.client.blazor.filtering
-    /// <summary>Editable description for the current editor session; it is not persisted.</summary>
-    public string? Description { get; set; }
+    /// <summary>Editable description saved with the filter settings.</summary>
+    public string? Remark { get => FilterSettings.Remark; set => FilterSettings.Remark = value ?? ""; }
     public bool IsGeneratingNameDescription => _generation is not null;
     public bool CanGenerateNameDescription => !IsGeneratingNameDescription && HasConditions(FilterHandler.Conditions);
 
@@ -41,6 +41,7 @@ public partial class RgfFilterComponent : ComponentBase, IDisposable
     private CancellationTokenSource? _generation;
     private int _generationVersion;
     private bool _disposed;
+    private IRgManager? _draftManager;
     private static readonly JsonSerializerOptions GenerationJson = new(JsonSerializerDefaults.Web);
 
     public bool IsSavingAsNewFilter => FilterSettings.FilterSettingsId is > 0 &&
@@ -63,7 +64,8 @@ public partial class RgfFilterComponent : ComponentBase, IDisposable
         var manager = Manager;
         var handler = FilterHandler;
         var name = settings.SettingsName;
-        var description = Description;
+        var description = Remark;
+        var needsName = string.IsNullOrWhiteSpace(name);
         string? snapshot = null;
         try
         {
@@ -77,7 +79,7 @@ public partial class RgfFilterComponent : ComponentBase, IDisposable
             };
             var request = new RgfNameDescriptionRequest
             {
-                ObjectType = "Filter", Target = RgfNameDescriptionTarget.Both,
+                ObjectType = "Filter", Target = needsName ? RgfNameDescriptionTarget.Both : RgfNameDescriptionTarget.Description,
                 ObjectData = JsonSerializer.SerializeToElement(data, GenerationJson),
                 ExistingName = name, ExistingDescription = description,
                 AiProviderOverride = provider, AiModelOverride = model
@@ -87,11 +89,23 @@ public partial class RgfFilterComponent : ComponentBase, IDisposable
             cancellation.Token.ThrowIfCancellationRequested();
             if (!IsCurrent()) return;
             var result = response.Result;
-            if (!response.Success || string.IsNullOrWhiteSpace(result?.Name) || result.Name.Length > 200 ||
-                string.IsNullOrWhiteSpace(result.Description) || result.Description.Length > 4000)
+            if (!response.Success || result is null ||
+                (needsName && (string.IsNullOrWhiteSpace(result.Name) || result.Name.Length > 200)) ||
+                string.IsNullOrWhiteSpace(result.Description))
                 throw new InvalidOperationException("Invalid name/description response.");
-            settings.SettingsName = result.Name;
-            Description = result.Description;
+            var existing = description ?? "";
+            var generated = result.Description;
+            var combined = existing;
+            if (!existing.Replace("\r\n", "\n").Contains(generated.Replace("\r\n", "\n").Trim(), StringComparison.Ordinal))
+            {
+                var separator = string.IsNullOrWhiteSpace(existing) ? "" : "\n\n---\n\n";
+                var available = Math.Max(0, 4000 - existing.Length - separator.Length);
+                var length = Math.Min(available, generated.Length);
+                if (length > 0 && length < generated.Length && char.IsHighSurrogate(generated[length - 1]) && char.IsLowSurrogate(generated[length])) length--;
+                if (length > 0) combined += separator + generated[..length];
+            }
+            if (needsName) settings.SettingsName = result.Name!;
+            Remark = combined;
             await GenerationToastAsync(true);
         }
         catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { }
@@ -107,7 +121,7 @@ public partial class RgfFilterComponent : ComponentBase, IDisposable
         }
 
         bool IsCurrent() => _showComponent && ReferenceEquals(manager, Manager) && ReferenceEquals(handler, FilterHandler) && version == _generationVersion && ReferenceEquals(settings, FilterSettings)
-            && name == settings.SettingsName && description == Description &&
+            && name == settings.SettingsName && description == Remark &&
             (snapshot is null || snapshot == JsonSerializer.Serialize(FilterHandler.Conditions, GenerationJson));
     }
 
@@ -184,6 +198,11 @@ public partial class RgfFilterComponent : ComponentBase, IDisposable
     protected virtual async Task OnShowFilter(IRgfEventArgs<RgfToolbarEventArgs> args)
     {
         _logger.LogDebug("OnShowFilter | EntityName:{EntityName}", EntityParameters.EntityName);
+        if (!ReferenceEquals(_draftManager, Manager))
+        {
+            _draftManager = Manager;
+            FilterSettings = new RgfFilterSettings();
+        }
         FilterHandler = await Manager.GetFilterHandlerAsync();
         // Capture the current shared filter, then detach the editable objects from applied requests.
         FilterHandler.StoreFilter();
@@ -197,7 +216,6 @@ public partial class RgfFilterComponent : ComponentBase, IDisposable
     private void Open()
     {
         InvalidateGeneration();
-        Description = null;
         FilterParameters.DialogParameters.EventDispatcher.Unsubscribe(this);//We'll reset it in case the dialog might have overwritten it
         FilterParameters.DialogParameters.EventDispatcher.Subscribe(RgfDialogEventKind.Close, OnDialogCloseAsync, true);
         if (EntityParameters.DialogTemplate != null)
@@ -260,7 +278,6 @@ public partial class RgfFilterComponent : ComponentBase, IDisposable
             predefFilter = FilterHandler.SelectPredefinedFilter(filterSettingsId);
             if (predefFilter != null)
             {
-                Description = null;
                 FilterSettings = predefFilter;
                 Condition = new RgfFilter.Condition() { Conditions = FilterHandler.Conditions };
                 _ = Manager.ToastManager.RaiseEventAsync(new RgfToastEventArgs(Manager.EntityDesc.MenuTitle, RgfToastEventArgs.ActionTemplate(_recroDict.GetRgfUiString("Load"), FilterSettings.SettingsName), RgfToastType.Success, delay: 2000), this);

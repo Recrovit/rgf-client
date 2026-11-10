@@ -6,7 +6,7 @@ This file contains the consolidated release history for the `rgf-client` solutio
 
 ### Features Added
 
-- Generate a Filter name and semantic description from current editor conditions with AI, localized feedback and protection against stale results. Description remains editable session state; saving a renamed Filter creates a private copy.
+- Generate a Filter remark and, when empty, a name from current editor conditions with AI, localized feedback and protection against stale results. Generated text extends the editable remark, and unsaved text survives reopening the editor. Saving persists the remark; saving a renamed Filter creates a private copy.
 
 - Copy the current Recroby conversation as Markdown, including any visible chat error, or copy an individual user message as original text.
 

@@ -51,6 +51,7 @@ public class RgfFilterSettings : RgfFilterSetting
                 Conditions = JsonSerializer.Deserialize<RgfFilter.Condition[]>(conditionsJson);
             }
             SQLTimeout = source.SQLTimeout;
+            Remark = source.Remark;
         }
     }
 
@@ -59,6 +60,9 @@ public class RgfFilterSettings : RgfFilterSetting
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public int? SQLTimeout { get; set; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string Remark { get; set; }
 
     public override object Clone() => DeepCopy(this);
 
