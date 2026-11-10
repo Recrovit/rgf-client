@@ -30,6 +30,8 @@ This file contains the consolidated release history for the `rgf-client` solutio
 
 ### Other Changes
 
+- Control compact or standard Bootstrap sizing on supported base UI components.
+
 - The Blazor Filter editor uses a localized Ignore case checkbox and tooltip for Like and NotLike. The backend can hide the checkbox while preserving existing filter values.
 
 ### Bugs Fixed
@@ -43,6 +45,8 @@ This file contains the consolidated release history for the `rgf-client` solutio
 - Date and local date-time inputs now show an invalid border while typing an invalid date and clear it when corrected, without changing value updates or adding validation messages.
 
 ### Breaking Changes
+
+- Supported base UI components now use standard Bootstrap sizing by default instead of compact sizing. Set `Small="true"` to retain the previous compact appearance.
 
 - RGF proxy requests from untrusted origins, or without accepted request-origin signals, are now rejected.
 

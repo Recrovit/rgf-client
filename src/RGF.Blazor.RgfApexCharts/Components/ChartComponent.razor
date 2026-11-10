@@ -53,12 +53,12 @@
                                     @if (i != 0 || RgfCharComp.ChartSettings.AggregationSettings.Columns.Count > 1)
                                     {
                                         <div class="p-1">
-                                            <button type="button" class="btn btn-sm btn-outline-primary" @onclick="(arg) => RgfCharComp.RemoveColumn(col)">-</button>
+                                            <button type="button" class="btn btn-outline-primary" @onclick="(arg) => RgfCharComp.RemoveColumn(col)">-</button>
                                         </div>
                                     }
                                 }
                                 <div class="p-1">
-                                    <button type="button" class="btn btn-sm btn-outline-primary" @onclick="(arg) => RgfCharComp.AddColumn()">+</button>
+                                    <button type="button" class="btn btn-outline-primary" @onclick="(arg) => RgfCharComp.AddColumn()">+</button>
                                 </div>
                             </div>
                             <div class="rgfcharts-flex-container rgfcharts-justify-content-start">
@@ -81,11 +81,11 @@
                                         </InputSelect>
                                     </div>
                                     <div class="p-1">
-                                        <button type="button" class="btn btn-sm btn-outline-primary" @onclick="(arg) => RgfCharComp.RemoveAtGroup(idx)">-</button>
+                                        <button type="button" class="btn btn-outline-primary" @onclick="(arg) => RgfCharComp.RemoveAtGroup(idx)">-</button>
                                     </div>
                                 }
                                 <div class="p-1">
-                                    <button type="button" class="btn btn-sm btn-outline-primary" @onclick="(arg) => RgfCharComp.AddGroup()">+</button>
+                                    <button type="button" class="btn btn-outline-primary" @onclick="(arg) => RgfCharComp.AddGroup()">+</button>
                                 </div>
                             </div>
                             <div class="rgfcharts-flex-container rgfcharts-justify-content-start">
@@ -108,11 +108,11 @@
                                         </InputSelect>
                                     </div>
                                     <div class="p-1">
-                                        <button type="button" class="btn btn-sm btn-outline-primary" @onclick="(arg) => RgfCharComp.RemoveAtSubGroup(idx)">-</button>
+                                        <button type="button" class="btn btn-outline-primary" @onclick="(arg) => RgfCharComp.RemoveAtSubGroup(idx)">-</button>
                                     </div>
                                 }
                                 <div class="p-1">
-                                    <button type="button" class="btn btn-sm btn-outline-primary" @onclick="(arg) => RgfCharComp.AddSubGroup()">+</button>
+                                    <button type="button" class="btn btn-outline-primary" @onclick="(arg) => RgfCharComp.AddSubGroup()">+</button>
                                 </div>
                             </div>
 
@@ -218,25 +218,25 @@
         {
             <div class="rgfcharts-flex-container rgfcharts-justify-content-end">
                 <div class="p-1">
-                    <button type="button" class="btn btn-sm btn-outline-primary" disabled="@(RgfCharComp.ChartStatus != RgfProcessingStatus.Valid)"
+                    <button type="button" class="btn btn-outline-primary" disabled="@(RgfCharComp.ChartStatus != RgfProcessingStatus.Valid)"
                             @onclick="(arg) => OnRedraw()">
                         @RecroDict.GetRgfUiString("Redraw")
                     </button>
                 </div>
                 <div class="p-1">
-                    <button type="button" class="btn btn-sm btn-primary" style="min-width:4rem" disabled="@(RgfCharComp.ChartStatus != RgfProcessingStatus.Invalid)"
+                    <button type="button" class="btn btn-primary" style="min-width:4rem" disabled="@(RgfCharComp.ChartStatus != RgfProcessingStatus.Invalid)"
                             @onclick="(arg) => OnCreateChart()">
                         @RgfCharComp.GetRecroDictChart("CreateChart")
                     </button>
                 </div>
                 <div class="p-1">
-                    <button type="button" class="btn btn-sm btn-primary" style="min-width:4rem" disabled="@(RgfCharComp.DataStatus != RgfProcessingStatus.Invalid)"
+                    <button type="button" class="btn btn-primary" style="min-width:4rem" disabled="@(RgfCharComp.DataStatus != RgfProcessingStatus.Invalid)"
                             @onclick="(arg) => OnGetData()">
                         @RgfCharComp.GetRecroDictChart("DataSet")
                     </button>
                 </div>
                 <div class="p-1">
-                    <button type="button" class="btn btn-sm btn-secondary" @onclick="RgfCharComp.OnClose" style="min-width:4rem">@RecroDict.GetRgfUiString("Close")</button>
+                    <button type="button" class="btn btn-secondary" @onclick="RgfCharComp.OnClose" style="min-width:4rem">@RecroDict.GetRgfUiString("Close")</button>
                 </div>
             </div>
         }

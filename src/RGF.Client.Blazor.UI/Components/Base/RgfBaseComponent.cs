@@ -18,6 +18,11 @@ public class RgfBaseComponent : ComponentBase, IAsyncDisposable
         Inherit
     }
 
+    // RGF-DOC: rgf.client.blazor-ui.entity-ui
+    /// <summary>Uses compact Bootstrap sizing where supported. Defaults to false.</summary>
+    [Parameter]
+    public bool Small { get; set; } = false;
+
     [Parameter]
     public string? CssClass { get; set; }
 

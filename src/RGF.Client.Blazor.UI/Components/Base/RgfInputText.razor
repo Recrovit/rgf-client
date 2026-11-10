@@ -28,7 +28,11 @@ else
 
     protected override void OnParametersSet()
     {
-        _baseCssClass = "form-control form-control-sm";
+        _baseCssClass = "form-control";
+        if (Small)
+        {
+            _baseCssClass += " form-control-sm";
+        }
 
         if (Password)
         {

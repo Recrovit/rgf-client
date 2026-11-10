@@ -137,7 +137,7 @@
                     @if (EntityParameters.DisplayMode != RfgDisplayMode.Chart && Manager.EntityDesc.Options.GetBoolValue("RGO_ClientMode") != true)
                     {
                         <div class="btn-group rg-grid-settings flex-grow-1" role="group" style="max-width:531px;">
-                            <div class="rg-predef-name input-group input-group-sm">
+                            <div class="rg-predef-name input-group">
                                 <RgfComboBox TValue="int?" Value="@RgfToolbar.GridSetting.GridSettingsId" Text="@RgfToolbar.GridSetting.SettingsName" AllowCustom="true"
                                              Tooltip="@RecroDict.GetRgfUiString("SavedViewName")"
                                              DataSource="@RgfToolbar.GridSettingList.Select(e => new KeyValuePair<int?, string>(e.GridSettingsId, e.SettingsName ?? ""))"

@@ -34,7 +34,6 @@
     background: var(--bs-body-bg, white);
     color: var(--bs-body-color, #212529);
     box-shadow: 0 .25rem 1rem #0003;
-    font-size: .8rem;
     overflow: auto;
     overflow-wrap: anywhere;
     box-sizing: border-box;

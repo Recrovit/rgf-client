@@ -56,6 +56,8 @@ else
 
     private InputSelect<TValue>? _inputRef { get; set; }
 
+    private bool _currentSmall;
+
     public bool IsCustomAllowed => AllowCustom && !Readonly && !Disabled;
 
 
@@ -68,7 +70,11 @@ else
     protected override void OnParametersSet()
     {
         AdditionalAttributes["rgf-bs-combobox"] = "";
-        _baseCssClass = "form-select form-select-sm";
+        _baseCssClass = "form-select";
+        if (Small)
+        {
+            _baseCssClass += " form-select-sm";
+        }
 
         if (DataSource == null)
         {
@@ -112,7 +118,13 @@ else
             if (_selfRef == null)
             {
                 _selfRef = DotNetObjectReference.Create(this);
-                await _jsRuntime.InvokeVoidAsync(RGFClientBlazorUIConfiguration.JsBlazorUiNamespace + ".ComboBox.initialize", _selfRef, this.Id, this.Text, this.Width);
+                await _jsRuntime.InvokeVoidAsync(RGFClientBlazorUIConfiguration.JsBlazorUiNamespace + ".ComboBox.initialize", _selfRef, this.Id, this.Text, this.Width, Small);
+                _currentSmall = Small;
+            }
+            if (_currentSmall != Small)
+            {
+                await _jsRuntime.InvokeVoidAsync(RGFClientBlazorUIConfiguration.JsBlazorUiNamespace + ".ComboBox.setSmall", this.Id, Small);
+                _currentSmall = Small;
             }
             if (_tooltipOptions != null)
             {

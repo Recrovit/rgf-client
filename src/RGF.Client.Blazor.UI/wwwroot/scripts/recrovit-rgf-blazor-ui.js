@@ -1,5 +1,5 @@
 ﻿/*!
-* recrovit-rgf-blazor-ui.js v1.12.0
+* recrovit-rgf-blazor-ui.js v1.13.0
 */
 
 window.Recrovit = window.Recrovit || {};
@@ -479,10 +479,14 @@ Blazor.UI = {
         }
     },
     ComboBox: {
-        initialize: function (dotNetRef, comboBoxId, value, width) {
+        initialize: function (dotNetRef, comboBoxId, value, width, small = false) {
+            var inputClass = 'rgf-combobox-edit form-control';
+            if (small) {
+                inputClass += ' form-control-sm';
+            }
             var combo = $(`#${comboBoxId}`).rgcombobox({
                 value: value,
-                inputClass: 'rgf-combobox-edit form-control form-control-sm',
+                inputClass: inputClass,
                 button: '<button class="rgf-combobox-button btn btn-outline-secondary" type="button" rgf-bs-combobox=""><i class="bi bi-caret-down-fill"></i></button>',
                 noWrapper: true,
                 calcWidth: false,
@@ -507,6 +511,9 @@ Blazor.UI = {
                     }
                 }
             });
+        },
+        setSmall: function (comboBoxId, small) {
+            $(`#${comboBoxId}`).rgcombobox('instance').input.toggleClass('form-control-sm', small);
         },
         setText: function (comboBoxId, text) {
             $(`#${comboBoxId}`).rgcombobox('instance').input.val(text);

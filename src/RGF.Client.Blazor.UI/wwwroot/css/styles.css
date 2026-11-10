@@ -1,9 +1,9 @@
 ﻿html.rgf-small-ui {
-    font-size: 87.5%;
+    font-size: 0.875rem;
 }
 
 html.rgf-large-ui {
-    font-size: 112.5%;
+    font-size: 1.125rem;
 }
 
 /* RGF-DOC: rgf.client.blazor-ui.entity-ui */

@@ -13,7 +13,7 @@
             case PropertyFormType.TextBox:
                 if (Property.ForeignEntity != null)
                 {
-                    <div class="input-group input-group-sm">
+                    <div class="input-group">
                         <RgfInputText @bind-Value="ItemData.StringValue"
                                       Readonly="Property.Readonly" Disabled="Property.Disabled"
                                       CssClass="@RgfFormItem.CssClass" Id="@Id"

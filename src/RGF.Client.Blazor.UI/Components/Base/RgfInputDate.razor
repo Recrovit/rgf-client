@@ -16,7 +16,11 @@
 
     protected override void OnParametersSet()
     {
-        _baseCssClass = "form-control form-control-sm rgf-input-date";
+        _baseCssClass = "form-control rgf-input-date";
+        if (Small)
+        {
+            _baseCssClass += " form-control-sm";
+        }
 
         base.OnParametersSet();
     }

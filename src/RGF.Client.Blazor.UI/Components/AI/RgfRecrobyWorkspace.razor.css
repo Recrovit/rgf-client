@@ -54,7 +54,7 @@
 .rgf-recroby-switcher:popover-open { display: flex; flex-direction: column; gap: .5rem; }
 .rgf-recroby-switcher > input { flex-shrink: 0; }
 .rgf-recroby-switcher-list { min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
-.rgf-recroby-group-title { padding: .25rem .5rem; font-size: .8rem; font-weight: 600; }
+.rgf-recroby-group-title { padding: .25rem .5rem; font-weight: 600; }
 .rgf-recroby-choice { display: flex; align-items: center; gap: .5rem; padding: .25rem .5rem; border-radius: .25rem; }
 .rgf-recroby-choice.active { background: var(--bs-primary-bg-subtle, #cfe2ff); }
 .rgf-recroby-choice-select { display: flex; align-items: center; gap: .5rem; flex: 1 1 0; min-width: 0; padding: .25rem 0; border: 0; background: transparent; color: inherit; text-align: left; }

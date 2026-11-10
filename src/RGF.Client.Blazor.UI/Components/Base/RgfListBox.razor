@@ -38,7 +38,11 @@
 
     protected override void OnParametersSet()
     {
-        _baseCssClass = "form-select form-select-sm";
+        _baseCssClass = "form-select";
+        if (Small)
+        {
+            _baseCssClass += " form-select-sm";
+        }
 
         if (DataSource == null && Items != null)
         {

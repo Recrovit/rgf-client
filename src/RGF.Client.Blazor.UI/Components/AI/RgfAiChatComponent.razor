@@ -7,7 +7,7 @@
             @ChatBox
             <div class="rgf-ai-conversation-copy">
                 <span role="status" class="@(CopySucceeded == false ? "small text-danger" : "visually-hidden")">@CopyStatus</span>
-                <button type="button" class="btn btn-sm btn-outline-secondary" data-action="copy-conversation"
+                <button type="button" class="btn btn-outline-secondary" data-action="copy-conversation"
                         title="Copy conversation" aria-label="Copy conversation" disabled="@(!CanCopyConversation)"
                         @onclick="CopyConversationAsync">
                     <i class="bi @(CopySucceeded == true ? "bi-check-lg" : "bi-copy")" aria-hidden="true"></i>

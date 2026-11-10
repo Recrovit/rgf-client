@@ -1,19 +1,26 @@
 @inherits RgfBaseComponent
 @* RGF-DOC: rgf.client.blazor-ui.markdown-viewer *@
+@{
+    var buttonCssClass = "btn";
+    if (Small)
+    {
+        buttonCssClass += " btn-sm";
+    }
+}
 <div class="rgf-markdown-viewer @CssClass" style="@Style">
     @if (ShowCopy || ShowToggle)
     {
         <div class="rgf-markdown-toolbar">
             @if (ShowCopy)
             {
-                <button type="button" class="btn btn-sm rgf-markdown-copy" title="Copy" aria-label="Copy"
+                <button type="button" class="@buttonCssClass rgf-markdown-copy" title="Copy" aria-label="Copy"
                         disabled="@(string.IsNullOrEmpty(Text) || _copying)" @onclick="CopyAsync" @onmouseleave="ResetCopyFeedback">
                     <i class="bi @(_copied ? "bi-check-lg" : "bi-copy")" aria-hidden="true"></i>
                 </button>
             }
             @if (ShowToggle)
             {
-                <button type="button" class="btn btn-sm rgf-markdown-toggle" title="@ToggleLabel"
+                <button type="button" class="@buttonCssClass rgf-markdown-toggle" title="@ToggleLabel"
                         aria-label="@ToggleLabel" aria-pressed="@(_renderMarkdown ? "true" : "false")"
                         @onclick="ToggleView">
                     <i class="bi @(_renderMarkdown ? "bi-file-text" : "bi-markdown")" aria-hidden="true"></i>
