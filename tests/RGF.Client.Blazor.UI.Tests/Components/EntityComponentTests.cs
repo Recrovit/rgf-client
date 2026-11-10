@@ -376,6 +376,45 @@ public sealed class EntityComponentTests
     }
 
     [Fact]
+    public async Task RecrobyDescriptionUnavailableDoesNotPopulateNewFilterRemark()
+    {
+        using var context = CreateTestContext(true);
+        context.Services.AddScoped<RgfRecrobyWorkspaceService>();
+        var workspace = context.Render<RgfRecrobyWorkspace>();
+        var api = (PendingRgfApiService)context.Services.GetRequiredService<IRgfApiService>();
+        var entity = CreateEntityParameters(RfgDisplayMode.Grid);
+        var grid = RenderWorkspace(context, entity);
+        await context.Services.GetRequiredService<RgfRecrobyWorkspaceService>()
+            .OpenOrActivateGridAsync(grid.Instance.RecrobyGridContext);
+        const string unavailable = "The filter was verified, but its description is unavailable.";
+        api.RecrobyResponse = request =>
+        {
+            var response = FilterReply(request,
+                [new() { Id = 1, Alias = "Name", QueryOperator = RgfFilter.QueryOperator.Equal, Param1 = "Alice" }]);
+            response.Message = unavailable;
+            response.FilterAction = response.FilterAction! with { Remark = null };
+            return Task.FromResult(response);
+        };
+
+        await workspace.FindComponent<RgfAiChatComponent>().Instance.Session
+            .SendAsync("Generate filter", cancellationToken: Xunit.TestContext.Current.CancellationToken);
+        Assert.Equal(unavailable, workspace.FindComponent<RgfAiChatComponent>().Instance.Session.Conversation.Messages.Last().Message);
+        Assert.Single(entity.Manager!.ListHandler.GetGridSettings().Conditions!);
+
+        entity.DialogTemplate = _ => builder => { };
+        var dialog = context.Render<RgfFilterComponent>(parameters => parameters
+            .Add(component => component.EntityParameters, entity)
+            .Add(component => component.FilterTemplate, _ => builder => { })
+            .Add(component => component.FooterTemplate, _ => builder => { }));
+        await dialog.InvokeAsync(() => entity.ToolbarParameters.EventDispatcher.DispatchEventAsync(
+            RgfToolbarEventKind.ShowFilter,
+            new RgfEventArgs<RgfToolbarEventArgs>(this, new RgfToolbarEventArgs(RgfToolbarEventKind.ShowFilter))));
+        Assert.Equal(string.Empty, dialog.Instance.FilterSettings.Remark);
+        Assert.Equal(string.Empty, dialog.Instance.FilterSettings.SettingsName);
+        Assert.Null(dialog.Instance.FilterSettings.FilterSettingsId);
+    }
+
+    [Fact]
     public async Task RecrobyKeepsTheLatestGridTurnAndRejectsAReplacedManager()
     {
         using var context = CreateTestContext(true);
@@ -471,7 +510,7 @@ public sealed class EntityComponentTests
         {
             Success = true, Message = "Generated filter summary",
             FilterAction = new(RgfAiFilterOperation.Replace, request.GridRequest!.SessionId,
-                request.GridRequest.GridId, 101, conditions)
+                request.GridRequest.GridId, 101, conditions, "Generated filter summary")
         };
         return JsonSerializer.Deserialize<RgfAiResponse>(JsonSerializer.Serialize(reply, options), options)!;
     }
