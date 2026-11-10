@@ -527,6 +527,7 @@ public partial class RgfRecrobyWorkspace : IAsyncDisposable
                 .SendAsync(request, cancellationToken);
             if (response is not { Success: true, FilterAction: { } action }) return response;
 
+            var description = response.Message;
             // The conversation keeps response objects as history. Consume the action in this turn.
             response.FilterAction = null;
             await workspace.InvokeAsync(async () =>
@@ -547,6 +548,7 @@ public partial class RgfRecrobyWorkspace : IAsyncDisposable
                             // Keep editor changes separate from the applied conditions until the user accepts them.
                             var applied = RgfGridSettings.DeepCopy(new RgfGridSettings { Conditions = handler.StoreFilter() })!;
                             list.ApplyFilterState(applied.Conditions!, list.SQLTimeout);
+                            handler.SetNewAiFilterSettings(description);
                         }
                     }
                 }

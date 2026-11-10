@@ -204,6 +204,10 @@ public partial class RgfFilterComponent : ComponentBase, IDisposable
             FilterSettings = new RgfFilterSettings();
         }
         FilterHandler = await Manager.GetFilterHandlerAsync();
+        if (FilterHandler.TakeNewAiFilterSettings() is { } newAiSettings)
+        {
+            FilterSettings = newAiSettings;
+        }
         // Capture the current shared filter, then detach the editable objects from applied requests.
         FilterHandler.StoreFilter();
         FilterHandler.ResetFilter();

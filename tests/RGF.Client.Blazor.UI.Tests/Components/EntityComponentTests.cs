@@ -353,8 +353,18 @@ public sealed class EntityComponentTests
         await dialog.InvokeAsync(() => entity.ToolbarParameters.EventDispatcher.DispatchEventAsync(RgfToolbarEventKind.ShowFilter,
             new RgfEventArgs<RgfToolbarEventArgs>(this, new RgfToolbarEventArgs(RgfToolbarEventKind.ShowFilter))));
         Assert.True(dialog.Instance.IsFilterActive);
+        Assert.Equal("Generated filter summary", dialog.Instance.FilterSettings.Remark);
+        Assert.Equal(string.Empty, dialog.Instance.FilterSettings.SettingsName);
+        Assert.Null(dialog.Instance.FilterSettings.FilterSettingsId);
+        Assert.Null(dialog.Instance.FilterSettings.RoleId);
+        Assert.False(dialog.Instance.FilterSettings.IsReadonly);
         AssertConditions(dialog.Instance.Condition!.Conditions);
         dialog.Instance.Condition.Conditions[0].Conditions.Clear();
+        dialog.Instance.FilterSettings.Remark = "Edited description";
+        await dialog.InvokeAsync(() => dialog.Instance.OnCancel());
+        await dialog.InvokeAsync(() => entity.ToolbarParameters.EventDispatcher.DispatchEventAsync(RgfToolbarEventKind.ShowFilter,
+            new RgfEventArgs<RgfToolbarEventArgs>(this, new RgfToolbarEventArgs(RgfToolbarEventKind.ShowFilter))));
+        Assert.Equal("Edited description", dialog.Instance.FilterSettings.Remark);
         await dialog.InvokeAsync(() => dialog.Instance.OnCancel());
         AssertConditions(handler.Conditions);
         AssertConditions(list.GetGridSettings().Conditions!);
@@ -402,6 +412,18 @@ public sealed class EntityComponentTests
         await older;
         Assert.Single(api.GridRequests);
         Assert.Equal("newer", Assert.Single(manager.ListHandler.GetGridSettings().Conditions!).Param1.ToString());
+        var handler = await manager.GetFilterHandlerAsync();
+        Assert.Equal("Generated filter summary", handler.TakeNewAiFilterSettings()!.Remark);
+        Assert.Null(handler.TakeNewAiFilterSettings());
+        handler.SetNewAiFilterSettings("old");
+        handler.SetNewAiFilterSettings("");
+        var empty = handler.TakeNewAiFilterSettings();
+        Assert.NotNull(empty);
+        Assert.Equal("", empty.Remark);
+        handler.SetNewAiFilterSettings("obsolete");
+        Assert.True(handler.InitFilter("[]"));
+        Assert.Null(handler.TakeNewAiFilterSettings());
+        handler.InitFilter(JsonSerializer.Serialize(manager.ListHandler.GetGridSettings().Conditions));
 
         using var replacement = new RgManager(new(manager.SessionParams), context.Services);
         Assert.True(await replacement.InitializeAsync(replacement.CreateGridRequest(request => request.EntityName = "Orders")));

@@ -748,6 +748,8 @@ public sealed class RgfChartComponentTests
         public bool ChangeProperty(RgfFilter.Condition condition, int newPropertyId) => false;
         public bool ChangeQueryOperator(Microsoft.Extensions.Logging.ILogger logger, RgfFilter.Condition condition, RgfFilter.QueryOperator newOperator) => false;
         public bool InitFilter(string? jsonCondition) => true;
+        public void SetNewAiFilterSettings(string? remark) { }
+        public RgfFilterSettings? TakeNewAiFilterSettings() => null;
         public void RemoveBracket(int clientId) { }
         public void RemoveCondition(int clientId) { }
         public bool ResetFilter() => true;

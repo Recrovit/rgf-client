@@ -454,6 +454,7 @@ public sealed class RgfFilterGenerationTests
             "get_Conditions" => Conditions,
             "get_PredefinedFilters" => PredefinedFilters,
             "get_RgfFilterProperties" => new[] { new RgfFilterProperty(new() { Alias = "Name" }, new() { Alias = "Name", RgClass = "rg-text" }) },
+            "TakeNewAiFilterSettings" => null,
             "StoreFilter" => Conditions.ToArray(),
             "ResetFilter" => Reset(),
             "SelectPredefinedFilter" => RgfFilterSettings.DeepCopy(PredefinedFilters.SingleOrDefault(f => f.FilterSettingsId == (int?)args![0])),

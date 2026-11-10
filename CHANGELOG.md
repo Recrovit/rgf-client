@@ -10,7 +10,7 @@ This file contains the consolidated release history for the `rgf-client` solutio
 
 - Copy the current Recroby conversation as Markdown, including any visible chat error, or copy an individual user message as original text.
 
-- Grid-linked Recroby Create conversations automatically replace and activate the current Grid filter with the validated result. The chat describes the generated filter and the existing RGF Toast system reports the load.
+- Grid-linked Recroby Create conversations automatically replace and activate the current Grid filter with the validated result. The chat describes the generated filter, its description is available as the new filter�s editable remark, and the existing RGF Toast system reports the load.
 
 - Grid-linked Recroby conversations now send the current applied filter and sort snapshot with each turn, independently per Grid and conversation; temporarily unavailable Grids preserve their chats.
 

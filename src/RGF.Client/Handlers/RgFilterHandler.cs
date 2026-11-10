@@ -28,6 +28,10 @@ public interface IRgFilterHandler
 
     bool InitFilter(string? jsonCondition);
 
+    void SetNewAiFilterSettings(string? remark);
+
+    RgfFilterSettings? TakeNewAiFilterSettings();
+
     void RemoveBracket(int clientId);
 
     void RemoveCondition(int clientId);
@@ -60,6 +64,8 @@ internal class RgFilterHandler : IRgFilterHandler
         PredefinedFilters = predefinedFilters ?? new List<RgfFilterSettings>();
     }
 
+    private RgfFilterSettings? _newAiFilterSettings;
+    private string? _newAiFilterState;
     private RgfFilter _filter;
     private RgfFilterProperty[] _rgfFilterProperties = [];
     private RgfEntity? _propertiesEntity;
@@ -100,6 +106,7 @@ internal class RgFilterHandler : IRgFilterHandler
         }
         set
         {
+            _newAiFilterSettings = null;
             _conditions = value;
             _conditionsQuickFilter = [];
             _propertiesEntity = null;
@@ -142,6 +149,7 @@ internal class RgFilterHandler : IRgFilterHandler
             return;
         }
 
+        _newAiFilterSettings = null;
         if (quickFilter != null && condition == null)
         {
             _conditionsQuickFilter.Remove(quickFilter);
@@ -175,7 +183,9 @@ internal class RgFilterHandler : IRgFilterHandler
 
     public bool ResetFilter()
     {
+        var pendingSettings = _newAiFilterSettings;
         Conditions = CloneConditions(_storedConditions);
+        _newAiFilterSettings = pendingSettings;
         _conditionsQuickFilter = CloneConditions(_storedQuickConditions);
         _propertiesEntity = null;
         EnsureFilterProperties();
@@ -203,6 +213,27 @@ internal class RgFilterHandler : IRgFilterHandler
         }
         catch { }
         return false;
+    }
+
+    // RGF-DOC: rgf.client.recroby.integration
+    public void SetNewAiFilterSettings(string? remark)
+    {
+        _newAiFilterSettings = new RgfFilterSettings
+        {
+            SettingsName = string.Empty,
+            Remark = remark ?? string.Empty,
+            IsReadonly = false
+        };
+        _newAiFilterState = JsonSerializer.Serialize(_manager.ListHandler.GetGridSettings().Conditions);
+    }
+
+    public RgfFilterSettings? TakeNewAiFilterSettings()
+    {
+        var settings = _newAiFilterState == JsonSerializer.Serialize(_manager.ListHandler.GetGridSettings().Conditions)
+            ? _newAiFilterSettings : null;
+        _newAiFilterSettings = null;
+        _newAiFilterState = null;
+        return settings;
     }
 
     public RgfFilter.Condition[] StoreFilter()
