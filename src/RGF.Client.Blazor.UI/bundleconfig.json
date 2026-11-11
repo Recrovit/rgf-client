@@ -4,5 +4,11 @@
     "inputFiles": [
       "wwwroot/scripts/recrovit-rgf-blazor-ui.js"
     ]
+  },
+  {
+    "outputFileName": "wwwroot/scripts/recrovit-rgf-blazor-ui-ai.min.js",
+    "inputFiles": [
+      "wwwroot/scripts/recrovit-rgf-blazor-ui-ai.js"
+    ]
   }
 ]

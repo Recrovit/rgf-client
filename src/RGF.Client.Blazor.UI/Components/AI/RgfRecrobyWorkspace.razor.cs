@@ -65,7 +65,10 @@ public partial class RgfRecrobyWorkspace : IAsyncDisposable
     private IRecroSecService RecroSec { get; set; } = null!;
 
     [Inject]
-    private IJSRuntime JS { get; set; } = null!;
+    private IJSRuntime _jsRuntime { get; set; } = null!;
+
+    [Inject]
+    private IRecroDictService RecroDict { get; set; } = null!;
 
     private readonly List<Conversation> _conversations = [];
     private readonly List<RgfRecrobyGridContext> _gridContexts = [];
@@ -85,7 +88,6 @@ public partial class RgfRecrobyWorkspace : IAsyncDisposable
     }
     internal RgfRecrobyGridContext? ActiveGridContext => _disposed ? null : _activeGridContext;
     internal event Action? ActiveGridContextChanged;
-    [Inject] private IRecroDictService RecroDict { get; set; } = null!;
 
     private string SwitcherLabel => _active is null
         ? RecroDict.GetRgfRecrobyString("ChooseConversation")
@@ -191,9 +193,8 @@ public partial class RgfRecrobyWorkspace : IAsyncDisposable
     private RgfRecrobyLayoutSettings _layout = new();
     private readonly string _selectorId = $"recroby-{Guid.NewGuid():N}";
     private ElementReference _element;
-    private IJSObjectReference? _module;
-    private Task<IJSObjectReference>? _moduleImport;
     private DotNetObjectReference<RgfRecrobyWorkspace>? _reference;
+    private const string JsNamespace = RGFClientBlazorUIConfiguration.JsBlazorUiNamespace + ".AI.Workspace";
     private bool _disposed;
     private IDisposable? _workspaceRegistration;
     private readonly object _disposalSync = new();
@@ -263,38 +264,42 @@ public partial class RgfRecrobyWorkspace : IAsyncDisposable
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (_disposed) return;
-        if (firstRender)
+        try
         {
-            _moduleImport = JS.InvokeAsync<IJSObjectReference>("import",
-                $"{RgfClientConfiguration.AppRootPath}/_content/Recrovit.RecroGridFramework.Client.Blazor.UI/Components/AI/RgfRecrobyWorkspace.razor.js").AsTask();
-            _module = await _moduleImport;
-            if (_module != null && !_disposed)
+            if (_disposed) return;
+            if (_reference is null)
             {
-                _reference = DotNetObjectReference.Create(this);
-                await _module.InvokeVoidAsync("initialize", _element, _reference, _layout);
+                await RGFClientBlazorUIConfiguration.WaitForAiScriptsAsync(_jsRuntime);
+                if (_disposed) return;
+
+                if (_reference is null)
+                {
+                    _reference = DotNetObjectReference.Create(this);
+                    await _jsRuntime.InvokeVoidAsync(JsNamespace + ".initialize", _element, _reference, _layout);
+                }
+            }
+            else
+            {
+                await _jsRuntime.InvokeVoidAsync(JsNamespace + ".update", _element, _layout);
+            }
+            if (_reference is not null && !_disposed)
+            {
+                await _jsRuntime.InvokeVoidAsync(JsNamespace + ".syncSwitcher", _element, _switcherOpen, _restoreSwitcherFocus);
+                _restoreSwitcherFocus = false;
+                if (_focusTitleEditor && _editing != null)
+                {
+                    _focusTitleEditor = false;
+                    await _jsRuntime.InvokeVoidAsync(JsNamespace + ".focusTitleEditor", _element);
+                }
+                if (_focusUserMessage)
+                {
+                    _focusUserMessage = false;
+                    if (!_layout.IsCollapsed)
+                        await _jsRuntime.InvokeVoidAsync(JsNamespace + ".focusUserMessage", _element);
+                }
             }
         }
-        else if (_module != null && !_disposed)
-        {
-            await _module.InvokeVoidAsync("update", _element, _layout);
-        }
-        if (_module != null && !_disposed)
-        {
-            await _module.InvokeVoidAsync("syncSwitcher", _element, _switcherOpen, _restoreSwitcherFocus);
-            _restoreSwitcherFocus = false;
-            if (_focusTitleEditor && _editing != null)
-            {
-                _focusTitleEditor = false;
-                await _module.InvokeVoidAsync("focusTitleEditor", _element);
-            }
-            if (_focusUserMessage)
-            {
-                _focusUserMessage = false;
-                if (!_layout.IsCollapsed)
-                    await _module.InvokeVoidAsync("focusUserMessage", _element);
-            }
-        }
+        catch (JSDisconnectedException) { }
     }
 
     /// <summary>Detaches owners and awaits all conversation component and browser cleanup.</summary>
@@ -345,12 +350,7 @@ public partial class RgfRecrobyWorkspace : IAsyncDisposable
         });
         try
         {
-            if (_moduleImport is not null) _module = await _moduleImport;
-            if (_module != null)
-            {
-                await _module.InvokeVoidAsync("dispose", _element);
-                await _module.DisposeAsync();
-            }
+            if (_reference is not null) await _jsRuntime.InvokeVoidAsync(JsNamespace + ".dispose", _element);
         }
         catch (JSDisconnectedException) { }
         finally { _reference?.Dispose(); }

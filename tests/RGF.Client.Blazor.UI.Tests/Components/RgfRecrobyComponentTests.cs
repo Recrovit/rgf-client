@@ -190,21 +190,17 @@ public sealed class RgfRecrobyComponentTests
         }
     }
 
-    [Theory]
-    [InlineData("")]
-    [InlineData("/test-root")]
-    public void RecrobyModuleImportsUseConfiguredAppRoot(string root)
+    [Fact]
+    public void WorkspaceAndSelectorUseGlobalInterop()
     {
-        RgfClientBlazorUiTestState.ConfigureClientPaths(root, "https://api.example.test");
-        try
-        {
-            using var context = SelectionContext(out _);
-            context.Render<RgfRecrobyWorkspace>();
-            foreach (var module in new[] { "RgfRecrobyComponent", "RgfRecrobyWorkspace" })
-                Assert.Contains(context.JSInterop.Invocations, invocation => invocation.Identifier == "import"
-                    && Equals(invocation.Arguments[0], $"{root}/_content/Recrovit.RecroGridFramework.Client.Blazor.UI/Components/AI/{module}.razor.js"));
-        }
-        finally { RgfClientBlazorUiTestState.Reset(); }
+        using var context = SelectionContext(out _);
+        var importCount = context.JSInterop.Invocations["import"].Count;
+        var cut = context.Render<RgfRecrobyWorkspace>();
+        cut.Find("[aria-label='Open Recroby']").Click();
+
+        Assert.Single(context.JSInterop.Invocations["Recrovit.RGF.Blazor.UI.AI.Workspace.initialize"]);
+        Assert.NotEmpty(context.JSInterop.Invocations["Recrovit.RGF.Blazor.UI.AI.Selector.sync"]);
+        Assert.Equal(importCount, context.JSInterop.Invocations["import"].Count);
     }
 
     [Theory]
@@ -232,6 +228,7 @@ public sealed class RgfRecrobyComponentTests
     {
         using var context = new BunitContext();
         context.JSInterop.Mode = JSRuntimeMode.Loose;
+        RgfClientBlazorUiTestState.LoadUiResources(context);
         context.Services.AddSingleton<IRecroDictService, FakeDashboardRecroDictService>();
         context.Services.AddSingleton<IRecroSecService, FakeRecroSecService>();
         var api = new DelayedCatalogApi();
@@ -253,6 +250,7 @@ public sealed class RgfRecrobyComponentTests
     {
         using var context = new BunitContext();
         context.JSInterop.Mode = JSRuntimeMode.Loose;
+        RgfClientBlazorUiTestState.LoadUiResources(context);
         context.Services.AddSingleton<IRecroDictService, FakeDashboardRecroDictService>();
         context.Services.AddSingleton<IRecroSecService, FakeRecroSecService>();
         var api = new DelayedCatalogApi();
@@ -425,6 +423,7 @@ public sealed class RgfRecrobyComponentTests
     {
         var context = new BunitContext();
         context.JSInterop.Mode = JSRuntimeMode.Loose;
+        RgfClientBlazorUiTestState.LoadUiResources(context);
         context.Services.AddSingleton<IRecroDictService, FakeDashboardRecroDictService>();
         context.Services.AddSingleton<IRecroSecService, FakeRecroSecService>();
         api = new CatalogApi();
@@ -474,6 +473,7 @@ public sealed class RgfRecrobyComponentTests
     {
         using var context = new BunitContext();
         context.JSInterop.Mode = JSRuntimeMode.Loose;
+        RgfClientBlazorUiTestState.LoadUiResources(context);
         context.Services.AddSingleton<IRecroDictService, FakeDashboardRecroDictService>();
         context.Services.AddSingleton<IRecroSecService, FakeRecroSecService>();
         context.Services.AddSingleton<IRgfApiService>(new ProviderMissingApi());
@@ -507,6 +507,7 @@ public sealed class RgfRecrobyComponentTests
     {
         using var context = new BunitContext();
         context.JSInterop.Mode = JSRuntimeMode.Loose;
+        RgfClientBlazorUiTestState.LoadUiResources(context);
         context.Services.AddSingleton<IRecroDictService, FakeDashboardRecroDictService>();
         context.Services.AddSingleton<IRecroSecService, FakeRecroSecService>();
         var error = new HttpRequestException("API failed");

@@ -80,12 +80,11 @@ public sealed class RgfAiUsageSummaryTests
     }
 
     [Fact]
-    public async Task PopoversHaveStableUniqueIdsAccessibleButtonsAndModuleDisposal()
+    public async Task PopoversHaveStableUniqueIdsAccessibleButtonsAndInstanceDisposal()
     {
         await using var context = Context();
-        var module = context.JSInterop.SetupModule(_ => true);
-        module.SetupVoid("sync", _ => true).SetVoidResult();
-        module.SetupVoid("dispose", _ => true).SetVoidResult();
+        context.JSInterop.SetupVoid("Recrovit.RGF.Blazor.UI.AI.Usage.sync", _ => true).SetVoidResult();
+        context.JSInterop.SetupVoid("Recrovit.RGF.Blazor.UI.AI.Usage.dispose", _ => true).SetVoidResult();
         var languageEventLog = new ListLogger();
         var security = new FakeRecroSecService(languageEventLog);
         context.Services.AddSingleton<IRecroSecService>(security);
@@ -118,8 +117,8 @@ public sealed class RgfAiUsageSummaryTests
         languageEventLog.Entries.Clear();
         await security.LanguageChangedEvent.InvokeAsync(new("eng"));
         Assert.Empty(languageEventLog.Entries);
-        Assert.Equal(2, module.Invocations["dispose"].Count);
-        Assert.All(module.Invocations["dispose"], invocation => Assert.IsType<string>(Assert.Single(invocation.Arguments)));
+        Assert.Equal(2, context.JSInterop.Invocations["Recrovit.RGF.Blazor.UI.AI.Usage.dispose"].Count);
+        Assert.All(context.JSInterop.Invocations["Recrovit.RGF.Blazor.UI.AI.Usage.dispose"], invocation => Assert.IsType<string>(Assert.Single(invocation.Arguments)));
     }
     private static BunitContext Context()
     {
@@ -127,6 +126,7 @@ public sealed class RgfAiUsageSummaryTests
         context.Services.AddSingleton<IRecroDictService, FakeDashboardRecroDictService>();
         context.Services.AddSingleton<IRecroSecService, FakeRecroSecService>();
         context.JSInterop.Mode = JSRuntimeMode.Loose;
+        RgfClientBlazorUiTestState.LoadUiResources(context);
         return context;
     }
 

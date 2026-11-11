@@ -69,7 +69,11 @@ public sealed class RgfClientBlazorUiConfigurationTests : IDisposable
         AssertImportOccurred(jsRuntime, $"{AppRootPath}/_content/Recrovit.RecroGridFramework.Client.Blazor.UI/lib/bootstrap/dist/js/bootstrap.bundle.min.js");
         AssertImportOccurred(jsRuntime, $"{ApiBaseAddress}/scripts/legacy-one.js");
         AssertImportOccurred(jsRuntime, $"{ApiBaseAddress}/scripts/legacy-two.js");
-        AssertImportOccurred(jsRuntime, $"{AppRootPath}/_content/Recrovit.RecroGridFramework.Client.Blazor.UI/scripts/{GetUiScriptFileName()}");
+        var scriptsPath = $"{AppRootPath}/_content/Recrovit.RecroGridFramework.Client.Blazor.UI/scripts/";
+        var imports = jsRuntime.GetInvocations("import").Select(invocation => invocation.Arguments[0]).ToList();
+        var uiIndex = imports.IndexOf(scriptsPath + GetUiScriptFileName());
+        Assert.True(uiIndex >= 0);
+        Assert.Equal(scriptsPath + GetAiScriptFileName(), imports[uiIndex + 1]);
 
         Assert.Contains(apiService.Requests, request =>
             request.Uri == "/rgf/api/RGFSriptReferences/-legacy-blazorui-" &&
@@ -142,7 +146,24 @@ public sealed class RgfClientBlazorUiConfigurationTests : IDisposable
         Assert.Equal(1, CountImports(jsRuntime, $"{AppRootPath}/_content/Recrovit.RecroGridFramework.Client.Blazor.UI/lib/bootstrap/dist/js/bootstrap.bundle.min.js"));
         Assert.Equal(1, CountImports(jsRuntime, $"{ApiBaseAddress}/scripts/legacy-one.js"));
         Assert.Equal(1, CountImports(jsRuntime, $"{AppRootPath}/_content/Recrovit.RecroGridFramework.Client.Blazor.UI/scripts/{GetUiScriptFileName()}"));
+        Assert.Equal(1, CountImports(jsRuntime, $"{AppRootPath}/_content/Recrovit.RecroGridFramework.Client.Blazor.UI/scripts/{GetAiScriptFileName()}"));
         Assert.Single(jsRuntime.GetInvocations("Recrovit.WebCli.InitRgfJqueryUiEx"));
+    }
+
+    [Fact]
+    public async Task CachedBaseReferencesAndUiScriptsLoadInEachBrowserRuntime()
+    {
+        RgfClientBlazorUiTestState.SetBlazorScriptReferences("/scripts/base.js");
+        var apiService = new FakeRgfApiService();
+        foreach (var jsRuntime in new[] { new RecordingJsRuntime(), new RecordingJsRuntime() })
+        {
+            using var services = CreateServiceProvider(jsRuntime, apiService);
+            await RgfBlazorConfigurationExtension.LoadResourcesAsync(services);
+            await RGFClientBlazorUIConfiguration.LoadResourcesAsync(services);
+
+            AssertImportOccurred(jsRuntime, $"{ApiBaseAddress}/scripts/base.js");
+            AssertImportOccurred(jsRuntime, $"{AppRootPath}/_content/Recrovit.RecroGridFramework.Client.Blazor.UI/scripts/{GetAiScriptFileName()}");
+        }
     }
 
     [Fact]
@@ -299,6 +320,8 @@ public sealed class RgfClientBlazorUiConfigurationTests : IDisposable
         => jsRuntime.GetInvocations("import").Count(invocation =>
             invocation.Arguments.Count == 1 &&
             Equals(invocation.Arguments[0], importPath));
+
+    private static string GetAiScriptFileName() => GetUiScriptFileName().Replace("blazor-ui.", "blazor-ui-ai.");
 
     private static string GetUiScriptFileName()
     {

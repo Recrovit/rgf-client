@@ -1,4 +1,4 @@
-// Runs production CSS/modules in Chromium; Firefox runs the Toast geometry subset via WebDriver BiDi.
+// Runs production CSS and scripts in Chromium; Firefox runs the Toast geometry subset via WebDriver BiDi.
 // dotnet/bUnit covers component lifetimes and transport; this covers browser geometry/events.
 import assert from "node:assert/strict";
 import { readFile, writeFile, mkdtemp, rm } from "node:fs/promises";
@@ -11,30 +11,29 @@ import { setTimeout as delay } from "node:timers/promises";
 const base = new URL("../src/RGF.Client.Blazor.UI/", import.meta.url);
 const appRoot = "/recroby-test";
 const packageRoot = "/_content/Recrovit.RecroGridFramework.Client.Blazor.UI/";
-const moduleRoot = packageRoot + "Components/AI/";
+const scriptsRoot = packageRoot + "scripts/";
+const scriptExtension = process.env.RGF_TEST_RELEASE ? ".min.js" : ".js";
+const uiScript = "recrovit-rgf-blazor-ui" + scriptExtension;
+const aiScript = "recrovit-rgf-blazor-ui-ai" + scriptExtension;
 const assets = {
     "/styles.css": ["text/css", await readFile(new URL("wwwroot/css/styles.css", base), "utf8")],
     "/icons.css": ["text/css", await readFile(new URL("wwwroot/lib/bootstrap-icons/font/bootstrap-icons.css", base), "utf8")],
     "/fonts/bootstrap-icons.woff2": ["font/woff2", await readFile(new URL("wwwroot/lib/bootstrap-icons/font/fonts/bootstrap-icons.woff2", base))],
     "/fonts/bootstrap-icons.woff": ["font/woff", await readFile(new URL("wwwroot/lib/bootstrap-icons/font/fonts/bootstrap-icons.woff", base))],
-    [moduleRoot + "RgfAiUsageSummary.razor.js"]: ["text/javascript", await readFile(new URL("Components/AI/RgfAiUsageSummary.razor.js", base), "utf8")],
     "/usage.css": ["text/css", await readFile(new URL("Components/AI/RgfAiUsageSummary.razor.css", base), "utf8")],
-    "/selection.js": ["text/javascript", await readFile(new URL("Components/AI/RgfRecrobyComponent.razor.js", base), "utf8")],
     "/selection.css": ["text/css", (await readFile(new URL("Components/AI/RgfRecrobyComponent.razor.css", base), "utf8")).replaceAll("::deep", "")],
     "/markdown.css": ["text/css", (await readFile(new URL("Components/Base/RgfMarkdownViewer.razor.css", base), "utf8")).replaceAll("::deep", "")],
     "/chat.css": ["text/css", (await readFile(new URL("Components/AI/RgfAiChatComponent.razor.css", base), "utf8")).replaceAll("::deep", "")],
-    "/module.js": ["text/javascript", await readFile(new URL("Components/AI/RgfRecrobyWorkspace.razor.js", base), "utf8")],
     "/style.css": ["text/css", (await readFile(new URL("Components/AI/RgfRecrobyWorkspace.razor.css", base), "utf8")).replaceAll("::deep", "")],
     "/bootstrap.css": ["text/css", await readFile(new URL("wwwroot/lib/bootstrap/dist/css/bootstrap.min.css", base), "utf8")]
 };
 assets['/bootstrap.js'] = ['text/javascript', await readFile(new URL('wwwroot/lib/bootstrap/dist/js/bootstrap.bundle.min.js', base), 'utf8')];
 assets['/jquery.js'] = ['text/javascript', await readFile(new URL('../RGF.Client.Blazor/wwwroot/lib/jquery/jquery.min.js', base), 'utf8')];
-assets['/ui.js'] = ['text/javascript', await readFile(new URL('wwwroot/scripts/recrovit-rgf-blazor-ui.js', base), 'utf8')];
+for (const file of [uiScript, aiScript])
+    assets[scriptsRoot + file] = ["text/javascript", await readFile(new URL("wwwroot/scripts/" + file, base), "utf8")];
 assets['/components.css'] = ['text/css', (await Promise.all(['Dashboard/DashboardPageComponent', 'GridComponent', 'NavbarComponent', 'DialogComponent'].map(name => readFile(new URL(`Components/${name}.razor.css`, base), 'utf8')))).join('\n').replaceAll('::deep', '')];
-assets[moduleRoot + 'RgfRecrobyComponent.razor.js'] = assets['/selection.js'];
-assets[moduleRoot + 'RgfRecrobyWorkspace.razor.js'] = assets['/module.js'];
 const html = `<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="/bootstrap.css"><link rel="stylesheet" href="/style.css"><link rel="stylesheet" href="/styles.css">
-<link rel="stylesheet" href="/icons.css"><link rel="stylesheet" href="/usage.css"><link rel="stylesheet" href="/components.css"><link rel="stylesheet" href="/selection.css"><link rel="stylesheet" href="/chat.css"><link rel="stylesheet" href="/markdown.css"><script src="/jquery.js"></script><script src="/bootstrap.js"></script><script src="/ui.js"></script>
+<link rel="stylesheet" href="/icons.css"><link rel="stylesheet" href="/usage.css"><link rel="stylesheet" href="/components.css"><link rel="stylesheet" href="/selection.css"><link rel="stylesheet" href="/chat.css"><link rel="stylesheet" href="/markdown.css"><script src="/jquery.js"></script><script src="/bootstrap.js"></script>
 <style>body {margin:0} #outside {height:60px} #host {margin-left:120px; width:calc(100% - 160px)}
 .chat-box {overflow-y:auto} .message {padding:10px} .navbar {height:56px} main {flex:1;min-height:0}
 .grid {width:100%} .modal {z-index:1055}</style></head><body>
@@ -67,18 +66,19 @@ const html = `<!doctype html><html><head><meta charset="utf-8"><link rel="styles
 <div class="rgf-recroby-resize" data-resize-handle tabindex="0"></div></section></div>
 <div class="toast-container rgf-toast-container position-fixed bottom-0 p-3" style="--rgf-toast-anchor: --rgf-toast-fixture;" hidden><div class="toast show" role="alert"><div class="toast-header"><strong class="me-auto">Host toast</strong><button id="toast-close" class="btn-close"></button></div><div class="toast-body">Still working</div></div></div></div>
 <div id="form-reference" class="card" style="position:fixed;left:-1000px;width:360px"><div class="dialog-header card-header"><ul class="nav nav-tabs card-header-tabs"><li class="nav-item"><button class="nav-link active">Form tab</button></li></ul></div></div>
-<script type="module">import * as workspace from '${appRoot}${moduleRoot}RgfRecrobyWorkspace.razor.js';
-import * as selection from '${appRoot}${moduleRoot}RgfRecrobyComponent.razor.js';
-import * as usage from '${appRoot}${moduleRoot}RgfAiUsageSummary.razor.js';
+<script type="module">
+await import('${appRoot}${scriptsRoot}${uiScript}');
+await import('${appRoot}${scriptsRoot}${aiScript}');
+const { Workspace: workspace, Selector: selection, Usage: usage } = window.Recrovit.RGF.Blazor.UI.AI;
 window.usage = usage;
 // Mirror the component's rendered native controls; use production CSS and JS.
 const chat = document.querySelector('.chat-box');
-window.usageListeners = 0;
+window.browserListeners = 0;
 const addWindowListener = window.addEventListener.bind(window);
 window.addEventListener = (name, handler, options) => {
-    if (handler.name === 'position' && options?.signal) {
-        window.usageListeners++;
-        options.signal.addEventListener('abort', () => window.usageListeners--, {once:true});
+    if (options?.signal) {
+        window.browserListeners++;
+        options.signal.addEventListener('abort', () => window.browserListeners--, {once:true});
     }
     addWindowListener(name, handler, options);
 };
@@ -1049,7 +1049,8 @@ try {
     await click('#effort-choice');
     await evaluate('selectionSync(true)');
     assert.equal(await evaluate("document.querySelector('#effort-panel').matches(':popover-open')"), false, 'processing closes AI top layer');
-    assert.equal(await evaluate('usageListeners'), 0, 'closed usage history has no global listeners');
+    const baseListeners = await evaluate('browserListeners');
+    assert.equal(baseListeners, 4, 'closed usage history adds no listeners to the Workspace and Selector listeners');
     await cdp('Emulation.setTimezoneOverride', {timezoneId:'America/New_York'});
     await evaluate("document.querySelectorAll('.rgf-ai-usage').forEach(usage.sync)");
     assert.equal(await evaluate("document.querySelector('[data-local-time]').textContent"), await evaluate("new Date('2026-10-14T00:00:00Z').toLocaleString()"));
@@ -1080,12 +1081,12 @@ try {
                 await delay(50);
                 assert.equal(await evaluate(`document.querySelector('${panel}').matches(':popover-open')`), false);
                 assert.equal(await evaluate('document.activeElement.id'), button.slice(1));
-                assert.equal(await evaluate('usageListeners'), 0, 'Escape releases active resources');
+                assert.equal(await evaluate('browserListeners'), baseListeners, 'Escape releases active resources');
             }
             await click('#usage-39-cost-button');
             await layout({isCollapsed:true});
             assert.equal(await evaluate("document.querySelector('#usage-39-cost').matches(':popover-open')"), false, 'collapse closes usage panel');
-            assert.equal(await evaluate('usageListeners'), 0);
+            assert.equal(await evaluate('browserListeners'), baseListeners);
         }
     }
     await viewport(1200,800);
@@ -1095,7 +1096,7 @@ try {
     await evaluate("document.querySelector('.rgf-recroby-conversation').hidden=true");
     await delay(50);
     assert.equal(await evaluate("document.querySelector('#usage-39-cost').matches(':popover-open')"), false, 'conversation switch closes usage panel');
-    assert.equal(await evaluate('usageListeners'), 0);
+    assert.equal(await evaluate('browserListeners'), baseListeners);
     await evaluate("document.querySelector('.rgf-recroby-conversation').hidden=false");
     await click('#usage-39-cost-button');
     await cdp('Input.dispatchMouseEvent', {type:'mousePressed',x:5,y:5,button:'left',clickCount:1});
@@ -1124,12 +1125,12 @@ try {
     assert.equal(await evaluate("document.querySelector('#usage-39-cost').matches(':popover-open')"), false);
     await click('#usage-39-cost-button-other');
     assert.equal(await evaluate("document.querySelector('#usage-39-cost-other').matches(':popover-open')"), true, 'another conversation opens its own independent panel');
-    assert.equal(await evaluate('usageListeners'), 2, 'only the active panel holds global listeners');
+    assert.equal(await evaluate('browserListeners'), baseListeners + 2, 'only the active panel holds global listeners');
     await evaluate("document.querySelector('#other-conversation').hidden=true; document.querySelector('.rgf-recroby-conversation').hidden=false");
     await delay(50);
     assert.equal(await evaluate("document.querySelector('#usage-39-cost-other').matches(':popover-open')"), false);
     await evaluate("document.querySelector('#other-conversation').remove(); usage.dispose('usage-row-39-other')");
-    assert.equal(await evaluate('usageListeners'), 0);
+    assert.equal(await evaluate('browserListeners'), baseListeners);
     await evaluate("document.querySelector('#usage-39-cost-button').focus()");
     assert.equal(await evaluate('document.activeElement.id'), 'usage-39-cost-button');
     await cdp('Input.dispatchKeyEvent', {type:'keyDown',key:'Enter',code:'Enter',windowsVirtualKeyCode:13,text:'\r',unmodifiedText:'\r'});
@@ -1141,16 +1142,16 @@ try {
     await click('#usage-39-cost-button');
     await evaluate("usage.dispose('usage-row-39')");
     assert.equal(await evaluate("document.querySelector('#usage-39-cost').matches(':popover-open')"), false, 'dispose closes top layer');
-    assert.equal(await evaluate('usageListeners'), 0, 'dispose releases all global listeners');
+    assert.equal(await evaluate('browserListeners'), baseListeners, 'dispose releases all global listeners');
     await click('#usage-39-cost-button');
     await delay(50);
-    assert.equal(await evaluate('usageListeners'), 0, 'dispose removes panel toggle handlers');
+    assert.equal(await evaluate('browserListeners'), baseListeners, 'dispose removes panel toggle handlers');
     await evaluate("document.querySelector('#usage-39-cost').hidePopover()");
     await evaluate("document.querySelector('#usage-0-cost-button').scrollIntoView({block:'nearest'})");
     await click('#usage-0-cost-button');
-    assert.equal(await evaluate('usageListeners'), 2);
+    assert.equal(await evaluate('browserListeners'), baseListeners + 2);
     await evaluate("document.querySelector('#usage-row-0').remove(); usage.dispose('usage-row-0')");
-    assert.equal(await evaluate('usageListeners'), 0, 'disposal by stable ID also works after Blazor removes the DOM node');
+    assert.equal(await evaluate('browserListeners'), baseListeners, 'disposal by stable ID also works after Blazor removes the DOM node');
     await evaluate(`document.querySelector('.chat-box').innerHTML = '<div class="message text-bg-secondary align-self-start">Choose a response</div><fieldset class="rgf-ai-choices align-self-start mt-2"><legend class="fs-6">Choose a response</legend>' + [0,1].map(i => '<label class="rgf-ai-choice card p-2 mb-2"><span class="d-flex align-items-start gap-2"><input id="reply-'+i+'" type="radio" class="form-check-input flex-shrink-0" name="replies"><span>'+('LongLocalizedChoice'.repeat(20))+'</span></span></label>').join('') + '<button type="button" class="btn btn-success" id="confirm-reply">Confirm response</button></fieldset>'`);
     for (const [width, height] of [[1200,800], [390,700], [390,260]]) {
         await viewport(width, height);
@@ -1181,6 +1182,25 @@ try {
     assert.equal(await evaluate('window.replyConfirmed'), true, 'Enter activates confirmation');
     await evaluate("document.querySelector('.rgf-ai-choices').disabled=true");
     assert.equal(await evaluate("[...document.querySelectorAll('.rgf-ai-choices input, .rgf-ai-choices button')].every(e=>e.matches(':disabled'))"), true, 'processing fieldset disables every native reply control');
+    const twoWorkspaces = await evaluate(`(() => {
+        const { Workspace, Selector } = Recrovit.RGF.Blazor.UI.AI;
+        const second = document.createElement('div');
+        second.id = 'second-workspace';
+        second.innerHTML = '<div class="rgf-recroby-selectors"></div>';
+        document.body.append(second);
+        const selectors = second.firstElementChild;
+        const secondReference = { invokeMethodAsync: async () => {} };
+        Workspace.initialize(second, secondReference, { mode: 1 });
+        Workspace.update(second, { mode: 1 });
+        Selector.sync(selectors, false);
+        Workspace.initialize(second, secondReference, { mode: 1 });
+        Selector.sync(selectors, false);
+        return [second.dataset.mode, document.querySelector('.rgf-recroby-workspace').dataset.mode, browserListeners];
+    })()`);
+    assert.deepEqual(twoWorkspaces, ['DockLeft', 'Floating', baseListeners + 4],
+        'Workspace and Selector instances keep separate state and repeated setup keeps one set of listeners');
+    await evaluate("document.querySelector('#second-workspace').remove()");
+    assert.equal(await evaluate('browserListeners'), baseListeners, 'removing a second workspace and selector releases only their listeners');
     console.log("PASS: continuation cards/keyboard, usage/selector top layer, viewport bounds, focus, Escape, outside click, collapse/switch/dispose, long history resources, local dates, all dock/mobile modes, host isolation, persistence, dialog/toast stacking");
     }
 } finally {

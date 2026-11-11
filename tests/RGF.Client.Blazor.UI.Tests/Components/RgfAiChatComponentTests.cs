@@ -880,6 +880,7 @@ public sealed class RgfAiChatComponentTests
         context.JSInterop.Mode = JSRuntimeMode.Loose;
         context.Services.AddSingleton<IRecroDictService, FakeDashboardRecroDictService>();
         context.Services.AddSingleton<IRecroSecService, FakeRecroSecService>();
+        RgfClientBlazorUiTestState.LoadUiResources(context);
         return context;
     }
 

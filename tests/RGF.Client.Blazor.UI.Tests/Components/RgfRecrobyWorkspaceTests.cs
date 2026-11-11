@@ -233,9 +233,7 @@ public sealed partial class RgfRecrobyWorkspaceTests
     public async Task WorkspaceDetachesAllGridContextsBeforeAsyncComponentCleanup()
     {
         using var context = Context();
-        var module = context.JSInterop.SetupModule(invocation => invocation.Arguments[0]?.ToString()?.EndsWith("RgfRecrobyComponent.razor.js") == true);
-        module.Mode = JSRuntimeMode.Loose;
-        var cleanup = module.SetupVoid("dispose", _ => true);
+        var cleanup = context.JSInterop.SetupVoid("Recrovit.RGF.Blazor.UI.AI.Selector.dispose", _ => true);
         var cut = context.Render<RgfRecrobyWorkspace>();
         var grids = new[] { new RgfRecrobyGridContext(), new RgfRecrobyGridContext() };
         foreach (var grid in grids)
@@ -250,7 +248,7 @@ public sealed partial class RgfRecrobyWorkspaceTests
         var disposal = cut.Instance.DisposeAsync().AsTask();
         try
         {
-            cut.WaitForAssertion(() => Assert.NotEmpty(module.Invocations["dispose"]));
+            cut.WaitForAssertion(() => Assert.NotEmpty(context.JSInterop.Invocations["Recrovit.RGF.Blazor.UI.AI.Selector.dispose"]));
             Assert.False(disposal.IsCompleted);
             Assert.All(grids, grid =>
             {
@@ -435,6 +433,7 @@ public sealed partial class RgfRecrobyWorkspaceTests
         context.Services.AddScoped<IRgfRecrobyWorkspaceService>(p => p.GetRequiredService<RgfRecrobyWorkspaceService>());
         context.Services.AddSingleton<IRecroDictService, FakeDashboardRecroDictService>();
         context.Services.AddSingleton<IRecroSecService, FakeRecroSecService>();
+        RgfClientBlazorUiTestState.LoadUiResources(context);
         return context;
     }
 
@@ -875,9 +874,7 @@ public sealed partial class RgfRecrobyWorkspaceTests
     public async Task AutomaticRemovalDetachesEventsAndBlazorAwaitsComponentCleanup()
     {
         using var context = Context();
-        var module = context.JSInterop.SetupModule(invocation => invocation.Arguments[0]?.ToString()?.EndsWith("RgfRecrobyComponent.razor.js") == true);
-        module.Mode = JSRuntimeMode.Loose;
-        var cleanup = module.SetupVoid("dispose", _ => true);
+        var cleanup = context.JSInterop.SetupVoid("Recrovit.RGF.Blazor.UI.AI.Selector.dispose", _ => true);
         var cut = context.Render<RgfRecrobyWorkspace>();
         var service = context.Services.GetRequiredService<RgfRecrobyWorkspaceService>();
         var grid = new RgfRecrobyGridContext();
@@ -888,9 +885,9 @@ public sealed partial class RgfRecrobyWorkspaceTests
             await service.OpenOrActivateGridAsync(grid);
             var component = cut.FindComponent<RgfRecrobyComponent>().Instance;
             var session = cut.FindComponent<RgfAiChatComponent>().Instance.Session;
-            var before = module.Invocations["dispose"].Count;
+            var before = context.JSInterop.Invocations["Recrovit.RGF.Blazor.UI.AI.Selector.dispose"].Count;
             cut.Find("[data-action=new]").Click();
-            cut.WaitForAssertion(() => Assert.True(module.Invocations["dispose"].Count > before));
+            cut.WaitForAssertion(() => Assert.True(context.JSInterop.Invocations["Recrovit.RGF.Blazor.UI.AI.Selector.dispose"].Count > before));
             Assert.Single(GridContextHandlers(grid));
             var handlers = (Action?)typeof(RgfAiConversationSession).GetField("StateChanged",
                 System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.GetValue(session);
@@ -922,15 +919,13 @@ public sealed partial class RgfRecrobyWorkspaceTests
     public async Task NewChatLeavesClosingConversationUntilExplicitCleanupCompletes()
     {
         using var context = Context();
-        var module = context.JSInterop.SetupModule(invocation => invocation.Arguments[0]?.ToString()?.EndsWith("RgfRecrobyComponent.razor.js") == true);
-        module.Mode = JSRuntimeMode.Loose;
-        var cleanup = module.SetupVoid("dispose", _ => true);
+        var cleanup = context.JSInterop.SetupVoid("Recrovit.RGF.Blazor.UI.AI.Selector.dispose", _ => true);
         var cut = context.Render<RgfRecrobyWorkspace>();
         var previous = cut.FindComponent<RgfAiChatComponent>().Instance.Session;
         var close = cut.Find(".rgf-recroby-choice > .btn-close").ClickAsync(new());
         try
         {
-            cut.WaitForAssertion(() => Assert.NotEmpty(module.Invocations["dispose"]));
+            cut.WaitForAssertion(() => Assert.NotEmpty(context.JSInterop.Invocations["Recrovit.RGF.Blazor.UI.AI.Selector.dispose"]));
             cut.Find("[data-action=new]").Click();
             Assert.Equal(2, cut.FindComponents<RgfAiChatComponent>().Count);
             Assert.Same(previous, cut.FindComponents<RgfAiChatComponent>()[0].Instance.Session);
@@ -998,14 +993,12 @@ public sealed partial class RgfRecrobyWorkspaceTests
     {
         using var context = Context();
         context.Services.AddSingleton<IRgfApiService>(new FailedApi(true));
-        var module = context.JSInterop.SetupModule(invocation => invocation.Arguments[0]?.ToString()?.EndsWith("RgfRecrobyWorkspace.razor.js") == true);
-        module.Mode = JSRuntimeMode.Loose;
         var cut = context.Render<RgfRecrobyWorkspace>();
         cut.Find("[data-action=switch]").Click();
         cut.Find("[data-action=rename]").Click();
-        Assert.Single(module.Invocations["focusTitleEditor"]);
-        Assert.Equal(false, module.Invocations["syncSwitcher"].Last().Arguments[1]);
-        Assert.Equal(false, module.Invocations["syncSwitcher"].Last().Arguments[2]);
+        Assert.Single(context.JSInterop.Invocations["Recrovit.RGF.Blazor.UI.AI.Workspace.focusTitleEditor"]);
+        Assert.Equal(false, context.JSInterop.Invocations["Recrovit.RGF.Blazor.UI.AI.Workspace.syncSwitcher"].Last().Arguments[1]);
+        Assert.Equal(false, context.JSInterop.Invocations["Recrovit.RGF.Blazor.UI.AI.Workspace.syncSwitcher"].Last().Arguments[2]);
         Assert.Empty(cut.FindAll("[data-action=switch]"));
         Assert.True(cut.Find(".rgf-recroby-switcher").HasAttribute("hidden"));
         Assert.Equal("New chat", cut.Find(".rgf-recroby-title-editor").GetAttribute("value"));
@@ -1268,14 +1261,12 @@ public sealed partial class RgfRecrobyWorkspaceTests
     {
         using var context = Context();
         context.Services.AddSingleton<IRgfApiService>(new CatalogApi());
-        var module = context.JSInterop.SetupModule(invocation => invocation.Arguments[0]?.ToString()?.EndsWith("RgfRecrobyComponent.razor.js") == true);
-        module.Mode = JSRuntimeMode.Loose;
-        var cleanup = module.SetupVoid("dispose", _ => true);
+        var cleanup = context.JSInterop.SetupVoid("Recrovit.RGF.Blazor.UI.AI.Selector.dispose", _ => true);
         var cut = context.Render<RgfRecrobyWorkspace>();
         var owner = context.Services.GetRequiredService<IRgfRecrobyWorkspaceService>().CreateOwner();
         await owner.OpenOrActivateAsync("custom", "a", "External", () => new(new PendingTransport()));
         var disposal = owner.DisposeAsync().AsTask();
-        cut.WaitForAssertion(() => Assert.NotEmpty(module.Invocations["dispose"]));
+        cut.WaitForAssertion(() => Assert.NotEmpty(context.JSInterop.Invocations["Recrovit.RGF.Blazor.UI.AI.Selector.dispose"]));
         Assert.False(disposal.IsCompleted);
         cleanup.SetVoidResult();
         await disposal;
@@ -1307,14 +1298,12 @@ public sealed partial class RgfRecrobyWorkspaceTests
     public async Task WorkspaceAndOwnerDisposalAwaitTheSameCleanup()
     {
         using var context = Context();
-        var module = context.JSInterop.SetupModule(invocation => invocation.Arguments[0]?.ToString()?.EndsWith("RgfRecrobyWorkspace.razor.js") == true);
-        module.Mode = JSRuntimeMode.Loose;
-        var cleanup = module.SetupVoid("dispose", _ => true);
+        var cleanup = context.JSInterop.SetupVoid("Recrovit.RGF.Blazor.UI.AI.Workspace.dispose", _ => true);
         var cut = context.Render<RgfRecrobyWorkspace>();
         var owner = context.Services.GetRequiredService<IRgfRecrobyWorkspaceService>().CreateOwner();
         await owner.OpenOrActivateAsync("custom", "a", "a", () => new(new PendingTransport()));
         var workspaceDisposal = cut.Instance.DisposeAsync().AsTask();
-        cut.WaitForAssertion(() => Assert.NotEmpty(module.Invocations["dispose"]));
+        cut.WaitForAssertion(() => Assert.NotEmpty(context.JSInterop.Invocations["Recrovit.RGF.Blazor.UI.AI.Workspace.dispose"]));
         var ownerDisposal = owner.DisposeAsync().AsTask();
         Assert.False(workspaceDisposal.IsCompleted);
         Assert.False(ownerDisposal.IsCompleted);

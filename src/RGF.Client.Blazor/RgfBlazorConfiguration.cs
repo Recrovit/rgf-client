@@ -204,19 +204,31 @@ public static class RgfBlazorConfigurationExtension
             await jsRuntime.InvokeAsync<IJSObjectReference>("import", $"{RgfClientConfiguration.AppRootPath}/_content/{_executingAssemblyName}/lib/jquery/jquery.min.js");
         }
 
-        if (!SriptReferences.Any())
+        // Backend reference URLs are shared, but the scripts must execute in each browser document.
+        var baseScriptsLoaded = await jsRuntime.InvokeAsync<bool>("eval", "typeof window.Recrovit?.RGF?.Blazor?.Client !== 'undefined' && typeof window.Recrovit?.LPUtils !== 'undefined'");
+        if (!baseScriptsLoaded)
         {
-            var api = serviceProvider.GetRequiredService<IRgfApiService>();
-            var res = await api.GetAsync<string[]>("/rgf/api/RGFSriptReferences", authClient: false);
-            if (res.Success)
+            var scriptReferences = SriptReferences;
+            var hasScriptReferences = scriptReferences.Any();
+            if (!hasScriptReferences)
             {
-                SriptReferences = res.Result;
-                foreach (var item in SriptReferences)
+                var api = serviceProvider.GetRequiredService<IRgfApiService>();
+                var res = await api.GetAsync<string[]>("/rgf/api/RGFSriptReferences", authClient: false);
+                if (res.Success)
                 {
-                    await jsRuntime.InvokeAsync<IJSObjectReference>("import", ApiService.BaseAddress + item);
+                    SriptReferences = scriptReferences = res.Result;
+                    hasScriptReferences = true;
                 }
-                await jsRuntime.InvokeVoidAsync($"Recrovit.WebCli.SetBaseAddress", ApiService.BaseAddress);
             }
+            foreach (var item in scriptReferences)
+            {
+                await jsRuntime.InvokeAsync<IJSObjectReference>("import", ApiService.BaseAddress + item);
+            }
+            if (hasScriptReferences)
+            {
+                await jsRuntime.InvokeVoidAsync("Recrovit.WebCli.SetBaseAddress", ApiService.BaseAddress);
+            }
+
             await jsRuntime.InvokeAsync<IJSObjectReference>("import", $"{RgfClientConfiguration.AppRootPath}/_content/{_executingAssemblyName}/scripts/" +
 #if DEBUG
                 "recrovit-rgf-blazor.js"

@@ -37,6 +37,7 @@
 
   <ItemGroup Condition="'$(Configuration)'=='Release'">
     <Content Update="wwwroot\scripts\recrovit-rgf-blazor-ui.js" CopyToPublishDirectory="Never" />
+    <Content Update="wwwroot\scripts\recrovit-rgf-blazor-ui-ai.js" CopyToPublishDirectory="Never" />
   </ItemGroup>
 
 </Project>

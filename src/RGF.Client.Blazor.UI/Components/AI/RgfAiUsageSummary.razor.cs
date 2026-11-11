@@ -18,6 +18,13 @@ public partial class RgfAiUsageSummary : IAsyncDisposable
     [Inject]
     private IRecroDictService RecroDict { get; set; } = null!;
 
+    [Inject]
+    private IJSRuntime _jsRuntime { get; set; } = null!;
+
+    /// <summary>The original response; no values are inferred from model configuration or other turns.</summary>
+    [Parameter, EditorRequired]
+    public RgfAiResponse Response { get; set; } = null!;
+
     protected override void OnInitialized()
     {
         base.OnInitialized();
@@ -29,43 +36,48 @@ public partial class RgfAiUsageSummary : IAsyncDisposable
         if (!_disposed) StateHasChanged();
     });
 
-    [Inject] private IJSRuntime JS { get; set; } = null!;
-    /// <summary>The original response; no values are inferred from model configuration or other turns.</summary>
-    [Parameter, EditorRequired] public RgfAiResponse Response { get; set; } = null!;
-
     private readonly string _id = $"rgf-ai-usage-{Guid.NewGuid():N}";
     private ElementReference _element;
-    private IJSObjectReference? _module;
+    private bool _jsInitialized;
+    private const string JsNamespace = RGFClientBlazorUIConfiguration.JsBlazorUiNamespace + ".AI.Usage";
     private bool _disposed;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (_disposed) return;
-        if (Response.CreditUsage is null && Response.CreditState is null)
+        try
         {
-            if (_module is not null) await _module.InvokeVoidAsync("dispose", _id);
-            return;
+            if (_disposed) return;
+            if (Response.CreditUsage is null && Response.CreditState is null)
+            {
+                if (_jsInitialized)
+                {
+                    _jsInitialized = false;
+                    await _jsRuntime.InvokeVoidAsync(JsNamespace + ".dispose", _id);
+                }
+                return;
+            }
+
+            await RGFClientBlazorUIConfiguration.WaitForAiScriptsAsync(_jsRuntime);
+            if (_disposed || (Response.CreditUsage is null && Response.CreditState is null)) return;
+
+            _jsInitialized = true;
+            await _jsRuntime.InvokeVoidAsync(JsNamespace + ".sync", _element);
         }
-        var module = _module ?? await JS.InvokeAsync<IJSObjectReference>("import",
-            $"{RgfClientConfiguration.AppRootPath}/_content/Recrovit.RecroGridFramework.Client.Blazor.UI/Components/AI/RgfAiUsageSummary.razor.js");
-        if (module is null) return;
-        if (_disposed) { await module.DisposeAsync(); return; }
-        _module = module;
-        await module.InvokeVoidAsync("sync", _element);
+        catch (JSDisconnectedException) { }
     }
 
     /// <summary>Closes the panel and releases all browser listeners and observers.</summary>
     public async ValueTask DisposeAsync()
     {
+        if (_disposed) return;
         _disposed = true;
         RecroSec.LanguageChangedEvent.Unsubscribe(OnLanguageChangedAsync);
         try
         {
-            if (_module is not null)
+            if (_jsInitialized)
             {
                 // The DOM node may already be removed when Blazor runs asynchronous disposal.
-                await _module.InvokeVoidAsync("dispose", _id);
-                await _module.DisposeAsync();
+                await _jsRuntime.InvokeVoidAsync(JsNamespace + ".dispose", _id);
             }
         }
         catch (JSDisconnectedException) { }

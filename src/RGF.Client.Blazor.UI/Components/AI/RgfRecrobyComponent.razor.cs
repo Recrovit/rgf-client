@@ -16,7 +16,8 @@ namespace Recrovit.RecroGridFramework.Client.Blazor.UI.Components.AI;
 /// <summary>Recroby chat with optional catalog selectors and an external or lazily created API conversation session.</summary>
 public partial class RgfRecrobyComponent : IAsyncDisposable
 {
-    private static readonly ConditionalWeakTable<IServiceProvider, RgfRecrobyCatalogCache> Catalogs = new();
+    private static readonly ConditionalWeakTable<IServiceProvider, RgfRecrobyCatalogCache> Catalogs = [];
+
     [Inject]
     private IRecroDictService RecroDict { get; set; } = null!;
 
@@ -27,15 +28,15 @@ public partial class RgfRecrobyComponent : IAsyncDisposable
     private IServiceProvider Services { get; set; } = null!;
 
     [Inject]
-    private IJSRuntime JS { get; set; } = null!;
+    private IJSRuntime _jsRuntime { get; set; } = null!;
 
     /// <summary>Optional callback forwarded unchanged for manual chat send exceptions.</summary>
     [Parameter]
     public EventCallback<Exception> SendFailed { get; set; }
 
     /// <summary>External session to retain; when null the component creates its own API-backed session.</summary>
-    [Parameter] public RgfAiConversationSession? Session { get; set; }
-
+    [Parameter]
+    public RgfAiConversationSession? Session { get; set; }
 
     private RgfAiConversationSession? _session;
     private RgfAiConversationSession? _subscribed;
@@ -43,9 +44,9 @@ public partial class RgfRecrobyComponent : IAsyncDisposable
     private readonly string _selectorId = $"recroby-selection-{Guid.NewGuid():N}";
     private readonly CancellationTokenSource _lifetime = new();
     private ElementReference _element;
-    private IJSObjectReference? _module;
-    private Task<IJSObjectReference>? _moduleImport;
+    private bool _jsInitialized;
     private bool _sessionChanged;
+    private const string JsNamespace = RGFClientBlazorUIConfiguration.JsBlazorUiNamespace + ".AI.Selector";
     private bool _disposed;
     private RgfAiChatComponent? _chat;
     private readonly object _disposalSync = new();
@@ -197,14 +198,18 @@ public partial class RgfRecrobyComponent : IAsyncDisposable
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (_disposed) return;
-        _lastRenderedLanguage = RecroSec.UserLanguage;
-        _moduleImport ??= JS.InvokeAsync<IJSObjectReference>("import",
-            $"{RgfClientConfiguration.AppRootPath}/_content/Recrovit.RecroGridFramework.Client.Blazor.UI/Components/AI/RgfRecrobyComponent.razor.js").AsTask();
-        _module = await _moduleImport;
-        if (_module is null || _disposed) return;
-        await _module.InvokeVoidAsync("sync", _element, SelectionDisabled || _sessionChanged);
-        _sessionChanged = false;
+        try
+        {
+            if (_disposed) return;
+            _lastRenderedLanguage = RecroSec.UserLanguage;
+            await RGFClientBlazorUIConfiguration.WaitForAiScriptsAsync(_jsRuntime);
+            if (_disposed) return;
+
+            _jsInitialized = true;
+            await _jsRuntime.InvokeVoidAsync(JsNamespace + ".sync", _element, SelectionDisabled || _sessionChanged);
+            _sessionChanged = false;
+        }
+        catch (JSDisconnectedException) { }
     }
 
     public ValueTask DisposeAsync()
@@ -239,12 +244,7 @@ public partial class RgfRecrobyComponent : IAsyncDisposable
         if (_subscribed is not null) _subscribed.StateChanged -= SessionChanged;
         try
         {
-            if (_moduleImport is not null) _module = await _moduleImport;
-            if (_module is not null)
-            {
-                await _module.InvokeVoidAsync("dispose", _element);
-                await _module.DisposeAsync();
-            }
+            if (_jsInitialized) await _jsRuntime.InvokeVoidAsync(JsNamespace + ".dispose", _element);
         }
         catch (JSDisconnectedException) { }
         finally { _lifetime.Dispose(); }

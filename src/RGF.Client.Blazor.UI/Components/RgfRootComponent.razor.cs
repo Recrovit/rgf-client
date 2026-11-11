@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.JSInterop;
 using Recrovit.RecroGridFramework.Client.AI;
 
 namespace Recrovit.RecroGridFramework.Client.Blazor.UI.Components;
@@ -10,6 +11,12 @@ public partial class RgfRootComponent
     private IServiceProvider _serviceProvider { get; set; } = default!;
 
     private bool _recrobyEnabled;
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        RGFClientBlazorUIConfiguration.RegisterResourceLoad(_serviceProvider.GetRequiredService<IJSRuntime>());
+    }
 
     protected override async Task OnParametersSetAsync()
     {
@@ -27,8 +34,7 @@ public partial class RgfRootComponent
 
         if (firstRender)
         {
-            await RgfBlazorConfigurationExtension.LoadResourcesAsync(_serviceProvider);
-            await RGFClientBlazorUIConfiguration.LoadResourcesAsync(_serviceProvider);
+            await RGFClientBlazorUIConfiguration.LoadResourcesAsync(_serviceProvider, themeName: null, loadBaseResources: true);
         }
     }
 }

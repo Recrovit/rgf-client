@@ -1,6 +1,29 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { bounds, normalize } from "../src/RGF.Client.Blazor.UI/Components/AI/RgfRecrobyWorkspace.razor.js";
+import { readFile } from "node:fs/promises";
+import { runInNewContext } from "node:vm";
+
+const scripts = new URL("../src/RGF.Client.Blazor.UI/wwwroot/scripts/", import.meta.url);
+const window = {};
+const load = async name => runInNewContext(await readFile(new URL(name, scripts), "utf8"), { window });
+await load("recrovit-rgf-blazor-ui.js");
+const ui = window.Recrovit.RGF.Blazor.UI;
+const base = ui.Base;
+await load("recrovit-rgf-blazor-ui-ai.js");
+const { bounds, normalize } = ui.AI.Workspace;
+
+test("the AI script adds its browser API to the existing UI namespace", () => {
+    assert.equal(window.Recrovit.RGF.Blazor.UI, ui);
+    assert.equal(ui.Base, base);
+    for (const [area, methods] of Object.entries({
+        Workspace: ["normalize", "bounds", "initialize", "update", "syncSwitcher", "focusTitleEditor", "focusUserMessage", "dispose"],
+        Selector: ["sync", "dispose"],
+        Usage: ["sync", "dispose"]
+    })) {
+        assert.deepEqual(Object.keys(ui.AI[area]).sort(), methods.sort());
+        for (const method of methods) assert.equal(typeof ui.AI[area][method], "function");
+    }
+});
 
 test("floating window stays visible after viewport shrinks without mutating desktop preferences", () => {
     const original = { x: 1000, y: 800, width: 900, height: 800 };

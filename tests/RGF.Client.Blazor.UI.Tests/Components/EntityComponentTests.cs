@@ -346,6 +346,7 @@ public sealed class EntityComponentTests
     {
         using var context = CreateTestContext(true);
         context.Services.AddScoped<RgfRecrobyWorkspaceService>();
+        await RgfClientBlazorUiTestState.LoadUiResourcesAsync(context);
         var workspace = context.Render<RgfRecrobyWorkspace>();
         var api = (PendingRgfApiService)context.Services.GetRequiredService<IRgfApiService>();
         api.GridProperties = [new() { Id = 8, Alias = "Number", ColTitle = "Number", ColPos = 1, Sort = 1 }];
@@ -452,6 +453,7 @@ public sealed class EntityComponentTests
     {
         using var context = CreateTestContext(true);
         context.Services.AddScoped<RgfRecrobyWorkspaceService>();
+        await RgfClientBlazorUiTestState.LoadUiResourcesAsync(context);
         var workspace = context.Render<RgfRecrobyWorkspace>();
         var api = (PendingRgfApiService)context.Services.GetRequiredService<IRgfApiService>();
         var entity = CreateEntityParameters(RfgDisplayMode.Grid);
@@ -491,6 +493,7 @@ public sealed class EntityComponentTests
     {
         using var context = CreateTestContext(true);
         context.Services.AddScoped<RgfRecrobyWorkspaceService>();
+        await RgfClientBlazorUiTestState.LoadUiResourcesAsync(context);
         var workspace = context.Render<RgfRecrobyWorkspace>();
         var api = (PendingRgfApiService)context.Services.GetRequiredService<IRgfApiService>();
         var services = context.Services.GetRequiredService<RgfRecrobyWorkspaceService>();
@@ -623,6 +626,7 @@ public sealed class EntityComponentTests
     {
         using var context = CreateTestContext(true);
         context.Services.AddScoped<RgfRecrobyWorkspaceService>();
+        await RgfClientBlazorUiTestState.LoadUiResourcesAsync(context);
         var workspace = context.Render<RgfRecrobyWorkspace>();
         var api = (PendingRgfApiService)context.Services.GetRequiredService<IRgfApiService>();
         var entity = CreateEntityParameters(RfgDisplayMode.Grid);
@@ -789,6 +793,7 @@ public sealed class EntityComponentTests
         context.ComponentFactories.AddStub<Recrovit.RecroGridFramework.Client.Blazor.UI.Components.FormComponent>();
         context.Services.AddScoped<RgfRecrobyWorkspaceService>();
         var entity = CreateEntityParameters(RfgDisplayMode.Grid);
+        await RgfClientBlazorUiTestState.LoadUiResourcesAsync(context);
         var cut = context.Render<RgfRecrobyWorkspace>(p => p.Add(c => c.ChildContent, builder =>
         {
             builder.OpenComponent<Recrovit.RecroGridFramework.Client.Blazor.UI.Components.EntityComponent>(0);
@@ -863,6 +868,7 @@ public sealed class EntityComponentTests
         var a = CreateEntityParameters(RfgDisplayMode.Grid);
         var b = CreateEntityParameters(RfgDisplayMode.Grid);
         b.IsEmbeddedEntity = true;
+        await RgfClientBlazorUiTestState.LoadUiResourcesAsync(context);
         var cut = context.Render<RgfRecrobyWorkspace>(p => p.Add(c => c.ChildContent, Grids(true)));
         AssertState("b");
         var firstEmbeddedContext = cut.FindComponents<RgfEntityComponent>()[1].Instance.RecrobyGridContext;

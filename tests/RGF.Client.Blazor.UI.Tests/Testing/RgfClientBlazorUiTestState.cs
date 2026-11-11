@@ -1,3 +1,7 @@
+using Bunit;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.JSInterop;
+using Recrovit.RecroGridFramework.Abstraction.Contracts.Services;
 using Recrovit.RecroGridFramework.Client.Services;
 using Recrovit.RecroGridFramework.Client.Services.Dashboard;
 using System.Collections.Concurrent;
@@ -7,10 +11,6 @@ namespace Recrovit.RecroGridFramework.Client.Blazor.UI.Tests.Testing;
 
 internal static class RgfClientBlazorUiTestState
 {
-    private static readonly FieldInfo UiScriptsLoadedField = typeof(RGFClientBlazorUIConfiguration)
-        .GetField("_scriptsLoaded", BindingFlags.Static | BindingFlags.NonPublic)
-        ?? throw new InvalidOperationException("Unable to locate RGFClientBlazorUIConfiguration._scriptsLoaded.");
-
     private static readonly PropertyInfo UiThemeNameProperty = typeof(RGFClientBlazorUIConfiguration)
         .GetProperty("ThemeName", BindingFlags.Static | BindingFlags.NonPublic)
         ?? throw new InvalidOperationException("Unable to locate RGFClientBlazorUIConfiguration.ThemeName.");
@@ -47,9 +47,24 @@ internal static class RgfClientBlazorUiTestState
         .GetField("RecroDictDashboard", BindingFlags.Static | BindingFlags.NonPublic)
         ?? throw new InvalidOperationException("Unable to locate RgfDashboardDefinitionHelper.RecroDictDashboard.");
 
+    public static void LoadUiResources(BunitContext context)
+    {
+        var loading = LoadUiResourcesAsync(context);
+        Assert.True(loading.IsCompleted);
+        loading.GetAwaiter().GetResult();
+    }
+
+    public static async Task LoadUiResourcesAsync(BunitContext context)
+    {
+        using var services = new ServiceCollection()
+            .AddSingleton(context.JSInterop.JSRuntime)
+            .AddSingleton<IRgfApiService, FakeRgfApiService>()
+            .BuildServiceProvider();
+        await RGFClientBlazorUIConfiguration.LoadResourcesAsync(services);
+    }
+
     public static void Reset()
     {
-        UiScriptsLoadedField.SetValue(null, false);
         UiThemeNameProperty.SetValue(null, "light");
 
         IsInitializedProperty.SetValue(null, false);
