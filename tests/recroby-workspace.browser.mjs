@@ -44,8 +44,7 @@ const html = `<!doctype html><html><head><meta charset="utf-8"><link rel="styles
 <div class="card-header rgf-recroby-conversation-bar">
 <button id="conversation-selector" class="btn btn-sm btn-outline-secondary rgf-recroby-selector" data-action="switch" aria-haspopup="dialog" aria-expanded="false" aria-controls="conversation-list" title="New chat"><span class="rgf-recroby-title">New chat</span><i aria-hidden="true">&#x2304;</i></button>
 <button class="btn btn-sm btn-outline-secondary" data-action="rename" aria-label="Rename conversation"><i class="bi bi-pencil-square" aria-hidden="true"></i></button>
-<div class="btn-group rgf-recroby-new-chat"><button class="btn btn-sm btn-outline-secondary" data-action="new" aria-label="New conversation">+</button><button class="btn btn-sm btn-outline-secondary dropdown-toggle dropdown-toggle-split" aria-label="New conversation options" aria-expanded="false" aria-haspopup="menu" popovertarget="new-chat-menu"></button></div>
-<div id="new-chat-menu" class="rgf-recroby-new-menu" popover="auto" role="menu"><button class="dropdown-item" role="menuitem" data-new-chat disabled>New chat with current Grid</button><button class="dropdown-item" role="menuitem" data-new-chat>New general chat</button></div>
+<button class="btn btn-sm btn-outline-secondary" data-action="new" aria-label="New conversation">+</button>
 <div id="conversation-list" class="rgf-recroby-switcher" popover="manual" hidden role="dialog" aria-label="Conversations">
 <div class="rgf-recroby-switcher-list"><div role="group" aria-label="Conversations" data-conversation-type="general">
 <div class="rgf-recroby-choice active"><button class="rgf-recroby-choice-select" data-action="select" aria-pressed="true"><span class="rgf-recroby-choice-title">Conversation 1</span><i aria-hidden="true">&#x2713;</i></button><button class="btn-close" aria-label="Close Conversation 1"></button></div>
@@ -324,32 +323,13 @@ try {
         await viewport(width, height);
         for (const mode of [0, 1, 2, 3]) {
             await layout({ mode, isCollapsed: false });
-            await click('[aria-label="New conversation options"]');
-            assert.equal(await evaluate("document.querySelector('.rgf-recroby-new-menu').matches(':popover-open')"), true);
-            const menu = await rect('.rgf-recroby-new-menu');
-            assert.ok(menu.x >= 0 && menu.right <= width && menu.y >= 0 && menu.bottom <= height, 'new chat menu fits the visual viewport');
-            assert.equal(await evaluate("document.querySelector('[data-new-chat]').matches(':disabled')"), true);
-            assert.equal(await evaluate("document.activeElement.textContent"), 'New general chat', 'general chat is initially focused when no Grid is active');
-            await click('.rgf-recroby-new-menu button:last-child');
-            assert.equal(await evaluate("document.querySelector('.rgf-recroby-new-menu').matches(':popover-open')"), false, 'selection closes the menu');
+            const button = await rect('[data-action=new]');
+            assert.ok(button.width > 0 && button.x >= 0 && button.right <= width &&
+                button.y >= 0 && button.bottom <= height, 'new conversation button fits the visual viewport');
         }
     }
     await viewport(1200, 800);
-    await layout({ mode: 2, isCollapsed: false });
-    await evaluate("document.querySelector('[data-new-chat]').disabled=false");
-    await click('[aria-label="New conversation options"]');
-    assert.equal(await evaluate('document.activeElement.textContent'), 'New chat with current Grid');
-    await cdp('Input.dispatchKeyEvent', {type:'keyDown',key:'ArrowDown',code:'ArrowDown',windowsVirtualKeyCode:40});
-    assert.equal(await evaluate('document.activeElement.textContent'), 'New general chat');
-    await cdp('Input.dispatchKeyEvent', {type:'keyDown',key:'Escape',code:'Escape',windowsVirtualKeyCode:27});
-    await cdp('Input.dispatchKeyEvent', {type:'keyUp',key:'Escape',code:'Escape',windowsVirtualKeyCode:27});
-    await delay(50);
-    assert.equal(await evaluate("document.querySelector('.rgf-recroby-new-menu').matches(':popover-open')"), false);
-    await click('[aria-label="New conversation options"]');
-    await click('#collapse');
-    assert.equal(await evaluate("document.querySelector('.rgf-recroby-new-menu').matches(':popover-open')"), false, 'collapse releases the top-layer menu');
-    await evaluate("document.querySelector('[data-new-chat]').disabled=true");
-    console.log('PASS: new-chat split menu in all layouts, disabled Grid action, keyboard navigation and collapse');
+    console.log('PASS: new conversation button in all layouts');
     for (const mode of [0, 1, 2, 3]) {
         await layout({ mode, isCollapsed: false });
         const preferences = await evaluate('JSON.stringify(settings)');

@@ -17,6 +17,12 @@ public sealed class RgfRecrobyGridContext
     /// <summary>The current initialized manager, or null while unavailable. Does not own the manager.</summary>
     public IRgManager? Manager { get; private set; }
 
+    /// <summary>Whether the owning Grid has permanently closed.</summary>
+    public bool IsClosed { get; private set; }
+
+    /// <summary>Raised once when the owning Grid permanently closes.</summary>
+    public event Action<RgfRecrobyGridContext>? Closed;
+
     /// <summary>Raised after the manager reference or retained display data changes.</summary>
     public event Action? Changed;
 
@@ -59,6 +65,7 @@ public sealed class RgfRecrobyGridContext
     public void SetManager(IRgManager manager)
     {
         ArgumentNullException.ThrowIfNull(manager);
+        if (IsClosed) return;
         var entityName = manager.EntityDesc.EntityName;
         var displayName = string.IsNullOrWhiteSpace(manager.EntityDesc.Title) ? entityName : manager.EntityDesc.Title;
         if (ReferenceEquals(Manager, manager) && EntityName == entityName && DisplayName == displayName) return;
@@ -75,5 +82,16 @@ public sealed class RgfRecrobyGridContext
         if (Manager is null || !ReferenceEquals(Manager, manager)) return;
         Manager = null;
         Changed?.Invoke();
+    }
+
+    /// <summary>Permanently releases the manager and signals the end of this Grid's lifetime.</summary>
+    public void Close()
+    {
+        if (IsClosed) return;
+        IsClosed = true;
+        var hadManager = Manager is not null;
+        Manager = null;
+        Closed?.Invoke(this);
+        if (hadManager) Changed?.Invoke();
     }
 }

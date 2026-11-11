@@ -133,8 +133,12 @@ public class RgManager : IRgManager
         ToastManager = notificationService.GetNotificationManager(RgfToastEventArgs.NotificationManagerScope);
     }
 
+    /// <summary>Raised before initialization starts, including reinitialization of an existing manager.</summary>
+    public event Action<RgManager>? Initializing;
+
     public async Task<bool> InitializeAsync(RgfGridRequest request)
     {
+        Initializing?.Invoke(this);
         _filterHandler = null;
         SelectParam = request.SelectParam;
 

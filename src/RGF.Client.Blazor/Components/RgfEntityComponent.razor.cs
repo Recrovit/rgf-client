@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Components;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.JSInterop;
 using Recrovit.RecroGridFramework.Abstraction.Contracts.API;
@@ -54,9 +55,10 @@ public partial class RgfEntityComponent : ComponentBase, IDisposable
     public IRgManager? Manager { get; set; }
 
     // RGF-DOC: rgf.client.recroby.integration
-    /// <summary>Stable identity and current initialized manager for this Grid's Recroby conversations.</summary>
+    /// <summary>Stable identity and current initialized manager for this Grid's Recroby context.</summary>
     public RgfRecrobyGridContext RecrobyGridContext { get; } = new();
 
+    private bool _recrobyRegistered;
     private bool _disposed;
 
     public List<IDisposable> Disposables { get; private set; } = [];
@@ -148,6 +150,7 @@ public partial class RgfEntityComponent : ComponentBase, IDisposable
         if (_disposed) return false;
         var manager = new RgManager(gridRequest, _serviceProvider);
         Manager = manager;
+        manager.Initializing += OnManagerInitializing;
         void EnsureCurrent()
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -205,7 +208,7 @@ public partial class RgfEntityComponent : ComponentBase, IDisposable
                 await EntityParameters.EventDispatcher.DispatchEventAsync(eventArgs.EventKind, new RgfEventArgs<RgfEntityEventArgs>(this, eventArgs));
                 EnsureCurrent();
 
-                RecrobyGridContext.SetManager(manager);
+                await PublishRecrobyContextAsync(manager);
                 _logger.LogDebug("Initialized | EntityName:{EntityName}", EntityParameters.EntityName);
                 return true;
             }
@@ -358,12 +361,28 @@ public partial class RgfEntityComponent : ComponentBase, IDisposable
             var eventArgs = new RgfEntityEventArgs(RgfEntityEventKind.Initialized, Manager!);
             await EntityParameters.EventDispatcher.DispatchEventAsync(eventArgs.EventKind, new RgfEventArgs<RgfEntityEventArgs>(this, eventArgs));
             if (!_disposed && ReferenceEquals(Manager, currentManager) && currentManager.ListHandler.Initialized)
-                RecrobyGridContext.SetManager(currentManager);
+                await PublishRecrobyContextAsync(currentManager);
             StateHasChanged();
         }
         catch (OperationCanceledException)
         {
             _logger.LogDebug("OnInitialized | OperationCanceledException | EntityName:{EntityName}", EntityParameters.EntityName);
+        }
+    }
+
+    private void OnManagerInitializing(RgManager manager) => RecrobyGridContext.ClearManager(manager);
+
+    private async Task PublishRecrobyContextAsync(IRgManager manager)
+    {
+        try
+        {
+            RecrobyGridContext.SetManager(manager);
+            if (!_recrobyRegistered && _serviceProvider.GetService<RgfRecrobyWorkspaceService>() is { } workspace)
+                _recrobyRegistered = await workspace.RegisterGridAsync(RecrobyGridContext);
+        }
+        catch (Exception error)
+        {
+            _logger.LogWarning(error, "Could not publish the Grid context to Recroby.");
         }
     }
 
@@ -390,6 +409,7 @@ public partial class RgfEntityComponent : ComponentBase, IDisposable
     public void Dispose()
     {
         _disposed = true;
+        RecrobyGridContext.Close();
         EntityParameters?.UnsubscribeFromAll(this);
         if (Disposables != null)
         {
@@ -405,6 +425,7 @@ public partial class RgfEntityComponent : ComponentBase, IDisposable
         var cancellation = _createManagerCancellationTokenSource;
         _createManagerCancellationTokenSource = null;
         // RGF-DOC: rgf.client.recroby.integration
+        if (manager is RgManager rgManager) rgManager.Initializing -= OnManagerInitializing;
         if (manager != null) RecrobyGridContext.ClearManager(manager);
         Manager = null;
         if (EntityParameters != null && ReferenceEquals(EntityParameters.Manager, manager)) EntityParameters.Manager = null;

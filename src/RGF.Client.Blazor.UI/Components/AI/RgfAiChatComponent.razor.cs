@@ -250,7 +250,7 @@ public partial class RgfAiChatComponent : IDisposable
                 var configurationFailure = response.ErrorCode is "AiCredit.InvalidConfiguration"
                     or RgfAiErrorCodes.AiProviderAuthenticationFailed;
                 var creditRejected = response.ErrorCode != null && CreditErrorCodes.Contains(response.ErrorCode);
-                var invalidContinuation = response.ErrorCode == "InvalidContinuationResponse";
+                var invalidContinuation = response.ErrorCode is "InvalidContinuationResponse" or "PendingGridChanged";
                 _errorKind = providerMissing || configurationFailure ? "configuration" : creditRejected ? "credit"
                     : invalidContinuation ? "continuation" : "workflow";
                 _sendError = configurationFailure

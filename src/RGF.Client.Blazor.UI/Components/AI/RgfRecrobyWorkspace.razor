@@ -5,6 +5,10 @@
     <section class="rgf-recroby-panel card" aria-label="Recroby" hidden="@_layout.IsCollapsed">
         <header class="card-header d-flex flex-wrap align-items-center gap-2 @(ActiveGridContext?.Manager is not null ? "bg-success-subtle" : null)" data-drag-handle>
             <strong><i class="bi bi-robot" aria-hidden="true"></i> Recroby</strong>
+            @if (ActiveGridContext is { } grid)
+            {
+                <span class="rgf-recroby-context" title="@grid.DisplayName">@grid.DisplayName</span>
+            }
             <div class="dropdown ms-auto rgf-recroby-desktop-controls">
                 <button type="button" class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false" title="Window layout" aria-label="Window layout"><i class="bi bi-window" aria-hidden="true"></i></button>
                 <ul class="dropdown-menu dropdown-menu-end">
@@ -23,18 +27,6 @@
             </div>
             <button type="button" class="btn btn-outline-secondary" aria-label="Collapse Recroby" @onclick="Collapse">−</button>
         </header>
-        @if (_active != null)
-        {
-            <div class="px-3 pt-1 small text-body-secondary rgf-recroby-context">@ContextLabel(_active)</div>
-        }
-        @if (_gridReconnectBlocked || _gridOwnerUnsupported)
-        {
-            <div class="alert alert-warning mx-3 my-1 py-1" role="alert">
-                @(_gridOwnerUnsupported
-                    ? GridMessage("RecrobyGridOwnerUnsupported", "This conversation does not support connecting to a Grid.")
-                    : GridMessage("RecrobyGridBusy", "Finish or cancel the current Recroby workflow, then click the Grid's Recroby button again to reconnect this conversation."))
-            </div>
-        }
         <div class="card-header rgf-recroby-conversation-bar" @onkeydown="SwitcherKeyDown">
             @if (_editing != null)
             {
@@ -52,14 +44,7 @@
                 </button>
             }
             <button type="button" class="btn btn-outline-secondary" data-action="rename" title="Rename conversation" aria-label="@($"Rename {_active?.Title}")" @onclick="BeginRename"><i class="bi bi-pencil-square" aria-hidden="true"></i></button>
-            <div class="btn-group rgf-recroby-new-chat">
-                <button type="button" class="btn btn-outline-secondary" data-action="new" title="New conversation" aria-label="New conversation" @onclick="NewConversation"><i class="bi bi-plus-lg" aria-hidden="true"></i></button>
-                <button type="button" class="btn btn-outline-secondary dropdown-toggle dropdown-toggle-split" popovertarget="@(_selectorId + "-new")" aria-label="New conversation options" aria-haspopup="menu" aria-expanded="false"></button>
-            </div>
-            <div id="@(_selectorId + "-new")" class="rgf-recroby-new-menu" popover="auto" role="menu" aria-label="New conversation">
-                <button type="button" class="dropdown-item" role="menuitem" data-new-chat disabled="@(_active?.GridContext is null)" @onclick="NewConversation">New chat with current Grid</button>
-                <button type="button" class="dropdown-item" role="menuitem" data-new-chat @onclick="NewGeneralConversation">New general chat</button>
-            </div>
+            <button type="button" class="btn btn-outline-secondary" data-action="new" title="New conversation" aria-label="New conversation" @onclick="NewConversation"><i class="bi bi-plus-lg" aria-hidden="true"></i></button>
             <div id="@(_selectorId + "-list")" class="rgf-recroby-switcher" popover="manual" hidden="@(!_switcherOpen)" role="dialog" aria-label="Conversations">
                 @if (_conversations.Count > 8)
                 {
@@ -76,7 +61,6 @@
                                     <button type="button" class="rgf-recroby-choice-select" data-action="select" title="@conversation.Title"
                                             aria-controls="@($"recroby-panel-{conversation.Id:N}")" aria-pressed="@((conversation == _active).ToString().ToLowerInvariant())" @onclick="() => SelectConversation(conversation)">
                                         <span class="rgf-recroby-choice-title">@conversation.Title</span>
-                                        @if (conversation.GridContext != null) { <small class="rgf-recroby-choice-context">@ContextLabel(conversation)</small> }
                                         @if (conversation == _active) { <i class="bi bi-check-lg" aria-hidden="true"></i> }
                                     </button>
                                     <button type="button" class="btn-close" title="Close @conversation.Title" aria-label="Close @conversation.Title" @onclick="() => CloseConversation(conversation)"></button>

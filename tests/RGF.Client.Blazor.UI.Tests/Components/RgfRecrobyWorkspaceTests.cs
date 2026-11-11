@@ -45,50 +45,103 @@ public sealed partial class RgfRecrobyWorkspaceTests
         Assert.Equal(((object?)null, "Orders", "Orders"), states[4]);
         grid.ClearManager(replacement);
         Assert.Equal(5, states.Count);
+        var closed = 0;
+        grid.Closed += context =>
+        {
+            Assert.Same(grid, context);
+            Assert.True(context.IsClosed);
+            Assert.Null(context.Manager);
+            closed++;
+        };
+        grid.Close();
+        grid.Close();
+        grid.SetManager(manager);
+        Assert.Equal(1, closed);
+        Assert.Null(grid.Manager);
     }
 
-    [Fact]
-    public async Task SharedGridContextUpdatesLabelsAutomaticallyUntilLastConversationCloses()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RegisteredGridsFallBackInReverseOrderAndSkipUnavailableManagers(bool invalidateMiddleGrid)
     {
         using var context = Context();
         var cut = context.Render<RgfRecrobyWorkspace>();
-        AddHistoryToActive(cut);
-        cut.Find("[data-action=new]").Click();
+        var service = context.Services.GetRequiredService<RgfRecrobyWorkspaceService>();
+        var session = cut.FindComponent<RgfAiChatComponent>().Instance.Session;
+        var a = CreateGrid("A");
+        var b = CreateGrid("B");
+        var c = CreateGrid("C");
+        Assert.True(await service.RegisterGridAsync(a));
+        Assert.Equal("A", ActiveGrid());
+        Assert.True(await service.RegisterGridAsync(b));
+        Assert.Equal("B", ActiveGrid());
+        Assert.True(await service.RegisterGridAsync(c));
+        Assert.Equal("C", ActiveGrid());
+        Assert.True(await service.RegisterGridAsync(a));
+        Assert.Equal("C", ActiveGrid());
+        Assert.Single(GridContextHandlers(a));
+        Assert.True(cut.Find(".rgf-recroby-panel").HasAttribute("hidden"));
+        Assert.Same(session, cut.FindComponent<RgfAiChatComponent>().Instance.Session);
+
+        var manager = b.Manager!;
+        if (invalidateMiddleGrid)
+        {
+            await cut.InvokeAsync(() => b.ClearManager(manager));
+            Assert.Equal("C", ActiveGrid());
+        }
+        await cut.InvokeAsync(c.Close);
+        Assert.Equal(invalidateMiddleGrid ? "A" : "B", ActiveGrid());
+        Assert.Empty(GridContextHandlers(c));
+
+        if (invalidateMiddleGrid)
+        {
+            var replacement = CreateGridManager();
+            replacement.EntityDesc.Title = "B replacement";
+            await cut.InvokeAsync(() => b.SetManager(replacement));
+            Assert.Equal("B replacement", ActiveGrid());
+        }
+
+        await cut.InvokeAsync(b.Close);
+        Assert.Equal("A", ActiveGrid());
+        await cut.InvokeAsync(a.Close);
+        Assert.Null(ActiveGrid());
+        Assert.False(await service.RegisterGridAsync(c));
+        Assert.False(await service.OpenOrActivateGridAsync(c));
+
+        string? ActiveGrid() => cut.FindAll("header .rgf-recroby-context").SingleOrDefault()?.TextContent;
+    }
+
+    [Fact]
+    public async Task ExplicitGridActivationReordersTheStackAndInactiveClosureKeepsSelection()
+    {
+        using var context = Context();
+        var cut = context.Render<RgfRecrobyWorkspace>();
+        var service = context.Services.GetRequiredService<RgfRecrobyWorkspaceService>();
+        var a = CreateGrid("A");
+        var b = CreateGrid("B");
+        var c = CreateGrid("C");
+        foreach (var grid in new[] { a, b, c }) Assert.True(await service.RegisterGridAsync(grid));
+        var bManager = b.Manager!;
+        await cut.InvokeAsync(() => b.ClearManager(bManager));
+        await cut.InvokeAsync(() => b.SetManager(bManager));
+        Assert.Equal("C", cut.Find(".rgf-recroby-context").TextContent);
+
+        Assert.True(await service.OpenOrActivateGridAsync(a));
+        Assert.Equal("A", cut.Find(".rgf-recroby-context").TextContent);
+        await cut.InvokeAsync(b.Close);
+        Assert.Equal("A", cut.Find(".rgf-recroby-context").TextContent);
+        await cut.InvokeAsync(a.Close);
+        Assert.Equal("C", cut.Find(".rgf-recroby-context").TextContent);
+    }
+
+    private static RgfRecrobyGridContext CreateGrid(string title)
+    {
         var grid = new RgfRecrobyGridContext();
         var manager = CreateGridManager();
+        manager.EntityDesc.Title = title;
         grid.SetManager(manager);
-        await context.Services.GetRequiredService<RgfRecrobyWorkspaceService>().OpenOrActivateGridAsync(grid);
-        AddHistoryToActive(cut);
-        cut.Find("[data-action=new]").Click();
-        Assert.Single(GridContextHandlers(grid));
-
-        await Task.Run(() => grid.ClearManager(manager), Xunit.TestContext.Current.CancellationToken);
-        cut.WaitForAssertion(() =>
-        {
-            Assert.Equal("Orders (unavailable)", cut.Find(".rgf-recroby-context").TextContent);
-            Assert.Equal(2, cut.FindAll("[data-action=select]").Count(e => e.TextContent.Contains("Orders (unavailable)")));
-        });
-        await Task.Run(() => grid.SetManager(manager), Xunit.TestContext.Current.CancellationToken);
-        cut.WaitForAssertion(() =>
-        {
-            Assert.Equal("Orders", cut.Find(".rgf-recroby-context").TextContent);
-            Assert.DoesNotContain("unavailable", cut.Markup);
-        });
-
-        await cut.FindAll(".rgf-recroby-choice > .btn-close")[1].ClickAsync(new());
-        Assert.Single(GridContextHandlers(grid));
-        await Task.Run(() => grid.ClearManager(manager), Xunit.TestContext.Current.CancellationToken);
-        cut.WaitForAssertion(() => Assert.Equal("Orders (unavailable)", cut.Find(".rgf-recroby-context").TextContent));
-        await Task.Run(() => grid.SetManager(manager), Xunit.TestContext.Current.CancellationToken);
-        cut.WaitForAssertion(() => Assert.Equal("Orders", cut.Find(".rgf-recroby-context").TextContent));
-
-        await cut.FindAll(".rgf-recroby-choice > .btn-close")[1].ClickAsync(new());
-        Assert.Empty(GridContextHandlers(grid));
-        var renderCount = cut.RenderCount;
-        grid.ClearManager(manager);
-        await cut.InvokeAsync(() => { });
-        Assert.Equal(renderCount, cut.RenderCount);
-        Assert.Equal("General chat", cut.Find(".rgf-recroby-context").TextContent);
+        return grid;
     }
 
     [Fact]
@@ -114,7 +167,11 @@ public sealed partial class RgfRecrobyWorkspaceTests
         {
             cut.WaitForAssertion(() => Assert.NotEmpty(module.Invocations["dispose"]));
             Assert.False(disposal.IsCompleted);
-            Assert.All(grids, grid => Assert.Empty(GridContextHandlers(grid)));
+            Assert.All(grids, grid =>
+            {
+                Assert.Empty(GridContextHandlers(grid));
+                Assert.Empty(GridContextHandlers(grid, nameof(RgfRecrobyGridContext.Closed)));
+            });
         }
         finally { cleanup.SetVoidResult(); }
         await disposal;
@@ -158,8 +215,8 @@ public sealed partial class RgfRecrobyWorkspaceTests
         Assert.Empty(GridContextHandlers(grid));
     }
 
-    private static Delegate[] GridContextHandlers(RgfRecrobyGridContext grid) =>
-        ((Action?)typeof(RgfRecrobyGridContext).GetField("Changed",
+    private static Delegate[] GridContextHandlers(RgfRecrobyGridContext grid, string eventName = nameof(RgfRecrobyGridContext.Changed)) =>
+        ((Delegate?)typeof(RgfRecrobyGridContext).GetField(eventName,
             System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.GetValue(grid))?.GetInvocationList() ?? [];
 
     private static Recrovit.RecroGridFramework.Client.Handlers.IRgManager CreateGridManager() =>
@@ -173,7 +230,7 @@ public sealed partial class RgfRecrobyWorkspaceTests
     }
 
     [Fact]
-    public async Task GridButtonConnectsActiveConversationWithoutSelectingExistingGridChat()
+    public async Task GridButtonActivatesGridWithoutSelectingAnotherChat()
     {
         using var context = Context();
         var service = context.Services.GetRequiredService<RgfRecrobyWorkspaceService>();
@@ -200,7 +257,7 @@ public sealed partial class RgfRecrobyWorkspaceTests
         Assert.Equal("Keep history", first.Conversation.Messages[0].Message);
         Assert.Equal("Reply", first.Conversation.Messages[1].Message);
         Assert.Equal("Second history", Assert.Single(second.Conversation.Messages).Message);
-        Assert.Empty(GridContextHandlers(a));
+        Assert.Single(GridContextHandlers(a));
         Assert.Single(GridContextHandlers(b));
     }
 
@@ -368,7 +425,7 @@ public sealed partial class RgfRecrobyWorkspaceTests
         Assert.NotSame(first.Instance.Session, chats[1].Instance.Session);
         chats[1].Find("textarea").Change("Draft two");
         Assert.Equal(2, cut.FindAll("[data-action=select]").Count);
-        Assert.Single(cut.FindAll(".rgf-recroby-conversation-bar .rgf-recroby-new-chat > [data-action=new]"));
+        Assert.Single(cut.FindAll(".rgf-recroby-conversation-bar > [data-action=new]"));
         Assert.Equal("New chat", cut.Find(".rgf-recroby-title").TextContent);
         Assert.Empty(cut.FindAll("button button"));
         cut.Find("[data-action=switch]").Click();
@@ -613,10 +670,8 @@ public sealed partial class RgfRecrobyWorkspaceTests
         Assert.Empty(cut.FindAll("[role=tab], [role=tabpanel]"));
     }
 
-    [Theory]
-    [InlineData("[data-action=new]")]
-    [InlineData("[data-new-chat]:last-child")]
-    public void NewGeneralChatRemovesEmptyRenamedConversationWithDraftAndSettings(string action)
+    [Fact]
+    public void NewGeneralChatRemovesEmptyRenamedConversationWithDraftAndSettings()
     {
         using var context = Context();
         var cut = context.Render<RgfRecrobyWorkspace>();
@@ -624,7 +679,7 @@ public sealed partial class RgfRecrobyWorkspaceTests
         Rename(cut, "Unused renamed chat");
         previous.Conversation.AiModelOverride = "custom/model";
         cut.Find("textarea").Change("Unsent draft");
-        cut.Find(action).Click();
+        cut.Find("[data-action=new]").Click();
         var current = Assert.Single(cut.FindComponents<RgfAiChatComponent>()).Instance.Session;
         Assert.NotSame(previous, current);
         Assert.Empty(previous.Conversation.Messages);
@@ -659,67 +714,11 @@ public sealed partial class RgfRecrobyWorkspaceTests
         Assert.True(await service.OpenOrActivateGridAsync(first));
         Assert.True(await service.OpenOrActivateGridAsync(second));
         Assert.Same(session, cut.FindComponent<RgfAiChatComponent>().Instance.Session);
-        Assert.Empty(GridContextHandlers(first));
+        Assert.Single(GridContextHandlers(first));
         Assert.Single(GridContextHandlers(second));
         cut.Find("[data-action=new]").Click();
         Assert.NotSame(session, cut.FindComponent<RgfAiChatComponent>().Instance.Session);
         Assert.Single(GridContextHandlers(second));
-    }
-
-    [Theory]
-    [InlineData(true)]
-    [InlineData(false)]
-    public async Task DetachedGridChatReconnectsOnlyAfterTheTurnOrWorkflowEnds(bool pendingWorkflow)
-    {
-        using var context = Context();
-        var api = new QueuedApi();
-        context.Services.AddSingleton<IRgfApiService>(api);
-        var cut = context.Render<RgfRecrobyWorkspace>();
-        var service = context.Services.GetRequiredService<RgfRecrobyWorkspaceService>();
-        var source = new RgfRecrobyGridContext();
-        var sourceManager = System.Reflection.DispatchProxy.Create<Recrovit.RecroGridFramework.Client.Handlers.IRgManager, SnapshotManager>();
-        source.SetManager(sourceManager);
-        var target = new RgfRecrobyGridContext();
-        target.SetManager(CreateGridManager());
-        Assert.True(await service.OpenOrActivateGridAsync(source));
-        var session = cut.FindComponent<RgfAiChatComponent>().Instance.Session;
-        var panel = cut.Find(".rgf-recroby-conversation").Id;
-        using var cancellation = new CancellationTokenSource();
-        Task? turn = null;
-        if (pendingWorkflow)
-            session.Conversation.ApplyResponse(new() { Success = true, Message = "Pending", WorkflowStatus = "WaitingForInput" });
-        else
-            turn = session.SendAsync("Processing", cancellationToken: cancellation.Token);
-
-        try
-        {
-            Assert.True(await service.OpenOrActivateGridAsync(source));
-            if (pendingWorkflow) await cut.InvokeAsync(() => source.ClearManager(sourceManager));
-            cut.Find("[aria-label='Collapse Recroby']").Click();
-            Assert.False(await service.OpenOrActivateGridAsync(target));
-            Assert.Contains("Finish or cancel", cut.Find(".rgf-recroby-panel > [role=alert]").TextContent);
-            Assert.False(cut.Find(".rgf-recroby-panel").HasAttribute("hidden"));
-            Assert.Equal(pendingWorkflow ? "Orders (unavailable)" : "Orders", cut.Find(".rgf-recroby-context").TextContent);
-            Assert.Equal(panel, cut.Find(".rgf-recroby-conversation").Id);
-            Assert.Same(session, cut.FindComponent<RgfAiChatComponent>().Instance.Session);
-            Assert.Single(GridContextHandlers(source));
-            Assert.Empty(GridContextHandlers(target));
-        }
-        finally { cancellation.Cancel(); }
-        if (turn is not null)
-            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => turn);
-        else
-            session.Conversation.ApplyResponse(new() { Success = true, Message = "Finished" });
-
-        Assert.True(await service.OpenOrActivateGridAsync(target));
-        Assert.Empty(cut.FindAll(".rgf-recroby-panel > [role=alert]"));
-        Assert.Equal("Orders", cut.Find(".rgf-recroby-context").TextContent);
-        Assert.Equal(panel, cut.Find(".rgf-recroby-conversation").Id);
-        Assert.Same(session, cut.FindComponent<RgfAiChatComponent>().Instance.Session);
-        Assert.Empty(GridContextHandlers(source));
-        Assert.Single(GridContextHandlers(target));
-        await cut.Instance.DisposeAsync();
-        Assert.Empty(GridContextHandlers(target));
     }
 
     [Theory]
@@ -768,9 +767,6 @@ public sealed partial class RgfRecrobyWorkspaceTests
     public async Task EmptyOwnerConversationSurvivesNewChatAndGridOpen()
     {
         using var context = Context();
-        var dictionary = new FakeDashboardRecroDictService();
-        dictionary.RecrobyUi["RecrobyGridOwnerUnsupported"] = "Localized owner warning";
-        context.Services.AddSingleton<IRecroDictService>(dictionary);
         var cut = context.Render<RgfRecrobyWorkspace>();
         var service = context.Services.GetRequiredService<RgfRecrobyWorkspaceService>();
         await using var owner = service.CreateOwner();
@@ -781,8 +777,10 @@ public sealed partial class RgfRecrobyWorkspaceTests
         await owner.OpenOrActivateAsync("custom", "owned", "Owned", () => throw new Exception("Must reuse"));
         var grid = new RgfRecrobyGridContext();
         grid.SetManager(CreateGridManager());
-        Assert.False(await service.OpenOrActivateGridAsync(grid));
-        Assert.Equal("Localized owner warning", cut.Find("[role=alert]").TextContent.Trim());
+        Assert.True(await service.OpenOrActivateGridAsync(grid));
+        Assert.Equal("Orders", cut.Find(".rgf-recroby-context").TextContent);
+        Assert.Equal("Owned", cut.Find(".rgf-recroby-title").TextContent);
+        Assert.Empty(cut.FindAll(".rgf-recroby-panel > [role=alert]"));
         Assert.Contains(cut.FindComponents<RgfAiChatComponent>(), c => ReferenceEquals(c.Instance.Session, session));
         Assert.Empty(session.Conversation.Messages);
     }
@@ -805,9 +803,9 @@ public sealed partial class RgfRecrobyWorkspaceTests
             var component = cut.FindComponent<RgfRecrobyComponent>().Instance;
             var session = cut.FindComponent<RgfAiChatComponent>().Instance.Session;
             var before = module.Invocations["dispose"].Count;
-            cut.FindAll("[data-new-chat]")[1].Click();
+            cut.Find("[data-action=new]").Click();
             cut.WaitForAssertion(() => Assert.True(module.Invocations["dispose"].Count > before));
-            Assert.Empty(GridContextHandlers(grid));
+            Assert.Single(GridContextHandlers(grid));
             var handlers = (Action?)typeof(RgfAiConversationSession).GetField("StateChanged",
                 System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.GetValue(session);
             Assert.Null(handlers);

@@ -68,7 +68,9 @@ public partial class RgfRecrobyWorkspace : IAsyncDisposable
     public RenderFragment? ChildContent { get; set; }
 
     private readonly List<Conversation> _conversations = [];
-    private readonly HashSet<RgfRecrobyGridContext> _gridContexts = new(ReferenceEqualityComparer.Instance);
+    private readonly List<RgfRecrobyGridContext> _gridContexts = [];
+    private RgfRecrobyGridContext? _activeGridContext;
+    private long _gridActivationVersion;
     private readonly ConditionalWeakTable<IRgManager, GridTurns> _gridTurns = new();
     private Conversation? _active;
     internal (string Provider, string Model)? NameDescriptionModelSelection
@@ -81,10 +83,8 @@ public partial class RgfRecrobyWorkspace : IAsyncDisposable
             return parts.Length == 2 ? (parts[0], parts[1]) : ("", alias);
         }
     }
-    internal RgfRecrobyGridContext? ActiveGridContext => _disposed ? null : _active?.GridContext;
+    internal RgfRecrobyGridContext? ActiveGridContext => _disposed ? null : _activeGridContext;
     internal event Action? ActiveGridContextChanged;
-    private bool _gridReconnectBlocked;
-    private bool _gridOwnerUnsupported;
     private IReadOnlyDictionary<string, string>? _recrobyUi;
     private IRecroSecService? _recroSec;
     private int _dictionaryLoadVersion;
@@ -96,12 +96,8 @@ public partial class RgfRecrobyWorkspace : IAsyncDisposable
     private bool _focusUserMessage;
     private bool HasMultipleTypes => _conversations.Select(c => c.RecrobyType).Distinct().Skip(1).Any();
     private static string TypeLabel(string type) => type == "general" ? "General chat" : type;
-    private static string ContextLabel(Conversation conversation) => conversation.GridContext is { } context
-        ? context.DisplayName + (context.Manager is null ? " (unavailable)" : string.Empty)
-        : TypeLabel(conversation.RecrobyType);
     private string ConversationLabel(Conversation conversation) => HasMultipleTypes
-        || conversation.GridContext is not null
-        ? $"{ContextLabel(conversation)}: {conversation.Title}" : conversation.Title;
+        ? $"{TypeLabel(conversation.RecrobyType)}: {conversation.Title}" : conversation.Title;
 
     private void BeginRename()
     {
@@ -149,12 +145,41 @@ public partial class RgfRecrobyWorkspace : IAsyncDisposable
     private void GridContextChanged()
     {
         if (_disposed) return;
+        // A manager can become available again before the renderer processes its invalidation.
+        var unavailable = _activeGridContext is { Manager: null } active ? active : null;
+        _ = InvokeAsync(() => UpdateActiveGrid(unavailable));
+    }
+
+    private void GridContextClosed(RgfRecrobyGridContext context)
+    {
+        if (_disposed) return;
         _ = InvokeAsync(() =>
         {
             if (_disposed) return;
-            ActiveGridContextChanged?.Invoke();
-            StateHasChanged();
+            _gridContexts.RemoveAll(candidate => ReferenceEquals(candidate, context));
+            DetachGridContext(context);
+            UpdateActiveGrid();
         });
+    }
+
+    private void UpdateActiveGrid(RgfRecrobyGridContext? unavailable = null)
+    {
+        if (_disposed) return;
+        var active = _gridContexts.FindLast(context => !ReferenceEquals(context, unavailable) &&
+            !context.IsClosed && context.Manager is not null);
+        if (!ReferenceEquals(_activeGridContext, active))
+        {
+            _activeGridContext = active;
+            ++_gridActivationVersion;
+            ActiveGridContextChanged?.Invoke();
+        }
+        StateHasChanged();
+    }
+
+    private void DetachGridContext(RgfRecrobyGridContext context)
+    {
+        context.Changed -= GridContextChanged;
+        context.Closed -= GridContextClosed;
     }
 
     private RgfRecrobyLayoutSettings _layout = new();
@@ -212,14 +237,6 @@ public partial class RgfRecrobyWorkspace : IAsyncDisposable
         CancelRename();
         _active = conversation;
         CloseSwitcher();
-        NotifyActiveConversationChanged();
-    }
-
-    private void NotifyActiveConversationChanged()
-    {
-        _gridReconnectBlocked = false;
-        _gridOwnerUnsupported = false;
-        if (!_disposed) ActiveGridContextChanged?.Invoke();
     }
 
     [JSInvokable]
@@ -303,8 +320,9 @@ public partial class RgfRecrobyWorkspace : IAsyncDisposable
         _disposed = true;
         _recroSec?.LanguageChangedEvent?.Unsubscribe(OnLanguageChangedAsync);
         _workspaceRegistration?.Dispose();
-        foreach (var context in _gridContexts) context.Changed -= GridContextChanged;
+        foreach (var context in _gridContexts) DetachGridContext(context);
         _gridContexts.Clear();
+        _activeGridContext = null;
         await InvokeAsync(async () =>
         {
             _active = null;
@@ -334,14 +352,15 @@ public partial class RgfRecrobyWorkspace : IAsyncDisposable
 
     protected override void OnInitialized()
     {
-        NewGeneralConversation();
+        NewConversation();
         _workspaceRegistration = Services.GetService<RgfRecrobyWorkspaceService>()?.RegisterWorkspace(
             async operation =>
             {
                 var result = false;
                 await InvokeAsync(() => result = operation());
                 return result;
-            }, OpenExternalConversation, CloseOwnerAsync, OpenGridConversation);
+            }, OpenExternalConversation, CloseOwnerAsync,
+            context => TrackGrid(context, activate: true), context => TrackGrid(context, activate: false));
     }
 
     protected override Task OnInitializedAsync()
@@ -373,37 +392,25 @@ public partial class RgfRecrobyWorkspace : IAsyncDisposable
         StateHasChanged();
     }
 
-    private bool OpenGridConversation(RgfRecrobyGridContext context)
+    private bool TrackGrid(RgfRecrobyGridContext context, bool activate)
     {
-        if (_disposed || _active is not { Closing: false } active || context.Manager is null) return false;
-        if (!ReferenceEquals(active.GridContext, context))
+        if (_disposed || context.IsClosed) return false;
+        var index = _gridContexts.FindIndex(candidate => ReferenceEquals(candidate, context));
+        if (index >= 0 && !activate) return true;
+        if (context.Manager is null) return false;
+
+        if (index >= 0)
         {
-            if (active.Owner is not null || active.GridBinding is not { } binding)
-            {
-                _gridReconnectBlocked = false;
-                _gridOwnerUnsupported = true;
-                Open();
-                StateHasChanged();
-                return false;
-            }
-            if (active.Session.IsProcessing || active.Session.Conversation.IsPendingWorkflow)
-            {
-                _gridOwnerUnsupported = false;
-                _gridReconnectBlocked = true;
-                Open();
-                StateHasChanged();
-                return false;
-            }
-            var previous = binding.Context;
-            binding.Context = context;
-            ObserveGridContext(context);
-            if (previous is not null) UnobserveUnusedGridContext(previous);
-            NotifyActiveConversationChanged();
+            _gridContexts.RemoveAt(index);
         }
-        _gridReconnectBlocked = false;
-        _gridOwnerUnsupported = false;
-        Open();
-        StateHasChanged();
+        else
+        {
+            context.Changed += GridContextChanged;
+            context.Closed += GridContextClosed;
+        }
+        _gridContexts.Add(context);
+        if (activate) Open();
+        UpdateActiveGrid();
         return true;
     }
 
@@ -444,25 +451,17 @@ public partial class RgfRecrobyWorkspace : IAsyncDisposable
     }
 
     private void NewConversation()
-        => CreateConversation(_active?.GridContext);
-
-    private void NewGeneralConversation() => CreateConversation(null);
-
-    private void CreateConversation(RgfRecrobyGridContext? context)
     {
         var previous = _active;
         CancelRename();
         CloseSwitcher(_switcherOpen);
         // Resolve the API only when sending a turn, so an unconfigured backend cannot break startup.
-        var binding = new GridContextBinding { Context = context };
-        _active = new Conversation(new RgfAiConversationSession(new LazyTransport(this, binding))) { GridBinding = binding };
+        _active = new Conversation(new RgfAiConversationSession(new LazyTransport(this)));
         var conversation = _active;
         conversation.StateChangedHandler = () => ConversationStateChanged(conversation);
         conversation.Session.StateChanged += conversation.StateChangedHandler;
         _conversations.Add(_active);
-        if (context is not null) ObserveGridContext(context);
         RemoveEmptyConversation(previous);
-        NotifyActiveConversationChanged();
     }
 
     private void RemoveEmptyConversation(Conversation? conversation)
@@ -485,8 +484,7 @@ public partial class RgfRecrobyWorkspace : IAsyncDisposable
         if (!_conversations.Contains(conversation)) return;
         RemoveConversation(conversation);
         if (_active == conversation) _active = _conversations.LastOrDefault();
-        if (!_disposed && _conversations.Count == 0) NewGeneralConversation();
-        else NotifyActiveConversationChanged();
+        if (!_disposed && _conversations.Count == 0) NewConversation();
     }
 
     private void RemoveConversation(Conversation conversation)
@@ -494,18 +492,6 @@ public partial class RgfRecrobyWorkspace : IAsyncDisposable
         conversation.Session.StateChanged -= conversation.StateChangedHandler;
         if (_editing == conversation) CancelRename();
         _conversations.Remove(conversation);
-        if (conversation.GridContext is { } context) UnobserveUnusedGridContext(context);
-    }
-
-    private void ObserveGridContext(RgfRecrobyGridContext context)
-    {
-        if (_gridContexts.Add(context)) context.Changed += GridContextChanged;
-    }
-
-    private void UnobserveUnusedGridContext(RgfRecrobyGridContext context)
-    {
-        if (!_conversations.Any(c => ReferenceEquals(c.GridContext, context)) && _gridContexts.Remove(context))
-            context.Changed -= GridContextChanged;
     }
 
     // The type identifies the general Recroby independently of its displayed title.
@@ -521,13 +507,6 @@ public partial class RgfRecrobyWorkspace : IAsyncDisposable
         public RgfRecrobyComponent? Component { get; set; }
         public object? Owner { get; init; }
         public string? ContextKey { get; init; }
-        public GridContextBinding? GridBinding { get; init; }
-        public RgfRecrobyGridContext? GridContext => GridBinding?.Context;
-    }
-
-    private sealed class GridContextBinding
-    {
-        public RgfRecrobyGridContext? Context { get; set; }
     }
 
     private sealed class GridTurns
@@ -535,29 +514,59 @@ public partial class RgfRecrobyWorkspace : IAsyncDisposable
         public long Latest;
     }
 
-    private sealed class LazyTransport(RgfRecrobyWorkspace workspace, GridContextBinding binding) : IRgfAiTransport
+    private sealed class LazyTransport(RgfRecrobyWorkspace workspace) : IRgfAiTransport
     {
+        private (string? ConversationId, string? Token, GridTarget Target)? _pending;
+        private readonly record struct GridTarget(RgfRecrobyGridContext? Context, string? SessionId, string? GridId, int EntityId);
+
         public async Task<RgfAiResponse> SendAsync(RgfAiRequest request, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
             RgfRecrobyGridContext? gridContext = null;
             IRgManager? manager = null;
-            var entityId = 0;
+            GridTarget target = default;
+            (string? SessionId, string? GridId) managerIds = default;
             GridTurns? turns = null;
             long turn = 0;
+            long activationVersion = 0;
+            RgfAiResponse? rejection = null;
             await workspace.InvokeAsync(() =>
             {
-                gridContext = binding.Context;
+                gridContext = workspace.ActiveGridContext;
                 manager = gridContext?.Manager;
+                activationVersion = workspace._gridActivationVersion;
+                var session = manager?.SessionParams;
+                managerIds = (session?.SessionId, session?.GridId);
+                var entityId = manager?.EntityDesc.EntityId ?? 0;
                 request.GridRequest = gridContext?.CreateGridRequest();
+                target = new(gridContext, request.GridRequest?.SessionId, request.GridRequest?.GridId, entityId);
+                if (_pending is { } pending && pending.ConversationId == request.ConversationId &&
+                    pending.Token == request.ConversationToken && pending.Target != target)
+                {
+                    rejection = new RgfAiResponse
+                    {
+                        ErrorCode = "PendingGridChanged",
+                        Message = pending.Target.Context is null
+                            ? workspace.GridMessage("RecrobyPendingGridAdded",
+                                "This workflow started without a Grid. Close the active Grids to continue, or start a new conversation.")
+                            : workspace.GridMessage("RecrobyPendingGridChanged",
+                                "Return to the original Grid to continue this workflow, or start a new conversation.")
+                    };
+                    return;
+                }
                 if (manager is null) return;
-                entityId = manager.EntityDesc.EntityId;
                 turns = workspace._gridTurns.GetValue(manager, static _ => new());
                 turn = ++turns.Latest;
             });
 
+            if (rejection is not null) return rejection;
+
             var response = await new RgfAiApiTransport(workspace.Services.GetRequiredService<IRgfApiService>())
                 .SendAsync(request, cancellationToken);
+            if (response.Success)
+                _pending = response.WorkflowStatus == "WaitingForInput"
+                    ? (response.ConversationId, response.ConversationToken, target)
+                    : null;
             if (response is not { Success: true, FilterAction: { } action }) return response;
 
             // The conversation keeps response objects as history. Consume the action in this turn.
@@ -604,11 +613,12 @@ public partial class RgfRecrobyWorkspace : IAsyncDisposable
             bool IsSuperseded() => turns is not null && turns.Latest != turn;
 
             bool IsTargetCurrent() => manager is not null && ReferenceEquals(gridContext?.Manager, manager) &&
-                ReferenceEquals(binding.Context, gridContext) &&
-                manager.ListHandler is { Initialized: true } && request.GridRequest is { } sent &&
+                ReferenceEquals(workspace.ActiveGridContext, gridContext) && activationVersion == workspace._gridActivationVersion &&
+                manager.ListHandler is { Initialized: true } &&
                 action is { Operation: RgfAiFilterOperation.Replace, Conditions.Length: > 0 } &&
                 !string.IsNullOrEmpty(action.SessionId) && !string.IsNullOrEmpty(action.GridId) && action.EntityId > 0 &&
-                action.SessionId == sent.SessionId && action.GridId == sent.GridId && action.EntityId == entityId &&
+                action.SessionId == target.SessionId && action.GridId == target.GridId && action.EntityId == target.EntityId &&
+                action.SessionId == managerIds.SessionId && action.GridId == managerIds.GridId &&
                 action.SessionId == manager.SessionParams.SessionId && action.GridId == manager.SessionParams.GridId &&
                 action.EntityId == manager.EntityDesc.EntityId;
         }

@@ -379,8 +379,8 @@ public sealed class EntityComponentTests
             }
         };
         api.RecrobyResponse = request => Task.FromResult(FilterReply(request, conditions));
-        var gridContext = grid.Instance.RecrobyGridContext;
-        await context.Services.GetRequiredService<RgfRecrobyWorkspaceService>().OpenOrActivateGridAsync(gridContext);
+        Assert.Equal("Orders", workspace.Find(".rgf-recroby-context").TextContent);
+        Assert.True(workspace.Find(".rgf-recroby-panel").HasAttribute("hidden"));
         var session = workspace.FindComponent<RgfAiChatComponent>().Instance.Session;
         api.GridRequests.Clear();
         var toasts = ((FakeEventNotificationService)context.Services.GetRequiredService<IRgfEventNotificationService>()).Toasts;
@@ -536,6 +536,38 @@ public sealed class EntityComponentTests
         Assert.Null(handler.TakeNewAiFilterSettings());
         handler.InitFilter(JsonSerializer.Serialize(manager.ListHandler.GetGridSettings().Conditions));
 
+        var alternate = new RgfRecrobyGridContext();
+        alternate.SetManager(manager);
+        var toasts = ((FakeEventNotificationService)context.Services.GetRequiredService<IRgfEventNotificationService>()).Toasts;
+        toasts.Clear();
+        api.GridRequests.Clear();
+        api.RecrobyResponse = async request =>
+        {
+            Assert.True(await services.RegisterGridAsync(alternate));
+            Assert.True(await services.OpenOrActivateGridAsync(gridContext));
+            return FilterReply(request, [new() { Id = 1, Param1 = "stale after A to B to A" }]);
+        };
+        await second.SendAsync("switch away and back", cancellationToken: Xunit.TestContext.Current.CancellationToken);
+        Assert.Empty(api.GridRequests);
+        Assert.Equal("newer", Assert.Single(manager.ListHandler.GetGridSettings().Conditions!).Param1.ToString());
+        Assert.Equal(RgfToastType.Error, Assert.Single(toasts).ToastType);
+        toasts.Clear();
+        api.RecrobyResponse = async request =>
+        {
+            // Queue both changes before the renderer can process the temporary fallback.
+            await workspace.InvokeAsync(() => Task.Run(() =>
+            {
+                gridContext.ClearManager(manager);
+                gridContext.SetManager(manager);
+            }).GetAwaiter().GetResult());
+            return FilterReply(request, [new() { Id = 1, Param1 = "stale after manager reinitialization" }]);
+        };
+        await second.SendAsync("invalidate and restore", cancellationToken: Xunit.TestContext.Current.CancellationToken);
+        Assert.Empty(api.GridRequests);
+        Assert.Equal("newer", Assert.Single(manager.ListHandler.GetGridSettings().Conditions!).Param1.ToString());
+        Assert.Equal(RgfToastType.Error, Assert.Single(toasts).ToastType);
+        await workspace.InvokeAsync(alternate.Close);
+
         using var replacement = new RgManager(new(manager.SessionParams), context.Services);
         Assert.True(await replacement.InitializeAsync(replacement.CreateGridRequest(request => request.EntityName = "Orders")));
         api.RecrobyResponse = async request =>
@@ -544,7 +576,6 @@ public sealed class EntityComponentTests
             return FilterReply(request, [new() { Id = 1, Param1 = "old manager" }]);
         };
         api.GridRequests.Clear();
-        var toasts = ((FakeEventNotificationService)context.Services.GetRequiredService<IRgfEventNotificationService>()).Toasts;
         toasts.Clear();
         await second.SendAsync("replace", cancellationToken: Xunit.TestContext.Current.CancellationToken);
         Assert.Empty(api.GridRequests);
@@ -591,6 +622,8 @@ public sealed class EntityComponentTests
     public async Task DeferredInitializationRetainsReplacementManagerUntilRecreationActivatesGrid()
     {
         using var context = CreateTestContext(true);
+        context.Services.AddScoped<RgfRecrobyWorkspaceService>();
+        var workspace = context.Render<RgfRecrobyWorkspace>();
         var api = (PendingRgfApiService)context.Services.GetRequiredService<IRgfApiService>();
         var entity = CreateEntityParameters(RfgDisplayMode.Grid);
         entity.DeferredInitialization = true;
@@ -631,6 +664,7 @@ public sealed class EntityComponentTests
         Assert.Empty(cut.FindAll(".rgf-entity-grid, .toolbar"));
         Assert.Empty(cut.FindComponents<StatefulView>());
 
+        Assert.Empty(workspace.FindAll(".rgf-recroby-context"));
         var refreshed = new List<bool>();
         manager.RefreshEntity += recreate => refreshed.Add(recreate);
         Assert.True(await cut.InvokeAsync(() => manager.RecreateAsync()));
@@ -647,6 +681,26 @@ public sealed class EntityComponentTests
             Assert.Single(cut.FindAll(".rgf-entity-grid"));
             Assert.Single(cut.FindAll(".toolbar"));
             Assert.Single(cut.FindComponents<StatefulView>());
+            Assert.Equal("Orders", workspace.Find(".rgf-recroby-context").TextContent);
+            Assert.True(workspace.Find(".rgf-recroby-panel").HasAttribute("hidden"));
+        });
+
+        var release = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        api.GridResponseGate = release;
+        var recreation = cut.InvokeAsync(() => manager.RecreateAsync());
+        try
+        {
+            await api.GridResponseStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), Xunit.TestContext.Current.CancellationToken);
+            Assert.Null(gridContext.Manager);
+            Assert.Empty(workspace.FindAll(".rgf-recroby-context"));
+        }
+        finally { release.TrySetResult(true); }
+        Assert.True(await recreation);
+        workspace.WaitForAssertion(() =>
+        {
+            Assert.Same(gridContext, cut.Instance.RecrobyGridContext);
+            Assert.Same(manager, gridContext.Manager);
+            Assert.Equal("Orders", workspace.Find(".rgf-recroby-context").TextContent);
         });
     }
 
@@ -746,7 +800,7 @@ public sealed class EntityComponentTests
         var firstManager = component.Manager!;
         Assert.Same(firstManager, gridContext.Manager);
         Assert.Equal("Orders", gridContext.EntityName);
-        cut.Find(".btn-toolbar .bi-robot").ParentElement!.Click();
+        Assert.True(cut.Find(".rgf-recroby-panel").HasAttribute("hidden"));
         Assert.Equal("Orders", cut.Find(".rgf-recroby-context").TextContent);
         Assert.NotEmpty(cut.FindAll("header.bg-success-subtle"));
         var session = cut.FindComponents<RgfAiChatComponent>().Last().Instance.Session;
@@ -778,16 +832,17 @@ public sealed class EntityComponentTests
         Assert.Single(cut.FindComponents<RgfAiChatComponent>());
         cut.Render(p => p.Add(c => c.ChildContent, "<main>Grid removed</main>"));
         Assert.Null(gridContext.Manager);
+        Assert.True(gridContext.IsClosed);
         Assert.Equal("Orders", gridContext.DisplayName);
         session.Conversation.AddUserMessage("Retained Grid history");
         cut.Find("[data-action=new]").Click();
-        Assert.Equal("Orders (unavailable)", cut.Find(".rgf-recroby-context").TextContent);
+        Assert.Empty(cut.FindAll(".rgf-recroby-context"));
         Assert.Equal(2, cut.FindComponents<RgfAiChatComponent>().Count);
         Assert.Empty(cut.FindComponents<RgfAiChatComponent>().Last().Instance.Session.Conversation.Messages);
     }
 
     [Fact]
-    public async Task RecrobyToolbarTracksSelectionAndReconnectsOnlyTheActiveDetachedConversation()
+    public async Task RecrobyToolbarActivatesGridsIndependentlyOfConversationSelection()
     {
         using var context = CreateTestContext(true);
         RgfBlazorConfiguration.RegisterComponent<Recrovit.RecroGridFramework.Client.Blazor.UI.Components.MenuComponent>(RgfBlazorConfiguration.ComponentType.Menu);
@@ -799,12 +854,19 @@ public sealed class EntityComponentTests
         context.Services.AddScoped<RgfRecrobyWorkspaceService>();
         var a = CreateEntityParameters(RfgDisplayMode.Grid);
         var b = CreateEntityParameters(RfgDisplayMode.Grid);
+        b.IsEmbeddedEntity = true;
         var cut = context.Render<RgfRecrobyWorkspace>(p => p.Add(c => c.ChildContent, Grids(true)));
+        AssertState("b");
+        var firstEmbeddedContext = cut.FindComponents<RgfEntityComponent>()[1].Instance.RecrobyGridContext;
+        cut.Render(p => p.Add(c => c.ChildContent, Grids(true, includeB: false)));
+        Assert.True(firstEmbeddedContext.IsClosed);
+        AssertState("a");
+        cut.Render(p => p.Add(c => c.ChildContent, Grids(true)));
         var managers = cut.FindComponents<RgfEntityComponent>().Select(c => c.Instance.Manager!).ToArray();
         Assert.Equal(managers[0].EntityDesc.EntityName, managers[1].EntityDesc.EntityName);
         Assert.Equal(2, ToolbarSubscriptionCount());
         ActiveSession().Conversation.AddUserMessage("General history");
-        AssertState(null);
+        AssertState("b");
         cut.Find("[data-action=new]").Click();
         Robot("a").Click();
         AssertState("a");
@@ -833,11 +895,12 @@ public sealed class EntityComponentTests
         ActiveSession().Conversation.AddUserMessage("Existing B chat");
         var originalBPanel = ActivePanel();
         Select(originalAPanel);
-        AssertState("a");
+        AssertState("b");
         cut.FindAll("[data-action=select]")[0].Click();
-        AssertState(null);
+        AssertState("b");
 
-        // A response from another A chat can arrive after the active chat is reconnected.
+        // Closing A while its turn runs falls back to the embedded Grid without changing the selected chat.
+        Robot("a").Click();
         var api = (PendingRgfApiService)context.Services.GetRequiredService<IRgfApiService>();
         var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -856,8 +919,8 @@ public sealed class EntityComponentTests
             cut.Render(p => p.Add(c => c.ChildContent, Grids(false)));
             Assert.Empty(cut.FindAll("#a .bi-robot"));
             Assert.Equal(1, ToolbarSubscriptionCount());
-            AssertState(null);
-            Assert.Equal("Orders (unavailable)", cut.Find(".rgf-recroby-context").TextContent);
+            AssertState("b");
+            Assert.Equal("Orders", cut.Find(".rgf-recroby-context").TextContent);
             cut.Find("[aria-label='Collapse Recroby']").Click();
             Robot("b").Click();
             AssertState("b");
@@ -867,8 +930,8 @@ public sealed class EntityComponentTests
             Assert.Equal(4, cut.FindComponents<RgfAiChatComponent>().Count);
             Assert.Equal("My Grid conversation", cut.Find(".rgf-recroby-title").TextContent);
             Assert.Equal("Existing history", Assert.Single(reconnect.Conversation.Messages).Message);
-            Assert.Contains("Orders (unavailable)", cut.Find($"[aria-controls='{originalAPanel}']").TextContent);
-            Assert.DoesNotContain("unavailable", cut.Find($"[aria-controls='{originalBPanel}']").TextContent);
+            Assert.DoesNotContain("Orders", cut.Find($"[aria-controls='{originalAPanel}']").TextContent);
+            Assert.DoesNotContain("Orders", cut.Find($"[aria-controls='{originalBPanel}']").TextContent);
             api.GridRequests.Clear();
         }
         finally { release.TrySetResult(); }
@@ -898,11 +961,15 @@ public sealed class EntityComponentTests
         await Close(reconnectPanel);
         AssertState("b");
         await Close(originalBPanel);
+        AssertState("b");
+        var embeddedContext = cut.FindComponent<RgfEntityComponent>().Instance.RecrobyGridContext;
+        cut.Render(p => p.Add(c => c.ChildContent, "<main>Grids removed</main>"));
+        Assert.True(embeddedContext.IsClosed);
         AssertState(null);
         await cut.Instance.DisposeAsync();
         Assert.Equal(0, ToolbarSubscriptionCount());
 
-        RenderFragment Grids(bool includeA) => builder =>
+        RenderFragment Grids(bool includeA, bool includeB = true) => builder =>
         {
             if (includeA)
             {
@@ -913,12 +980,15 @@ public sealed class EntityComponentTests
                 builder.CloseComponent();
                 builder.CloseElement();
             }
-            builder.OpenElement(4, "div");
-            builder.AddAttribute(5, "id", "b");
-            builder.OpenComponent<Recrovit.RecroGridFramework.Client.Blazor.UI.Components.EntityComponent>(6);
-            builder.AddAttribute(7, "EntityParameters", b);
-            builder.CloseComponent();
-            builder.CloseElement();
+            if (includeB)
+            {
+                builder.OpenElement(4, "div");
+                builder.AddAttribute(5, "id", "b");
+                builder.OpenComponent<Recrovit.RecroGridFramework.Client.Blazor.UI.Components.EntityComponent>(6);
+                builder.AddAttribute(7, "EntityParameters", b);
+                builder.CloseComponent();
+                builder.CloseElement();
+            }
         };
 
         AngleSharp.Dom.IElement Robot(string grid) => cut.Find($"#{grid} .btn-toolbar .bi-robot").ParentElement!;
@@ -950,7 +1020,7 @@ public sealed class EntityComponentTests
     }
 
     [Fact]
-    public void RecrobyToolbarRequiresWorkspaceAndTechnicalChartGridCannotPublishIt()
+    public void GridInitializesWithoutRecrobyAndDeferredChartWaitsForInitialization()
     {
         using var context = CreateTestContext(true);
         RgfBlazorConfiguration.RegisterComponent<Recrovit.RecroGridFramework.Client.Blazor.UI.Components.MenuComponent>(RgfBlazorConfiguration.ComponentType.Menu);
@@ -961,6 +1031,9 @@ public sealed class EntityComponentTests
         context.ComponentFactories.AddStub<Recrovit.RecroGridFramework.Client.Blazor.UI.Components.FormComponent>();
         var entity = CreateEntityParameters(RfgDisplayMode.Grid);
         var standalone = context.Render<Recrovit.RecroGridFramework.Client.Blazor.UI.Components.EntityComponent>(p => p.Add(c => c.EntityParameters, entity));
+        Assert.Null(context.Services.GetService<RgfRecrobyWorkspaceService>());
+        Assert.True(standalone.FindComponent<RgfEntityComponent>().Instance.Manager!.ListHandler.Initialized);
+        Assert.Single(standalone.FindAll(".rgf-entity-grid"));
         Assert.Empty(standalone.FindAll(".btn-toolbar .bi-robot"));
         var technical = new RgfEntityParameters("RGRecroChart") { DeferredInitialization = true, IsEmbeddedEntity = true };
         var chartGrid = context.Render<RgfEntityComponent>(p => p.Add(c => c.EntityParameters, technical));

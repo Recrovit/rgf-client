@@ -49,7 +49,7 @@ public sealed partial class RgfRecrobyWorkspaceTests
     }
 
     [Fact]
-    public async Task WorkspaceSerializesConversationSpecificSnapshotsDuringConcurrentSendsAndManagerReplacement()
+    public async Task WorkspaceSnapshotsTheActiveGridAtTheStartOfEachConversationTurn()
     {
         using var context = Context();
         var api = new SnapshotApi();
@@ -83,15 +83,74 @@ public sealed partial class RgfRecrobyWorkspaceTests
         var replacement = DispatchProxy.Create<IRgManager, SnapshotManager>();
         ((SnapshotManager)replacement).GridId = "replacement";
         ((SnapshotManager)replacement).Settings.Sort![0][0] = 12;
-        first.SetManager(replacement);
-        first.ClearManager(firstManager);
-        await firstSession.SendAsync("updated while second is active", cancellationToken: Xunit.TestContext.Current.CancellationToken);
+        await cut.InvokeAsync(() =>
+        {
+            first.SetManager(replacement);
+            first.ClearManager(firstManager);
+        });
+        var token = Xunit.TestContext.Current.CancellationToken;
+        await firstSession.SendAsync("first chat while second Grid is active", cancellationToken: token);
+        await secondSession.SendAsync("second chat while second Grid is active", cancellationToken: token);
+        Assert.All(api.Json.TakeLast(2), json => Assert.Equal("second", ReadGrid(json)!.GridId));
+        await cut.InvokeAsync(second.Close);
+        await firstSession.SendAsync("replacement after fallback", cancellationToken: token);
         Assert.Equal("replacement", ReadGrid(api.Json.Last())!.GridId);
         Assert.Equal(12, ReadGrid(api.Json.Last())!.ListParam.Sort[0][0]);
-        first.ClearManager(replacement);
+        await cut.InvokeAsync(() => first.ClearManager(replacement));
         await firstSession.SendAsync("temporarily unavailable", cancellationToken: Xunit.TestContext.Current.CancellationToken);
         Assert.Null(ReadGrid(api.Json.Last()));
         Assert.Contains(cut.FindComponents<RgfAiChatComponent>(), c => ReferenceEquals(c.Instance.Session, firstSession));
+    }
+
+    [Fact]
+    public async Task PendingWorkflowRejectsOtherAndMissingGridsAndResumesOnTheOriginal()
+    {
+        using var context = Context();
+        var api = new SnapshotApi
+        {
+            Response = new()
+            {
+                Success = true, WorkflowStatus = "WaitingForInput",
+                ConversationId = "pending-id", ConversationToken = "pending-token", Message = "Choose a filter"
+            }
+        };
+        context.Services.AddSingleton<IRgfApiService>(api);
+        var cut = context.Render<RgfRecrobyWorkspace>();
+        var service = context.Services.GetRequiredService<RgfRecrobyWorkspaceService>();
+        var a = new RgfRecrobyGridContext();
+        var b = new RgfRecrobyGridContext();
+        var manager = DispatchProxy.Create<IRgManager, SnapshotManager>();
+        a.SetManager(manager);
+        var other = DispatchProxy.Create<IRgManager, SnapshotManager>();
+        ((SnapshotManager)other).GridId = "other";
+        b.SetManager(other);
+        Assert.True(await service.RegisterGridAsync(a));
+        var session = cut.FindComponent<RgfAiChatComponent>().Instance.Session;
+        var token = Xunit.TestContext.Current.CancellationToken;
+        await session.SendAsync("begin", cancellationToken: token);
+        Assert.True(session.Conversation.IsPendingWorkflow);
+
+        Assert.True(await service.RegisterGridAsync(b));
+        var rejection = await session.SendAsync("continue on B", cancellationToken: token);
+        Assert.False(rejection.Success);
+        Assert.Equal("PendingGridChanged", rejection.ErrorCode);
+        Assert.Contains("original Grid", rejection.Message);
+        await cut.InvokeAsync(() => { b.Close(); a.ClearManager(manager); });
+        rejection = await session.SendAsync("continue without a Grid", cancellationToken: token);
+        Assert.Equal("PendingGridChanged", rejection.ErrorCode);
+        Assert.Single(api.Json);
+        Assert.True(session.Conversation.IsPendingWorkflow);
+        Assert.Equal("pending-id", session.Conversation.ConversationId);
+        Assert.Equal("pending-token", session.Conversation.ConversationToken);
+        Assert.Equal(2, session.Conversation.Messages.Count);
+
+        await cut.InvokeAsync(() => a.SetManager(manager));
+        api.Response = new() { Success = true, ConversationId = "pending-id", Message = "Done" };
+        Assert.True((await session.SendAsync("continue on A", cancellationToken: token)).Success);
+        Assert.False(session.Conversation.IsPendingWorkflow);
+        Assert.Equal(2, api.Json.Count);
+        Assert.Equal("grid", ReadGrid(api.Json[^1])!.GridId);
+        Assert.Equal("pending-token", JsonDocument.Parse(api.Json[^1]).RootElement.GetProperty("conversationToken").GetString());
     }
 
     private static RgfGridRequest? ReadGrid(string json) =>
@@ -110,6 +169,7 @@ public sealed partial class RgfRecrobyWorkspaceTests
         protected override object? Invoke(MethodInfo? method, object?[]? args)
         {
             if (method!.Name == "get_EntityDesc") return new RgfEntity { EntityName = "Orders", Title = "Orders" };
+            if (method.Name == "get_SessionParams") return new RgfSessionParams { SessionId = "session", GridId = GridId };
             if (method.Name == "get_ListHandler")
             {
                 var list = DispatchProxy.Create<IRgListHandler, SnapshotList>();
@@ -140,6 +200,7 @@ public sealed partial class RgfRecrobyWorkspaceTests
     {
         public List<string> Json { get; } = [];
         public bool Hold { get; set; }
+        public RgfAiResponse Response { get; set; } = new() { Success = true, Message = "answer" };
         public TaskCompletionSource Release { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public Task<IRgfApiResponse<T>> GetAsync<T>(IRgfApiRequest request) where T : class => throw new NotSupportedException();
         public async Task<IRgfApiResponse<T>> PostAsync<T>(IRgfApiRequest request) where T : class
@@ -147,7 +208,7 @@ public sealed partial class RgfRecrobyWorkspaceTests
             Json.Add(await request.Content.ReadAsStringAsync());
             if (Hold) await Release.Task;
             return (IRgfApiResponse<T>)(object)new ApiResponse<RgfAiResponse> { Success = true,
-                Result = new() { Success = true, Message = "answer" } };
+                Result = Response };
         }
     }
 }
