@@ -9,55 +9,58 @@ namespace Recrovit.RecroGridFramework.Client.Services;
 
 internal class RecroDictService : IRecroDictService, IRecroDictFormatter
 {
+    private const string StandardUiScope = "RGF.UI";
+    private const string RecrobyUiScope = "RGF.Recroby.UI";
+
     private readonly ILogger _logger;
     private readonly IRgfApiService _apiService;
-    private readonly IServiceProvider _serviceProvider;
+    private readonly SemaphoreSlim _initializationGate = new(1);
+    private readonly Dictionary<string, string> _defaultLanguages;
+    private volatile UiDictionaries? _ui;
 
-    public RecroDictService(IConfiguration configuration, ILogger<RecroDictService> logger, IRgfApiService apiService, IServiceProvider serviceProvider)
+    private sealed record UiDictionaries(string Language, Dictionary<string, string> Languages,
+        ConcurrentDictionary<string, string> Standard, ConcurrentDictionary<string, string> Recroby);
+
+    public RecroDictService(IConfiguration configuration, ILogger<RecroDictService> logger, IRgfApiService apiService)
     {
         _logger = logger;
         _apiService = apiService;
-        _serviceProvider = serviceProvider;
         var config = configuration.GetSection("Recrovit:RecroGridFramework:RecroDict");
         DefaultLanguage = (config.GetValue<string>("DefaultLanguage", "eng") ?? "eng").ToLower();
-        Languages = new Dictionary<string, string>() { { DefaultLanguage, DefaultLanguage } };
-        _rgfUi = [];
+        _defaultLanguages = new() { [DefaultLanguage] = DefaultLanguage };
     }
 
+    // RGF-DOC: rgf.client.recroby.integration
     public async Task InitializeAsync(string? language = null)
     {
-        language ??= DefaultLanguage;
-        if (!IsInitialized || language != _uiLanguage)
+        language = string.IsNullOrEmpty(language) ? DefaultLanguage : language;
+        await _initializationGate.WaitAsync();
+        try
         {
-            var dict = await GetDictionaryAsync("RGF.Language", language, false);
-            Languages = dict.ToDictionary(k => k.Key, v => v.Value);
+            if (string.Equals(language, _ui?.Language, StringComparison.OrdinalIgnoreCase)) return;
 
-            dict = await GetDictionaryAsync("RGF.UI", language, false);
-            _rgfUi = dict.ToDictionary(k => k.Key, v => v.Value);
-
+            var languages = await GetDictionaryAsync("RGF.Language", language, authClient: false);
+            var standard = await GetDictionaryAsync(StandardUiScope, language, authClient: false);
+            var recroby = await GetDictionaryAsync(RecrobyUiScope, language, authClient: false);
+            _ui = new(language, languages.ToDictionary(), new(standard, standard.Comparer), new(recroby, recroby.Comparer));
             _logger.LogInformation("RecroDict:{Language} initialized.", language);
-            _uiLanguage = language;
-            IsInitialized = true;
         }
+        finally { _initializationGate.Release(); }
     }
 
-    public string DefaultLanguage { get; private set; }
+    public string DefaultLanguage { get; }
 
-    public Dictionary<string, string> Languages { get; private set; }
+    public Dictionary<string, string> Languages => _ui?.Languages ?? _defaultLanguages;
 
-    public bool IsInitialized { get; private set; }
+    public bool IsInitialized => _ui is not null;
 
     private static ConcurrentDictionary<string, MemoryCache> DictionaryCache { get; } = new();
-
-    private Dictionary<string, string> _rgfUi;
-
-    private string? _uiLanguage;
 
     public virtual async Task<ConcurrentDictionary<string, string>> GetDictionaryAsync(string scope, string? language = null, bool authClient = true)
     {
         if (string.IsNullOrEmpty(language))
         {
-            language = _uiLanguage ?? DefaultLanguage;
+            language = _ui?.Language ?? DefaultLanguage;
         }
         var dictCache = DictionaryCache.GetOrAdd(language, new MemoryCache(new MemoryCacheOptions()));
         var dict = await dictCache.GetOrCreateAsync(scope, async entry =>
@@ -74,16 +77,18 @@ internal class RecroDictService : IRecroDictService, IRecroDictFormatter
         return dict!;
     }
 
-    public string GetRgfUiString(string resourceKey)
-    {
-        if (!IsInitialized)
-        {
-            return "RecroDict has not been initialized";
-        }
-        return IRecroDictServiceExtension.GetItem(_rgfUi, resourceKey, $"RGF.UI.{resourceKey}");
-    }
+    public string GetRgfUiString(string resourceKey) => GetUiString(_ui?.Standard, StandardUiScope, resourceKey);
 
-    public string GetRgfUiString(string resourceKey, params object[] args) => FormatResource("RGF.UI", resourceKey, GetRgfUiString(resourceKey), args);
+    public string GetRgfUiString(string resourceKey, params object[] args) => FormatResource(StandardUiScope, resourceKey, GetRgfUiString(resourceKey), args);
+
+    public string GetRgfRecrobyString(string resourceKey) => GetUiString(_ui?.Recroby, RecrobyUiScope, resourceKey);
+
+    public string GetRgfRecrobyString(string resourceKey, params object[] args) => FormatResource(RecrobyUiScope, resourceKey, GetRgfRecrobyString(resourceKey), args);
+
+    private static string GetUiString(ConcurrentDictionary<string, string>? dictionary, string scope, string resourceKey) =>
+        dictionary is null
+            ? "RecroDict has not been initialized"
+            : IRecroDictServiceExtension.GetItem(dictionary, resourceKey, $"{scope}.{resourceKey}");
 
     public string FormatResource(string? scope, string resourceKey, string value, params object[] args)
     {

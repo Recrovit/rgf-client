@@ -10,13 +10,14 @@ import { setTimeout as delay } from "node:timers/promises";
 
 const base = new URL("../src/RGF.Client.Blazor.UI/", import.meta.url);
 const appRoot = "/recroby-test";
-const moduleRoot = "/_content/Recrovit.RecroGridFramework.Client.Blazor.UI/Components/AI/";
+const packageRoot = "/_content/Recrovit.RecroGridFramework.Client.Blazor.UI/";
+const moduleRoot = packageRoot + "Components/AI/";
 const assets = {
     "/styles.css": ["text/css", await readFile(new URL("wwwroot/css/styles.css", base), "utf8")],
     "/icons.css": ["text/css", await readFile(new URL("wwwroot/lib/bootstrap-icons/font/bootstrap-icons.css", base), "utf8")],
     "/fonts/bootstrap-icons.woff2": ["font/woff2", await readFile(new URL("wwwroot/lib/bootstrap-icons/font/fonts/bootstrap-icons.woff2", base))],
     "/fonts/bootstrap-icons.woff": ["font/woff", await readFile(new URL("wwwroot/lib/bootstrap-icons/font/fonts/bootstrap-icons.woff", base))],
-    "/usage.js": ["text/javascript", await readFile(new URL("Components/AI/RgfAiUsageSummary.razor.js", base), "utf8")],
+    [moduleRoot + "RgfAiUsageSummary.razor.js"]: ["text/javascript", await readFile(new URL("Components/AI/RgfAiUsageSummary.razor.js", base), "utf8")],
     "/usage.css": ["text/css", await readFile(new URL("Components/AI/RgfAiUsageSummary.razor.css", base), "utf8")],
     "/selection.js": ["text/javascript", await readFile(new URL("Components/AI/RgfRecrobyComponent.razor.js", base), "utf8")],
     "/selection.css": ["text/css", (await readFile(new URL("Components/AI/RgfRecrobyComponent.razor.css", base), "utf8")).replaceAll("::deep", "")],
@@ -58,17 +59,17 @@ const html = `<!doctype html><html><head><meta charset="utf-8"><link rel="styles
 <div class="rgf-recroby-selectors">
 <button id="model-choice" class="btn btn-sm btn-outline-secondary" popovertarget="model-panel" aria-expanded="false"><i class="bi bi-cpu me-1" aria-hidden="true"></i>Provider / Model ▾</button>
 <button id="effort-choice" class="btn btn-sm btn-outline-secondary" popovertarget="effort-panel" aria-expanded="false"><i class="bi bi-lightbulb me-1" aria-hidden="true"></i>Default ▾</button>
-<div id="model-panel" class="rgf-recroby-selection-panel" popover="auto" role="dialog"><label>Provider</label><select class="form-select"><option>Provider</option></select><label>Model</label><select class="form-select" data-close-popover><option>Model</option></select></div>
+<div id="model-panel" class="rgf-recroby-selection-panel" popover="auto" role="dialog"><label class="form-label">Provider</label><select class="form-select"><option>Provider</option></select><label class="form-label">Model</label><select class="form-select" data-close-popover><option>Model</option></select></div>
 <button id="format-choice" class="btn btn-sm btn-outline-secondary" popovertarget="format-panel" aria-expanded="false"><i class="bi bi-markdown me-1" aria-hidden="true"></i>Minimal ▾</button>
-<div id="format-panel" class="rgf-recroby-selection-panel" popover="auto" role="dialog"><label>Response format</label><select class="form-select" data-close-popover><option>Plain text</option><option selected>Minimal</option><option>Normal</option><option>Maximum</option></select></div>
-<div id="effort-panel" class="rgf-recroby-selection-panel" popover="auto" role="dialog"><label>Reasoning effort</label><select class="form-select" data-close-popover><option>Default</option><option>High</option></select></div>
+<div id="format-panel" class="rgf-recroby-selection-panel" popover="auto" role="dialog"><label class="form-label">Response format</label><select class="form-select" data-close-popover><option>Plain text</option><option selected>Minimal</option><option>Normal</option><option>Maximum</option></select></div>
+<div id="effort-panel" class="rgf-recroby-selection-panel" popover="auto" role="dialog"><label class="form-label">Reasoning effort</label><select class="form-select" data-close-popover><option>Default</option><option>High</option></select></div>
 </div></div></div></div>
 <div class="rgf-recroby-resize" data-resize-handle tabindex="0"></div></section></div>
 <div class="toast-container rgf-toast-container position-fixed bottom-0 p-3" style="--rgf-toast-anchor: --rgf-toast-fixture;" hidden><div class="toast show" role="alert"><div class="toast-header"><strong class="me-auto">Host toast</strong><button id="toast-close" class="btn-close"></button></div><div class="toast-body">Still working</div></div></div></div>
 <div id="form-reference" class="card" style="position:fixed;left:-1000px;width:360px"><div class="dialog-header card-header"><ul class="nav nav-tabs card-header-tabs"><li class="nav-item"><button class="nav-link active">Form tab</button></li></ul></div></div>
 <script type="module">import * as workspace from '${appRoot}${moduleRoot}RgfRecrobyWorkspace.razor.js';
 import * as selection from '${appRoot}${moduleRoot}RgfRecrobyComponent.razor.js';
-import * as usage from '${appRoot}/usage.js';
+import * as usage from '${appRoot}${moduleRoot}RgfAiUsageSummary.razor.js';
 window.usage = usage;
 // Mirror the component's rendered native controls; use production CSS and JS.
 const chat = document.querySelector('.chat-box');
@@ -163,6 +164,7 @@ if (firefox) {
 const child = spawn(executable, firefox ? ['--headless', '--no-remote', '--profile', profile, '--remote-debugging-port', String(firefoxPort), 'about:blank'] : ["--headless", "--disable-gpu", "--no-first-run", "--no-default-browser-check",
     "--remote-debugging-port=0", `--user-data-dir=${profile}`, "about:blank"], { windowsHide: true, stdio: "ignore" });
 let socket;
+let browserSocket;
 try {
     let endpoint;
     if (firefox) {
@@ -176,6 +178,12 @@ try {
             try { port = (await readFile(join(profile, "DevToolsActivePort"), "utf8")).split("\n")[0]; } catch { await delay(100); }
         }
         assert.ok(port, "Chromium debugging endpoint started");
+        const browser = await (await fetch(`http://127.0.0.1:${port}/json/version`)).json();
+        browserSocket = new WebSocket(browser.webSocketDebuggerUrl);
+        await new Promise((resolve, reject) => {
+            browserSocket.addEventListener("open", resolve, { once: true });
+            browserSocket.addEventListener("error", reject, { once: true });
+        });
         const targets = await (await fetch(`http://127.0.0.1:${port}/json`)).json();
         endpoint = targets.find(t => t.type === "page").webSocketDebuggerUrl;
     }
@@ -319,6 +327,42 @@ try {
     await layout({mode:0,isCollapsed:true,dockWidth:360});
     console.log('PASS: Toast anchor geometry, resize, collapse, all modes, mobile, narrow host, multiple Roots, missing anchor, disabled Workspace, overflow and stacking');
     if (!firefox && !process.env.RGF_TEST_TOAST_ONLY && !simulateNoAnchors) {
+    await cdp('Page.bringToFront');
+    await cdp('Emulation.setFocusEmulationEnabled', { enabled: true });
+    await layout({ isCollapsed: false });
+    await evaluate(`(async () => {
+        window.tooltipOptions = { trigger: 'hover focus', allowHtml: false, delayShow: 0, delayHide: 0 };
+        const header = document.querySelector('[data-drag-handle]');
+        header.insertAdjacentHTML('beforeend', '<div class="dropdown" id="layout-tooltip"><button type="button" class="btn dropdown-toggle" data-bs-toggle="dropdown" aria-label="Window layout">Layout</button><ul class="dropdown-menu"><li><button type="button" class="dropdown-item">Dock right</button></li></ul></div>');
+        const dropdown = document.querySelector('#layout-tooltip');
+        Recrovit.RGF.Blazor.UI.Base.tooltip(dropdown, { ...tooltipOptions, trigger: 'hover', title: 'Window layout' });
+    })()`);
+    const dropdownButton = await rect('#layout-tooltip .dropdown-toggle');
+    await cdp('Input.dispatchMouseEvent', { type: 'mouseMoved', x: dropdownButton.x + dropdownButton.width / 2, y: dropdownButton.y + dropdownButton.height / 2 });
+    const tooltipText = () => evaluate("document.querySelector('.tooltip.show .tooltip-inner')?.textContent");
+    await delay(100);
+    assert.equal(await tooltipText(), 'Window layout', 'hovering over the dropdown trigger shows a Bootstrap tooltip');
+    assert.equal(await evaluate("document.querySelector('#layout-tooltip button').hasAttribute('title')"), false);
+    await click('#layout-tooltip .dropdown-toggle');
+    assert.equal(await evaluate("document.querySelector('#layout-tooltip .dropdown-menu').classList.contains('show')"), true, 'tooltip and dropdown use separate Bootstrap targets');
+    await click('#layout-tooltip .dropdown-toggle');
+    await evaluate(`(() => {
+        const dropdown = document.querySelector('#layout-tooltip');
+        window.detachedTooltipAnchor = dropdown;
+        window.initialTooltip = bootstrap.Tooltip.getInstance(dropdown);
+        const label = 'Ablakelrendezés';
+        dropdown.firstElementChild.setAttribute('aria-label', label);
+        Recrovit.RGF.Blazor.UI.Base.tooltip(dropdown, { ...tooltipOptions, trigger: 'hover', title: label });
+    })()`);
+    assert.equal(await tooltipText(), 'Ablakelrendezés', 'the visible tooltip updates in place after a language change');
+    assert.equal(await evaluate("document.querySelector('#layout-tooltip button').getAttribute('aria-label')"), await tooltipText());
+    assert.equal(await evaluate("document.querySelectorAll('.tooltip').length"), 1);
+    assert.equal(await evaluate("bootstrap.Tooltip.getInstance(detachedTooltipAnchor) === initialTooltip"), true);
+    await evaluate("Recrovit.RGF.Blazor.UI.Base.tooltip(detachedTooltipAnchor); detachedTooltipAnchor.remove()");
+    assert.equal(await evaluate("bootstrap.Tooltip.getInstance(detachedTooltipAnchor) === null && !document.querySelector('.tooltip')"), true, 'the standard helper disposes its instance and overlay');
+
+    console.log('PASS: Shared Bootstrap tooltip updates, dropdown coexistence and cleanup');
+
     for (const [width, height] of [[1200, 800], [390, 700], [390, 260]]) {
         await viewport(width, height);
         for (const mode of [0, 1, 2, 3]) {
@@ -916,36 +960,66 @@ try {
     console.log('PASS: Copy-first toolbar geometry for short/long/plain replies, Usage, all docking/mobile layouts, native clipboard success/rejection');
     await evaluate("document.querySelector('#markdown-message').remove(); document.querySelector('#user-copy-message').remove()");
     await evaluate("document.querySelector('#model-choice').lastChild.textContent=' provider / ' + 'long-model-name-'.repeat(20) + ' ▾'");
-    for (const [width, height] of [[1200, 800], [800, 400], [390, 700], [390, 260]]) {
-        await viewport(width, height);
-        for (const mode of [0, 1, 2, 3]) {
-            await layout({ mode, isCollapsed: false, height: 360, dockHeight: 300 });
-            const before = await rect('section');
-            for (const id of ['model', 'effort', 'format']) {
-                await evaluate(`document.querySelector('#${id}-choice').scrollIntoView({block:'nearest'})`);
-                await click(`#${id}-choice`);
-                const popup = await rect(`#${id}-panel`), anchor = await rect(`#${id}-choice`);
-                const selectors = await rect('.rgf-recroby-selectors');
-                assert.ok(anchor.x >= selectors.x && anchor.right <= selectors.right + 1, 'selector with icon stays within its container');
-                assert.equal(await evaluate("getComputedStyle(document.querySelector('#model-choice')).textOverflow"), 'ellipsis');
-                assert.equal(await evaluate(`document.querySelector('#${id}-panel').matches(':popover-open')`), true);
-                assert.ok(popup.y >= 7 && popup.bottom <= height - 7 && popup.x >= 7 && popup.right <= width - 7, `AI ${id} panel fits ${mode} at ${width}x${height}`);
-                assert.ok(popup.bottom <= anchor.y, 'AI selection opens upwards');
-                assert.deepEqual(await rect('section'), before, 'AI popover does not resize the workspace');
-                assert.ok(await evaluate(`(() => {const p=document.querySelector('#${id}-panel'),r=p.getBoundingClientRect();return p.contains(document.elementFromPoint(r.x+10,r.y+10));})()`), 'AI top layer is visible outside overflow hidden');
-                assert.equal(await evaluate(`document.querySelector('#${id}-panel').contains(document.activeElement)`), true);
-                await cdp('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape' });
-                await cdp('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Escape' });
-                await delay(50);
-                assert.equal(await evaluate(`document.querySelector('#${id}-panel').matches(':popover-open')`), false);
+    for (const [lang, labels] of [
+        ['en', { model: ['Provider', 'Model'], effort: ['Reasoning effort'], format: ['Response format'] }],
+        ['hu', { model: ['Szolgáltató', 'Modell'], effort: ['Következtetési erőfeszítés'], format: ['Válaszformátum'] }]
+    ]) {
+        await evaluate(`(() => {
+            document.documentElement.lang = ${JSON.stringify(lang)};
+            for (const [id, texts] of Object.entries(${JSON.stringify(labels)})) {
+                document.getElementById(id + '-panel').querySelectorAll('label')
+                    .forEach((label, index) => label.textContent = texts[index]);
             }
-            await click('#model-choice');
-            await layout({ isCollapsed: true });
-            assert.equal(await evaluate("document.querySelector('#model-panel').matches(':popover-open')"), false, 'collapse closes AI top layer');
+        })()`);
+        for (const [width, height] of [[1200, 800], [800, 400], [390, 700], [390, 260], [260, 700]]) {
+            await viewport(width, height);
+            for (const mode of [0, 1, 2, 3]) {
+                await layout({ mode, isCollapsed: false, height: 360, dockHeight: 300 });
+                const before = await rect('section');
+                for (const id of ['model', 'effort', 'format']) {
+                    await evaluate(`document.querySelector('#${id}-choice').scrollIntoView({block:'nearest'})`);
+                    await click(`#${id}-choice`);
+                    const popup = await rect(`#${id}-panel`), anchor = await rect(`#${id}-choice`);
+                    const selectors = await rect('.rgf-recroby-selectors');
+                    assert.ok(anchor.x >= selectors.x && anchor.right <= selectors.right + 1, 'selector with icon stays within its container');
+                    assert.equal(await evaluate("getComputedStyle(document.querySelector('#model-choice')).textOverflow"), 'ellipsis');
+                    assert.equal(await evaluate(`document.querySelector('#${id}-panel').matches(':popover-open')`), true);
+                    assert.ok(popup.y >= 7 && popup.bottom <= height - 7 && popup.x >= 7 && popup.right <= width - 7, `AI ${id} panel fits ${mode} at ${width}x${height}`);
+                    assert.ok(popup.bottom <= anchor.y, 'AI selection opens upwards');
+                    assert.ok(await evaluate(`(() => {
+                        const panel = document.querySelector('#${id}-panel');
+                        if (panel.scrollWidth > panel.clientWidth) return false;
+                        return [...panel.querySelectorAll('label')].every(label => {
+                            const field = label.nextElementSibling;
+                            const labelRect = label.getBoundingClientRect(), fieldRect = field.getBoundingClientRect();
+                            const panelRect = panel.getBoundingClientRect();
+                            const range = document.createRange();
+                            return labelRect.bottom <= fieldRect.top
+                                && fieldRect.left >= panelRect.left && fieldRect.right <= panelRect.right
+                                && [...label.textContent.matchAll(/\\S+/g)].every(word => {
+                                    range.setStart(label.firstChild, word.index);
+                                    range.setEnd(label.firstChild, word.index + word[0].length);
+                                    return range.getClientRects().length === 1;
+                                });
+                        });
+                    })()`), `AI ${id} labels stay above their fields without splitting words in ${lang}, mode ${mode}, at ${width}x${height}`);
+                    assert.deepEqual(await rect('section'), before, 'AI popover does not resize the workspace');
+                    assert.ok(await evaluate(`(() => {const p=document.querySelector('#${id}-panel'),r=p.getBoundingClientRect();return p.contains(document.elementFromPoint(r.x+10,r.y+10));})()`), 'AI top layer is visible outside overflow hidden');
+                    assert.equal(await evaluate(`document.querySelector('#${id}-panel').contains(document.activeElement)`), true);
+                    await cdp('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape' });
+                    await cdp('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Escape' });
+                    await delay(50);
+                    assert.equal(await evaluate(`document.querySelector('#${id}-panel').matches(':popover-open')`), false);
+                }
+                await click('#model-choice');
+                await layout({ isCollapsed: true });
+                assert.equal(await evaluate("document.querySelector('#model-panel').matches(':popover-open')"), false, 'collapse closes AI top layer');
+            }
         }
     }
     await viewport(1200, 800);
     await evaluate("document.querySelector('#model-choice').lastChild.textContent='Provider / Model ▾'");
+    console.log("PASS: English and Hungarian selector labels above fields, with no split words or horizontal overflow in floating and docked layouts");
     await layout({ mode: 0, isCollapsed: false, height: 560 });
     for (const id of ['model', 'effort', 'format']) {
         await click('#' + id + '-choice');
@@ -1110,7 +1184,13 @@ try {
     console.log("PASS: continuation cards/keyboard, usage/selector top layer, viewport bounds, focus, Escape, outside click, collapse/switch/dispose, long history resources, local dates, all dock/mobile modes, host isolation, persistence, dialog/toast stacking");
     }
 } finally {
+    if (browserSocket?.readyState === WebSocket.OPEN) {
+        const closed = new Promise(resolve => browserSocket.addEventListener("close", resolve, { once: true }));
+        browserSocket.send(JSON.stringify({ id: 1, method: "Browser.close" }));
+        await Promise.race([closed, delay(2000, undefined, { ref: false })]);
+    }
     socket?.close(); child.kill();
+    browserSocket?.close();
     await new Promise(resolve => server.close(resolve));
     await delay(500);
     await rm(profile, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });

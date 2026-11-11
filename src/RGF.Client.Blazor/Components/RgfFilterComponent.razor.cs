@@ -137,7 +137,7 @@ public partial class RgfFilterComponent : ComponentBase, IDisposable
 
     private Task GenerationToastAsync(bool success) => Manager.ToastManager.RaiseEventAsync(
         new RgfToastEventArgs(Manager.EntityDesc.MenuTitle,
-            _recroDict.GetRgfUiString(success ? "AiNameDescriptionGenerated" : "AiNameDescriptionFailed"),
+            _recroDict.GetRgfRecrobyString(success ? "AiNameDescriptionGenerated" : "AiNameDescriptionFailed"),
             success ? RgfToastType.Success : RgfToastType.Error, delay: 3000), this);
 
     public bool IsPublicFilterSettingAllowed => Manager.EntityDesc.Permissions.GetPermission(RgfPermissionType.PublicFilterSetting);

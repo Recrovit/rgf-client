@@ -1,3 +1,6 @@
+using Microsoft.Extensions.DependencyInjection;
+using Recrovit.RecroGridFramework.Abstraction.Contracts.Services;
+using Recrovit.RecroGridFramework.Client.Blazor.UI.Tests.Testing;
 using Bunit;
 using Recrovit.RecroGridFramework.Abstraction.Contracts.AI;
 using Recrovit.RecroGridFramework.Abstraction.Contracts.AI.Server;
@@ -45,7 +48,8 @@ public sealed class RgfAiUsageSummaryTests
 
         var button = cut.Find("button[popovertarget$=-tokens]");
         Assert.Equal(value, button.TextContent.Trim());
-        Assert.Equal($"{label}: {value}", button.GetAttribute("title"));
+        Assert.False(button.HasAttribute("title"));
+        Assert.False(button.HasAttribute("data-rgf-usage-tooltip"));
         Assert.Equal($"{label}: {value}", button.GetAttribute("aria-label"));
         Assert.Equal("bi bi-bar-chart", button.QuerySelector("i")!.ClassName);
 
@@ -82,7 +86,12 @@ public sealed class RgfAiUsageSummaryTests
         var module = context.JSInterop.SetupModule(_ => true);
         module.SetupVoid("sync", _ => true).SetVoidResult();
         module.SetupVoid("dispose", _ => true).SetVoidResult();
-        var response = new RgfAiResponse { CreditUsage = new() { Tokens = new() }, CreditState = new() };
+        var languageEventLog = new ListLogger();
+        var security = new FakeRecroSecService(languageEventLog);
+        context.Services.AddSingleton<IRecroSecService>(security);
+        var dictionary = (FakeDashboardRecroDictService)context.Services.GetRequiredService<IRecroDictService>();
+        dictionary.HungarianRecrobyUi["LlmCalls"] = "LLM-hívások";
+        var response = new RgfAiResponse { CreditUsage = new() { LlmCallCount = 3, Tokens = new() }, CreditState = new() };
         var first = context.Render<RgfAiUsageSummary>(p => p.Add(c => c.Response, response));
         var second = context.Render<RgfAiUsageSummary>(p => p.Add(c => c.Response, response));
         var ids = first.FindAll("[popover]").Select(e => e.Id).ToArray();
@@ -96,13 +105,27 @@ public sealed class RgfAiUsageSummaryTests
         }
         first.Render();
         Assert.Equal(ids, first.FindAll("[popover]").Select(e => e.Id));
+        await dictionary.InitializeAsync("hun");
+        await security.LanguageChangedEvent.InvokeAsync(new("hun"));
+        Assert.Equal(2, languageEventLog.Entries.Count);
+        Assert.Equal(ids, first.FindAll("[popover]").Select(e => e.Id));
+        var usage = first.Find("button[popovertarget$=-tokens]");
+        Assert.False(usage.HasAttribute("data-rgf-usage-tooltip"));
+        Assert.Equal("LLM-hívások: 3", usage.GetAttribute("aria-label"));
+        Assert.Equal("LLM-hívások", first.Find("[id$=-tokens] dt").TextContent);
+
         await context.DisposeAsync();
+        languageEventLog.Entries.Clear();
+        await security.LanguageChangedEvent.InvokeAsync(new("eng"));
+        Assert.Empty(languageEventLog.Entries);
         Assert.Equal(2, module.Invocations["dispose"].Count);
         Assert.All(module.Invocations["dispose"], invocation => Assert.IsType<string>(Assert.Single(invocation.Arguments)));
     }
     private static BunitContext Context()
     {
         var context = new BunitContext();
+        context.Services.AddSingleton<IRecroDictService, FakeDashboardRecroDictService>();
+        context.Services.AddSingleton<IRecroSecService, FakeRecroSecService>();
         context.JSInterop.Mode = JSRuntimeMode.Loose;
         return context;
     }
@@ -118,6 +141,11 @@ public sealed class RgfAiUsageSummaryTests
         var cut = context.Render<RgfAiUsageSummary>(p => p.Add(c => c.Response, new() { CreditUsage = new() { ExecutionTime = TimeSpan.FromSeconds(seconds) } }));
         Assert.Equal(expected.Replace('.', System.Globalization.CultureInfo.CurrentCulture.NumberFormat.NumberDecimalSeparator[0]), cut.Find(".rgf-ai-usage-duration").TextContent.Trim());
         Assert.Empty(cut.FindAll(".rgf-ai-usage-duration[popovertarget], .bi-info-circle"));
+        var duration = cut.Find(".rgf-ai-usage-duration");
+        Assert.False(duration.HasAttribute("title"));
+        Assert.False(duration.HasAttribute("data-rgf-usage-tooltip"));
+        Assert.False(duration.HasAttribute("tabindex"));
+        Assert.Equal($"Execution time: {expected.Replace('.', System.Globalization.CultureInfo.CurrentCulture.NumberFormat.NumberDecimalSeparator[0])}", duration.GetAttribute("aria-label"));
     }
 
     [Fact]
@@ -182,7 +210,11 @@ public sealed class RgfAiUsageSummaryTests
         using var context = Context();
         var value = source is null ? (decimal?)null : decimal.Parse(source, System.Globalization.CultureInfo.InvariantCulture);
         var cut = context.Render<RgfAiUsageSummary>(p => p.Add(c => c.Response, new() { CreditUsage = new() { ChargedCredit = value } }));
-        Assert.Contains(expected.Replace('.', System.Globalization.CultureInfo.CurrentCulture.NumberFormat.NumberDecimalSeparator[0]), cut.Find("button[popovertarget$=-cost]").TextContent);
+        var button = cut.Find("button[popovertarget$=-cost]");
+        var formatted = expected.Replace('.', System.Globalization.CultureInfo.CurrentCulture.NumberFormat.NumberDecimalSeparator[0]);
+        Assert.Equal(formatted, button.TextContent.Trim());
+        Assert.False(button.HasAttribute("data-rgf-usage-tooltip"));
+        Assert.Equal($"Charged credit: {formatted}", button.GetAttribute("aria-label"));
     }
 
     [Fact]
@@ -198,11 +230,21 @@ public sealed class RgfAiUsageSummaryTests
         Assert.Contains("1m 12s", cut.Markup);
         Assert.Equal(new[] { "bi bi-stopwatch", "bi bi-cpu", "bi bi-bar-chart", "bi bi-coin", "bi bi-piggy-bank" },
             cut.FindAll(".rgf-ai-usage > span > i, .rgf-ai-usage > button > i").Select(icon => icon.ClassName));
+        var indicators = cut.FindAll(".rgf-ai-usage > span, .rgf-ai-usage > button");
+        Assert.Equal(5, indicators.Count);
+        Assert.All(indicators, indicator =>
+        {
+            Assert.False(indicator.HasAttribute("title"));
+            Assert.False(indicator.HasAttribute("data-rgf-usage-tooltip"));
+        });
         Assert.Equal("Unknown", cut.Find("[id$=-cost] dd").TextContent);
         Assert.Equal("0", Assert.Single(cut.FindAll("[id$=-tokens] dd")).TextContent);
         response.CreditUsage.Models = [new() { ProviderId = "p", ModelId = "a" }, new() { ProviderId = "q", ModelId = "a" }];
         cut.Render();
         Assert.Contains("2 models", cut.Markup);
+        var models = cut.Find("button[popovertarget$=-models]");
+        Assert.False(models.HasAttribute("data-rgf-usage-tooltip"));
+        Assert.Equal("Models: 2 models", models.GetAttribute("aria-label"));
         Assert.Single(cut.FindAll(".bi-bar-chart"));
     }
 
@@ -217,6 +259,8 @@ public sealed class RgfAiUsageSummaryTests
         var cut = context.Render<RgfAiUsageSummary>(p => p.Add(c => c.Response, new() { CreditState = new() { Mode = mode } }));
         Assert.Contains(label, cut.Find(".rgf-ai-usage-item").TextContent);
         var button = cut.Find("button[popovertarget$=-credit]");
+        Assert.False(button.HasAttribute("data-rgf-usage-tooltip"));
+        Assert.Equal($"Credit state at response completion: {label}", button.GetAttribute("aria-label"));
         var icon = button.QuerySelector("i")!;
         Assert.Equal("bi bi-piggy-bank", icon.ClassName);
         Assert.Equal("true", icon.GetAttribute("aria-hidden"));
@@ -225,16 +269,18 @@ public sealed class RgfAiUsageSummaryTests
         Assert.Contains("Snapshot at response completion", cut.Markup);
     }
 
-    [Fact]
-    public void PrepaidAndIndependentPeriodsPreserveExpiryNegativeBalanceAndUtcSource()
+    [Theory]
+    [InlineData(true, "Yes")]
+    [InlineData(false, "No")]
+    public void PrepaidAndIndependentPeriodsPreserveExpiryNegativeBalanceAndUtcSource(bool isExpired, string expiryLabel)
     {
         using var context = Context();
         var response = new RgfAiResponse { CreditState = new() { Mode = AiCreditMode.Prepaid,
-            Prepaid = new(-2, new DateOnly(2026, 10, 13), true, DateTime.UtcNow) } };
+            Prepaid = new(-2, new DateOnly(2026, 10, 13), isExpired, DateTime.UtcNow) } };
         var cut = context.Render<RgfAiUsageSummary>(p => p.Add(c => c.Response, response));
         Assert.Contains("-2", cut.Markup);
         Assert.Contains("2026-10-13", cut.Markup);
-        Assert.Contains("Yes", cut.Markup);
+        Assert.Contains(cut.FindAll("[id$=-credit] dd"), item => item.TextContent == expiryLabel);
         response.CreditState = new() { Mode = AiCreditMode.Periodic, Periods = [
             new(AiCreditPeriodType.Daily, 1, 3, new DateTime(2026, 10, 14), DateTime.UtcNow),
             new(AiCreditPeriodType.Monthly, 100, 3, new DateTime(2026, 11, 1), DateTime.UtcNow) ] };

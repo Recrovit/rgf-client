@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -13,6 +13,7 @@ using Recrovit.RecroGridFramework.Client.Events;
 using Recrovit.RecroGridFramework.Client.Handlers;
 using System.Globalization;
 using System.Runtime.CompilerServices;
+using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 
@@ -61,11 +62,10 @@ public partial class RgfRecrobyWorkspace : IAsyncDisposable
     private IServiceProvider Services { get; set; } = null!;
 
     [Inject]
-    private IJSRuntime JS { get; set; } = null!;
+    private IRecroSecService RecroSec { get; set; } = null!;
 
-    /// <summary>Application content that shares available space with the docked desktop panel.</summary>
-    [Parameter]
-    public RenderFragment? ChildContent { get; set; }
+    [Inject]
+    private IJSRuntime JS { get; set; } = null!;
 
     private readonly List<Conversation> _conversations = [];
     private readonly List<RgfRecrobyGridContext> _gridContexts = [];
@@ -85,26 +85,32 @@ public partial class RgfRecrobyWorkspace : IAsyncDisposable
     }
     internal RgfRecrobyGridContext? ActiveGridContext => _disposed ? null : _activeGridContext;
     internal event Action? ActiveGridContextChanged;
-    private IReadOnlyDictionary<string, string>? _recrobyUi;
-    private IRecroSecService? _recroSec;
-    private int _dictionaryLoadVersion;
-    private string GridMessage(string key, string fallback) =>
-        _recrobyUi?.TryGetValue(key, out var value) == true && !string.IsNullOrWhiteSpace(value) ? value : fallback;
+    [Inject] private IRecroDictService RecroDict { get; set; } = null!;
+
+    private string SwitcherLabel => _active is null
+        ? RecroDict.GetRgfRecrobyString("ChooseConversation")
+        : RecroDict.GetRgfRecrobyString("ChooseConversationNamed", ConversationLabel(_active));
+    private string? SwitcherTooltip => _active is null ? null : HtmlEncoder.Default.Encode(ConversationLabel(_active));
+    private string RenameLabel => _active is null
+        ? RecroDict.GetRgfRecrobyString("RenameConversation")
+        : RecroDict.GetRgfRecrobyString("RenameConversationNamed", DisplayTitle(_active));
     private Conversation? _editing;
     private string _editTitle = string.Empty;
     private bool _focusTitleEditor;
     private bool _focusUserMessage;
     private bool HasMultipleTypes => _conversations.Select(c => c.RecrobyType).Distinct().Skip(1).Any();
-    private static string TypeLabel(string type) => type == "general" ? "General chat" : type;
+    private string TypeLabel(string type) => type == "general" ? RecroDict.GetRgfRecrobyString("GeneralChat") : type;
+    private string DisplayTitle(Conversation conversation) => conversation.NeedsAutomaticTitle && conversation.Title == "New chat"
+        ? RecroDict.GetRgfRecrobyString("NewChat") : conversation.Title;
     private string ConversationLabel(Conversation conversation) => HasMultipleTypes
-        ? $"{TypeLabel(conversation.RecrobyType)}: {conversation.Title}" : conversation.Title;
+        ? $"{TypeLabel(conversation.RecrobyType)}: {DisplayTitle(conversation)}" : DisplayTitle(conversation);
 
     private void BeginRename()
     {
         if (_active == null) return;
         CloseSwitcher(false);
         _editing = _active;
-        _editTitle = _active.Title;
+        _editTitle = DisplayTitle(_active);
         _focusTitleEditor = true;
     }
 
@@ -199,7 +205,7 @@ public partial class RgfRecrobyWorkspace : IAsyncDisposable
     private bool _restoreSwitcherFocus;
     private string _search = string.Empty;
     private IEnumerable<Conversation> FilteredConversations => _conversations.Where(c =>
-        _conversations.Count <= 8 || c.Title.Contains(_search, StringComparison.OrdinalIgnoreCase));
+        _conversations.Count <= 8 || DisplayTitle(c).Contains(_search, StringComparison.OrdinalIgnoreCase));
 
     private void ToggleSwitcher()
     {
@@ -318,7 +324,7 @@ public partial class RgfRecrobyWorkspace : IAsyncDisposable
     private async Task DisposeCoreAsync()
     {
         _disposed = true;
-        _recroSec?.LanguageChangedEvent?.Unsubscribe(OnLanguageChangedAsync);
+        RecroSec.LanguageChangedEvent.Unsubscribe(OnLanguageChangedAsync);
         _workspaceRegistration?.Dispose();
         foreach (var context in _gridContexts) DetachGridContext(context);
         _gridContexts.Clear();
@@ -352,6 +358,8 @@ public partial class RgfRecrobyWorkspace : IAsyncDisposable
 
     protected override void OnInitialized()
     {
+        base.OnInitialized();
+        RecroSec.LanguageChangedEvent.Subscribe(OnLanguageChangedAsync);
         NewConversation();
         _workspaceRegistration = Services.GetService<RgfRecrobyWorkspaceService>()?.RegisterWorkspace(
             async operation =>
@@ -363,34 +371,10 @@ public partial class RgfRecrobyWorkspace : IAsyncDisposable
             context => TrackGrid(context, activate: true), context => TrackGrid(context, activate: false));
     }
 
-    protected override Task OnInitializedAsync()
+    private Task OnLanguageChangedAsync(DataEventArgs<string> _) => InvokeAsync(() =>
     {
-        _recroSec = Services.GetService<IRecroSecService>();
-        _recroSec?.LanguageChangedEvent?.Subscribe(OnLanguageChangedAsync);
-        return LoadRecrobyUiAsync(_recroSec?.UserLanguage);
-    }
-
-    private Task OnLanguageChangedAsync(DataEventArgs<string> args) =>
-        InvokeAsync(() => LoadRecrobyUiAsync(args.Value));
-
-    private async Task LoadRecrobyUiAsync(string? language)
-    {
-        if (_disposed || Services.GetService<IRecroDictService>() is not { } recroDict) return;
-        var version = ++_dictionaryLoadVersion;
-        try
-        {
-            var dictionary = await recroDict.GetDictionaryAsync("RGF.Recroby.UI", language!, authClient: false);
-            if (_disposed || version != _dictionaryLoadVersion) return;
-            _recrobyUi = dictionary;
-        }
-        catch (Exception error)
-        {
-            if (_disposed || version != _dictionaryLoadVersion) return;
-            _recrobyUi = null;
-            LogGridError(error, "The Recroby UI dictionary could not be loaded.");
-        }
-        StateHasChanged();
-    }
+        if (!_disposed) StateHasChanged();
+    });
 
     private bool TrackGrid(RgfRecrobyGridContext context, bool activate)
     {
@@ -423,8 +407,14 @@ public partial class RgfRecrobyWorkspace : IAsyncDisposable
         if (conversation is null)
         {
             var session = sessionFactory() ?? throw new InvalidOperationException("The session factory returned null.");
-            conversation = new Conversation(session) { Owner = owner, ContextKey = contextKey,
-                RecrobyType = type, Title = title, NeedsAutomaticTitle = false };
+            conversation = new Conversation(session)
+            {
+                Owner = owner,
+                ContextKey = contextKey,
+                RecrobyType = type,
+                Title = title,
+                NeedsAutomaticTitle = false
+            };
             _conversations.Add(conversation);
         }
         SelectConversation(conversation);
@@ -547,10 +537,8 @@ public partial class RgfRecrobyWorkspace : IAsyncDisposable
                     {
                         ErrorCode = "PendingGridChanged",
                         Message = pending.Target.Context is null
-                            ? workspace.GridMessage("RecrobyPendingGridAdded",
-                                "This workflow started without a Grid. Close the active Grids to continue, or start a new conversation.")
-                            : workspace.GridMessage("RecrobyPendingGridChanged",
-                                "Return to the original Grid to continue this workflow, or start a new conversation.")
+                            ? workspace.RecroDict.GetRgfRecrobyString("RecrobyPendingGridAdded")
+                            : workspace.RecroDict.GetRgfRecrobyString("RecrobyPendingGridChanged")
                     };
                     return;
                 }

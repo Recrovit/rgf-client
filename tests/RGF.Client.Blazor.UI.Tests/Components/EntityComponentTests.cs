@@ -804,6 +804,14 @@ public sealed class EntityComponentTests
         Assert.Equal("Orders", cut.Find(".rgf-recroby-context").TextContent);
         Assert.NotEmpty(cut.FindAll("header.bg-success-subtle"));
         var session = cut.FindComponents<RgfAiChatComponent>().Last().Instance.Session;
+        var dictionary = (FakeDashboardRecroDictService)context.Services.GetRequiredService<IRecroDictService>();
+        var security = context.Services.GetRequiredService<IRecroSecService>();
+        dictionary.HungarianRecrobyUi["OpenRecroby"] = "Recroby megnyitása";
+        Assert.Equal("Open Recroby", cut.Find(".btn-toolbar .bi-robot").ParentElement!.GetAttribute("aria-label"));
+        await dictionary.InitializeAsync("hun");
+        await security.LanguageChangedEvent.InvokeAsync(new("hun"));
+        cut.WaitForAssertion(() => Assert.Equal("Recroby megnyitása",
+            cut.Find(".btn-toolbar .bi-robot").ParentElement!.GetAttribute("aria-label")));
         cut.Find(".btn-toolbar .bi-robot").ParentElement!.Click();
         Assert.Single(cut.FindComponents<RgfAiChatComponent>());
         var api = (PendingRgfApiService)context.Services.GetRequiredService<IRgfApiService>();
@@ -2260,6 +2268,13 @@ public sealed class EntityComponentTests
             _ => resourceKey
         };
         public string GetRgfUiString(string resourceKey, params object[] args) => string.Format(GetRgfUiString(resourceKey), args);
+
+        public string GetRgfRecrobyString(string resourceKey) => IsInitialized
+            ? $"RGF.Recroby.UI.{resourceKey}"
+            : "RecroDict has not been initialized";
+
+        public string GetRgfRecrobyString(string resourceKey, params object[] args) =>
+            RecroDictFormatHelper.Format(GetRgfRecrobyString(resourceKey), args).Value;
     }
 
     private sealed class FakeRecroSecService(string userLanguage) : IRecroSecService

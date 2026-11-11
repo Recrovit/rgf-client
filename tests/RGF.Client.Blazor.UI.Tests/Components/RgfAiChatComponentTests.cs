@@ -16,6 +16,37 @@ public sealed class RgfAiChatComponentTests
     private const string CopyConversation = "[data-action=copy-conversation]";
 
     [Fact]
+    public async Task StandaloneChatUsesTheCurrentDictionaryOnLanguageChange()
+    {
+        await using var context = CreateContext();
+        var languageEventLog = new ListLogger();
+        var security = new FakeRecroSecService(languageEventLog);
+        context.Services.AddSingleton<IRecroSecService>(security);
+        var dictionary = (FakeDashboardRecroDictService)context.Services.GetRequiredService<IRecroDictService>();
+        dictionary.HungarianUi["Send"] = "Küldés";
+        var session = new RgfAiConversationSession(new TestTransport());
+        var cut = context.Render<RgfAiChatComponent>(p => p.Add(c => c.Session, session));
+        Assert.Single(cut.FindAll("button[aria-label=Send]"));
+
+        cut.Render();
+        cut.Render();
+        await dictionary.InitializeAsync("hun");
+        await security.LanguageChangedEvent.InvokeAsync(new("hun"));
+        Assert.Single(cut.FindAll("button[aria-label=Küldés]"));
+        Assert.Single(languageEventLog.Entries);
+
+        await dictionary.InitializeAsync("eng");
+        await security.LanguageChangedEvent.InvokeAsync(new("eng"));
+        Assert.Single(cut.FindAll("button[aria-label=Send]"));
+        Assert.Same(session, cut.Instance.Session);
+
+        await context.DisposeAsync();
+        languageEventLog.Entries.Clear();
+        await security.LanguageChangedEvent.InvokeAsync(new("hun"));
+        Assert.Empty(languageEventLog.Entries);
+    }
+
+    [Fact]
     public void ConversationCopyIsOptInAndDisabledWithoutExportableMessages()
     {
         using var context = CreateContext();
@@ -26,7 +57,7 @@ public sealed class RgfAiChatComponentTests
         cut.Render(p => p.Add(c => c.ShowCopyConversation, true));
         var button = cut.Find(CopyConversation);
         Assert.True(button.HasAttribute("disabled"));
-        Assert.Equal("Copy conversation", button.GetAttribute("title"));
+        Assert.False(button.HasAttribute("title"));
         Assert.Equal("Copy conversation", button.GetAttribute("aria-label"));
         Assert.NotNull(button.QuerySelector(".bi-copy"));
         Assert.Contains("chat-box", button.ParentElement!.PreviousElementSibling!.ClassList);
@@ -485,7 +516,7 @@ public sealed class RgfAiChatComponentTests
         Assert.True(cut.FindComponent<RgfInputText>().Instance.Multiline);
         Assert.Empty(cut.FindComponents<SpinnerComponent>());
         var send = cut.Find("button[aria-label=Send]");
-        Assert.Equal("Send", send.GetAttribute("title"));
+        Assert.False(send.HasAttribute("title"));
         Assert.Empty(send.TextContent.Trim());
         Assert.Equal("true", send.QuerySelector(".bi-send")!.GetAttribute("aria-hidden"));
     }
@@ -537,7 +568,7 @@ public sealed class RgfAiChatComponentTests
             Assert.True(cut.Find("button").HasAttribute("disabled"));
             Assert.Equal(string.Empty, cut.FindComponent<RgfInputText>().Instance.Value);
             var cancel = cut.Find("button[aria-label='Cancel request']");
-            Assert.Equal("Cancel request", cancel.GetAttribute("title"));
+            Assert.False(cancel.HasAttribute("title"));
             Assert.Empty(cancel.TextContent.Trim());
             Assert.Equal("true", cancel.QuerySelector(".bi-stop-circle")!.GetAttribute("aria-hidden"));
         });
@@ -848,6 +879,7 @@ public sealed class RgfAiChatComponentTests
         var context = new BunitContext();
         context.JSInterop.Mode = JSRuntimeMode.Loose;
         context.Services.AddSingleton<IRecroDictService, FakeDashboardRecroDictService>();
+        context.Services.AddSingleton<IRecroSecService, FakeRecroSecService>();
         return context;
     }
 

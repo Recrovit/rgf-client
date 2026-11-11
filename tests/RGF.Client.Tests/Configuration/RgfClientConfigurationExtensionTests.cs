@@ -350,6 +350,13 @@ public sealed class RgfClientConfigurationExtensionTests : IDisposable
             => RecroDictFormatHelper.Format(value, args).Value;
 
         public string GetRgfUiString(string resourceKey, params object[] args) => resourceKey;
+
+        public string GetRgfRecrobyString(string resourceKey) => IsInitialized
+            ? $"RGF.Recroby.UI.{resourceKey}"
+            : "RecroDict has not been initialized";
+
+        public string GetRgfRecrobyString(string resourceKey, params object[] args) =>
+            RecroDictFormatHelper.Format(GetRgfRecrobyString(resourceKey), args).Value;
     }
 
     private sealed class FakeRecroSecService : IRecroSecService

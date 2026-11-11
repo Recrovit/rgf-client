@@ -2,13 +2,13 @@
 
 namespace Recrovit.RecroGridFramework.Abstraction.Contracts.Services;
 
-/// <summary>Loads backend resource dictionaries and formats standard UI translations.</summary>
+/// <summary>Loads backend resource dictionaries and formats UI translations.</summary>
 public interface IRecroDictService
 {
-    /// <summary>Whether the standard UI dictionary has been initialized.</summary>
+    /// <summary>Whether the resource dictionaries have been initialized.</summary>
     bool IsInitialized { get; }
 
-    /// <summary>Initializes standard UI resources for the requested language or configured default.</summary>
+    /// <summary>Initializes the language, standard UI, and Recroby UI dictionaries for the requested language or configured default.</summary>
     Task InitializeAsync(string language = null);
 
     /// <summary>Available language identifiers and labels loaded during initialization.</summary>
@@ -25,6 +25,12 @@ public interface IRecroDictService
 
     /// <summary>Gets and formats a standard UI translation with the supplied arguments.</summary>
     string GetRgfUiString(string resourceKey, params object[] args);
+
+    /// <summary>Gets a Recroby UI translation for the initialized language.</summary>
+    string GetRgfRecrobyString(string resourceKey);
+
+    /// <summary>Gets and formats a Recroby UI translation with the supplied arguments.</summary>
+    string GetRgfRecrobyString(string resourceKey, params object[] args);
 }
 
 /// <summary>Optional formatting adapter used by resource lookup extensions.</summary>

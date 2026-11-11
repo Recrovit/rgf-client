@@ -16,6 +16,43 @@ namespace Recrovit.RecroGridFramework.Client.Tests.Services;
 public sealed class RecroSecServiceTests
 {
     [Fact]
+    public async Task RecroDictPublishesAllUiScopesForTheSelectedLanguage()
+    {
+        var api = new FakeRecroSecApiService();
+        using var services = CreateServiceProvider(new TestAuthenticationStateProvider(), api, useRealDictionary: true);
+        using var scope = services.CreateScope();
+        var dictionary = scope.ServiceProvider.GetRequiredService<IRecroDictService>();
+
+        Assert.Equal("RecroDict has not been initialized", dictionary.GetRgfRecrobyString("Send"));
+        Assert.Equal("RecroDict has not been initialized", dictionary.GetRgfUiString("Copied"));
+        await dictionary.InitializeAsync();
+        Assert.Equal("Hungarian", dictionary.Languages["hun"]);
+        Assert.Equal("Copied", dictionary.GetRgfUiString("Copied"));
+        Assert.Equal("Item: Orders", dictionary.GetRgfUiString("Item", "Orders"));
+        Assert.Equal("Send", dictionary.GetRgfRecrobyString("Send"));
+        Assert.Equal("Rename Orders", dictionary.GetRgfRecrobyString("Rename", "Orders"));
+        Assert.Equal("eng", dictionary.GetRgfUiString("Language"));
+        await dictionary.InitializeAsync("eng");
+        Assert.Equal(3, api.DictionaryRequests.Count);
+
+        await dictionary.InitializeAsync("hun");
+        Assert.Equal("hun", dictionary.GetRgfUiString("Language"));
+        Assert.Equal("Másolva", dictionary.GetRgfUiString("Copied"));
+        Assert.Equal("Elem: Orders", dictionary.GetRgfUiString("Item", "Orders"));
+        Assert.Equal("RGF.UI.Missing", dictionary.GetRgfUiString("Missing"));
+        Assert.Equal("RGF.Recroby.UI.Copied", dictionary.GetRgfRecrobyString("Copied"));
+        Assert.Equal("Küldés", dictionary.GetRgfRecrobyString("Send"));
+        Assert.Equal("Rename Orders", dictionary.GetRgfRecrobyString("Rename", "Orders"));
+        Assert.Equal("RGF.Recroby.UI.Missing", dictionary.GetRgfRecrobyString("Missing"));
+        Assert.Equal(
+            from language in new[] { "eng", "hun" }
+            from dictionaryScope in new[] { "RGF.Language", "RGF.UI", "RGF.Recroby.UI" }
+            select $"/rgf/api/RecroDict/{dictionaryScope}/{language}",
+            api.DictionaryRequests.Select(request => request.Uri));
+        Assert.All(api.DictionaryRequests, request => Assert.False(request.AuthClient));
+    }
+
+    [Fact]
     public void RecroSecService_InitializesWithDefaultNonNullUserState()
     {
         using var serviceProvider = CreateServiceProvider(new TestAuthenticationStateProvider(), new FakeRecroSecApiService());
@@ -176,7 +213,7 @@ public sealed class RecroSecServiceTests
         Assert.Null(apiService.SavedSettings[0][RgfUserStateSettingKeys.Language]);
     }
 
-    private static ServiceProvider CreateServiceProvider(TestAuthenticationStateProvider authProvider, FakeRecroSecApiService apiService)
+    private static ServiceProvider CreateServiceProvider(TestAuthenticationStateProvider authProvider, FakeRecroSecApiService apiService, bool useRealDictionary = false)
     {
         var configuration = CreateConfiguration();
         var services = new ServiceCollection();
@@ -186,7 +223,7 @@ public sealed class RecroSecServiceTests
         services.AddSingleton<AuthenticationStateProvider>(authProvider);
         services.AddSingleton<NavigationManager, TestNavigationManager>();
         services.AddSingleton<IRgfApiService>(apiService);
-        services.AddSingleton<IRecroDictService, FakeRecroDictService>();
+        if (!useRealDictionary) services.AddSingleton<IRecroDictService, FakeRecroDictService>();
         return services.BuildServiceProvider();
     }
 
@@ -219,9 +256,34 @@ public sealed class RecroSecServiceTests
         public RgfUserState UserStateResponse { get; set; } = new();
 
         public List<Dictionary<string, string?>> SavedSettings { get; } = [];
+        public List<IRgfApiRequest> DictionaryRequests { get; } = [];
 
         public Task<IRgfApiResponse<ResultType>> GetAsync<ResultType>(IRgfApiRequest request) where ResultType : class
         {
+            if (request.Uri.StartsWith("/rgf/api/RecroDict/", StringComparison.Ordinal))
+            {
+                DictionaryRequests.Add(request);
+                var segments = request.Uri.Split('/');
+                var language = segments[^1];
+                var items = segments[^2] switch
+                {
+                    "RGF.Language" => new Dictionary<string, string> { ["eng"] = "English", ["hun"] = "Hungarian" },
+                    "RGF.UI" => new()
+                    {
+                        ["Language"] = language,
+                        ["Copied"] = language == "hun" ? "Másolva" : "Copied",
+                        ["Item"] = language == "hun" ? "Elem: {0}" : "Item: {0}"
+                    },
+                    "RGF.Recroby.UI" => new() { ["Send"] = language == "hun" ? "Küldés" : "Send", ["Rename"] = "Rename {0}" },
+                    _ => throw new NotSupportedException(request.Uri)
+                };
+                return Task.FromResult<IRgfApiResponse<ResultType>>(new ApiResponse<ResultType>
+                {
+                    Success = true,
+                    Result = (ResultType)(object)items
+                });
+            }
+
             if (request.Uri.EndsWith("/rgf/api/recrosec/UserState", StringComparison.Ordinal)
                 && typeof(ResultType) == typeof(RgfUserState))
             {
@@ -278,6 +340,13 @@ public sealed class RecroSecServiceTests
         public string GetRgfUiString(string resourceKey) => resourceKey;
 
         public string GetRgfUiString(string resourceKey, params object[] args) => resourceKey;
+
+        public string GetRgfRecrobyString(string resourceKey) => IsInitialized
+            ? $"RGF.Recroby.UI.{resourceKey}"
+            : "RecroDict has not been initialized";
+
+        public string GetRgfRecrobyString(string resourceKey, params object[] args) =>
+            RecroDictFormatHelper.Format(GetRgfRecrobyString(resourceKey), args).Value;
     }
 
     private sealed class TestAuthenticationStateProvider : AuthenticationStateProvider

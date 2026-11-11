@@ -15,6 +15,73 @@ namespace Recrovit.RecroGridFramework.Client.Blazor.UI.Tests.Components;
 public sealed class RgfRecrobyComponentTests
 {
     [Fact]
+    public async Task StandaloneRecrobyLocalizesSelectorsAndChatWithoutWorkspace()
+    {
+        using var context = SelectionContext(out _);
+        var security = context.Services.GetRequiredService<IRecroSecService>();
+        var dictionary = (FakeDashboardRecroDictService)context.Services.GetRequiredService<IRecroDictService>();
+        dictionary.HungarianRecrobyUi["ResponseFormat"] = "Válaszformátum";
+        dictionary.HungarianRecrobyUi["FormatMinimal"] = "Minimális";
+        dictionary.HungarianUi["Send"] = "Küldés";
+        var cut = context.Render<RgfRecrobyComponent>();
+
+        Assert.Contains("Minimal", cut.Find("button[aria-label='Response format']").TextContent);
+        await dictionary.InitializeAsync("hun");
+        await security.LanguageChangedEvent.InvokeAsync(new("hun"));
+        Assert.Contains("Minimális", cut.Find("button[aria-label=Válaszformátum]").TextContent);
+        Assert.Single(cut.FindAll("button[aria-label=Küldés]"));
+        Assert.Equal(RgfAiResponseFormat.Minimal, cut.FindComponent<RgfAiChatComponent>().Instance.Session.Conversation.ResponseFormat);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task WorkspaceLanguageChangeSkipsRetryButLaterRenderRetriesFailedCatalog(bool throws)
+    {
+        using var context = SelectionContext(out var api);
+        api.FailNextCatalog = true;
+        api.ThrowOnFailure = throws;
+        var security = (FakeRecroSecService)context.Services.GetRequiredService<IRecroSecService>();
+        var cut = context.Render<RgfRecrobyWorkspace>();
+        var dictionary = (FakeDashboardRecroDictService)context.Services.GetRequiredService<IRecroDictService>();
+        dictionary.HungarianRecrobyUi["ResponseFormat"] = "Válaszformátum";
+        Assert.Equal(1, api.CatalogCalls);
+
+        security.UserLanguage = "hun";
+        await dictionary.InitializeAsync("hun");
+        await security.LanguageChangedEvent.InvokeAsync(new("hun"));
+
+        Assert.Single(cut.FindAll("button[aria-label=Válaszformátum]"));
+        Assert.Equal(1, api.CatalogCalls);
+        Assert.Null(api.Request);
+
+        // A subsequent unrelated parameter render restores the original retry behavior.
+        cut.Render();
+        cut.WaitForAssertion(() => Assert.Equal(4, cut.FindAll("select").Count));
+        Assert.Equal(2, api.CatalogCalls);
+    }
+
+    [Fact]
+    public async Task StandaloneLanguageChangeDoesNotDelayLaterCatalogRetry()
+    {
+        using var context = SelectionContext(out var api);
+        api.FailNextCatalog = true;
+        var security = (FakeRecroSecService)context.Services.GetRequiredService<IRecroSecService>();
+        var dictionary = (FakeDashboardRecroDictService)context.Services.GetRequiredService<IRecroDictService>();
+        var cut = context.Render<RgfRecrobyComponent>();
+        Assert.Equal(1, api.CatalogCalls);
+
+        security.UserLanguage = "hun";
+        await dictionary.InitializeAsync("hun");
+        await security.LanguageChangedEvent.InvokeAsync(new("hun"));
+        Assert.Equal(1, api.CatalogCalls);
+
+        cut.Render();
+        cut.WaitForAssertion(() => Assert.Equal(4, cut.FindAll("select").Count));
+        Assert.Equal(2, api.CatalogCalls);
+    }
+
+    [Fact]
     public void UserMessagesHaveIndependentCopyButtonsAndStayPlainText()
     {
         using var context = SelectionContext(out var api);
@@ -166,6 +233,7 @@ public sealed class RgfRecrobyComponentTests
         using var context = new BunitContext();
         context.JSInterop.Mode = JSRuntimeMode.Loose;
         context.Services.AddSingleton<IRecroDictService, FakeDashboardRecroDictService>();
+        context.Services.AddSingleton<IRecroSecService, FakeRecroSecService>();
         var api = new DelayedCatalogApi();
         context.Services.AddSingleton<IRgfApiService>(api);
         var first = context.Render<RgfRecrobyComponent>();
@@ -186,6 +254,7 @@ public sealed class RgfRecrobyComponentTests
         using var context = new BunitContext();
         context.JSInterop.Mode = JSRuntimeMode.Loose;
         context.Services.AddSingleton<IRecroDictService, FakeDashboardRecroDictService>();
+        context.Services.AddSingleton<IRecroSecService, FakeRecroSecService>();
         var api = new DelayedCatalogApi();
         context.Services.AddSingleton<IRgfApiService>(api);
         var cut = context.Render<RgfRecrobyComponent>();
@@ -357,6 +426,7 @@ public sealed class RgfRecrobyComponentTests
         var context = new BunitContext();
         context.JSInterop.Mode = JSRuntimeMode.Loose;
         context.Services.AddSingleton<IRecroDictService, FakeDashboardRecroDictService>();
+        context.Services.AddSingleton<IRecroSecService, FakeRecroSecService>();
         api = new CatalogApi();
         context.Services.AddSingleton<IRgfApiService>(api);
         return context;
@@ -405,6 +475,7 @@ public sealed class RgfRecrobyComponentTests
         using var context = new BunitContext();
         context.JSInterop.Mode = JSRuntimeMode.Loose;
         context.Services.AddSingleton<IRecroDictService, FakeDashboardRecroDictService>();
+        context.Services.AddSingleton<IRecroSecService, FakeRecroSecService>();
         context.Services.AddSingleton<IRgfApiService>(new ProviderMissingApi());
         var cut = context.Render<RgfRecrobyComponent>();
         Assert.Single(cut.FindAll("[popovertarget]"));
@@ -437,6 +508,7 @@ public sealed class RgfRecrobyComponentTests
         using var context = new BunitContext();
         context.JSInterop.Mode = JSRuntimeMode.Loose;
         context.Services.AddSingleton<IRecroDictService, FakeDashboardRecroDictService>();
+        context.Services.AddSingleton<IRecroSecService, FakeRecroSecService>();
         var error = new HttpRequestException("API failed");
         context.Services.AddSingleton<IRgfApiService>(new FailingApi(error));
         Exception? received = null;

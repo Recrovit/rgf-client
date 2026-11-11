@@ -1,5 +1,6 @@
 using Bunit;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Recrovit.RecroGridFramework.Abstraction.Contracts.API;
 using Recrovit.RecroGridFramework.Abstraction.Contracts.Services;
 using Recrovit.RecroGridFramework.Abstraction.Infrastructure.Events;
@@ -26,6 +27,13 @@ internal static class DashboardPageTestServices
 
 internal sealed class FakeRecroSecService : IRecroSecService
 {
+    public FakeRecroSecService() : this(null) { }
+
+    public FakeRecroSecService(ILogger? languageEventLogger)
+    {
+        LanguageChangedEvent = new(languageEventLogger);
+    }
+
     public EventDispatcher<EventArgs> AuthenticationStateChanged { get; } = new();
     public EventDispatcher<DataEventArgs<RgfUserState>> UserStateChangedEvent { get; } = new();
     public string? UserName => null;
@@ -35,8 +43,8 @@ internal sealed class FakeRecroSecService : IRecroSecService
     public ClaimsPrincipal CurrentUser { get; } = new(new ClaimsIdentity());
     public RgfUserState UserState { get; } = new();
     public IReadOnlyDictionary<string, string> Roles => UserState.Roles ?? new Dictionary<string, string>();
-    public string UserLanguage => "eng";
-    public EventDispatcher<DataEventArgs<string>> LanguageChangedEvent { get; } = new();
+    public string UserLanguage { get; set; } = "eng";
+    public EventDispatcher<DataEventArgs<string>> LanguageChangedEvent { get; }
     public Task<string?> GetAccessTokenAsync() => Task.FromResult<string?>(null);
     public Task<string?> SetUserLanguageAsync(string? language) => Task.FromResult<string?>(null);
     public Task<bool> UpdateUserStateSettingsAsync(IDictionary<string, string?> settings) => Task.FromResult(false);

@@ -3,32 +3,42 @@
 
 @if (Response.CreditUsage is not null || Response.CreditState is not null)
 {
-    <div class="rgf-ai-usage" id="@_id" @ref="_element" aria-label="Response usage">
+    <div class="rgf-ai-usage" id="@_id" @ref="_element" aria-label="@RecroDict.GetRgfRecrobyString("ResponseUsage")">
         @if (Response.CreditUsage is { } usage)
         {
             @if (usage.ExecutionTime is { } duration)
             {
-                <span class="rgf-ai-usage-duration" aria-label="Execution time"><i class="bi bi-stopwatch" aria-hidden="true"></i> @Duration(duration)</span>
+                var durationLabel = RecroDict.GetRgfRecrobyString("ExecutionTime");
+                var durationValue = Duration(duration);
+                <span class="rgf-ai-usage-duration" aria-label="@($"{durationLabel}: {durationValue}")"><i class="bi bi-stopwatch" aria-hidden="true"></i> @durationValue</span>
             }
             @if (usage.Models.Count > 0)
             {
-                @Item("models", "cpu", ModelLabel, "Models", ModelsContent)
+                @Item("models", "cpu", ModelLabel, RecroDict.GetRgfRecrobyString("Models"), ModelsContent)
             }
-            @Item("tokens", "bar-chart", usage.Tokens?.TotalTokens?.ToString() ?? usage.LlmCallCount.ToString(), "Aggregated token statistics", TokensContent, showHeading: false, buttonLabel: usage.Tokens?.TotalTokens is not null ? "Total tokens" : "LLM calls")
-            @Item("cost", "coin", Credit(usage.ChargedCredit), "Charged credit", CostContent)
+            @Item("tokens", "bar-chart", usage.Tokens?.TotalTokens?.ToString() ?? usage.LlmCallCount.ToString(), RecroDict.GetRgfRecrobyString("TokenStatistics"), TokensContent, showHeading: false, buttonLabel: usage.Tokens?.TotalTokens is not null ? RecroDict.GetRgfRecrobyString("TotalTokens") : RecroDict.GetRgfRecrobyString("LlmCalls"))
+            @Item("cost", "coin", Credit(usage.ChargedCredit), RecroDict.GetRgfRecrobyString("ChargedCredit"), CostContent)
         }
         @if (Response.CreditState is { } state)
         {
-            @Item("credit", "piggy-bank", StateLabel(state), "Credit state at response completion", StateContent)
+            @Item("credit", "piggy-bank", StateLabel(state), RecroDict.GetRgfRecrobyString("CreditStateAtCompletion"), StateContent)
         }
     </div>
 }
 
 @code {
     private RenderFragment Item(string group, string icon, string value, string label, RenderFragment content, bool showHeading = true, string? buttonLabel = null) => @<text>
-        <button type="button" class="rgf-ai-usage-item" popovertarget="@PanelId(group)" aria-controls="@PanelId(group)" aria-haspopup="dialog" aria-expanded="false" aria-label="@($"{buttonLabel ?? label}: {value}")" title="@(buttonLabel is null ? value : $"{buttonLabel}: {value}")"><i class="bi bi-@icon" aria-hidden="true"></i> @value</button>
+        @{
+            var usageLabel = $"{buttonLabel ?? label}: {value}";
+        }
+        <button type="button" class="rgf-ai-usage-item" popovertarget="@PanelId(group)" aria-controls="@PanelId(group)" aria-haspopup="dialog" aria-expanded="false" aria-label="@usageLabel">
+            <i class="bi bi-@icon" aria-hidden="true"></i> @value
+        </button>
         <div class="rgf-ai-usage-panel" id="@PanelId(group)" popover="auto" role="dialog" aria-label="@label" tabindex="-1">
-            @if (showHeading) { <strong>@label</strong> }
+            @if (showHeading)
+            {
+                <strong>@label</strong>
+            }
             @content
         </div>
     </text>;
@@ -36,13 +46,19 @@
     private RenderFragment ModelsContent => @<text>
         @foreach (var model in Response.CreditUsage!.Models)
         {
-            <dl><dt>Provider</dt><dd>@Identity(model.ProviderId)</dd><dt>Model</dt><dd>@Identity(model.ModelId)</dd>
-                <dt>Effort</dt><dd>@(Response.CreditUsage.ReasoningEffort ?? "Default")</dd></dl>
+            <dl>
+                <dt>@(RecroDict.GetRgfRecrobyString("Provider"))</dt>
+                <dd>@Identity(model.ProviderId)</dd>
+                <dt>@(RecroDict.GetRgfRecrobyString("Model"))</dt>
+                <dd>@Identity(model.ModelId)</dd>
+                <dt>@(RecroDict.GetRgfRecrobyString("Effort"))</dt>
+                <dd>@(Response.CreditUsage.ReasoningEffort ?? RecroDict.GetRgfUiString("Default"))</dd>
+            </dl>
         }
     </text>;
 
     private RenderFragment CostContent => @<text>
-        <dl><dt>Total charged credit</dt><dd>@Credit(Response.CreditUsage!.ChargedCredit)</dd></dl>
+        <dl><dt>@(RecroDict.GetRgfRecrobyString("TotalChargedCredit"))</dt><dd>@Credit(Response.CreditUsage!.ChargedCredit)</dd></dl>
         @foreach (var model in Response.CreditUsage.Models)
         {
             <dl><dt>@Identity(model.ProviderId) / @Identity(model.ModelId)</dt><dd>@Credit(model.ChargedCredit)</dd></dl>
@@ -50,51 +66,80 @@
     </text>;
 
     private RenderFragment StateContent => @<text>
-        <p>Snapshot at response completion.</p>
+        <p>@(RecroDict.GetRgfRecrobyString("CreditSnapshot"))</p>
         @switch (Response.CreditState!.Mode)
         {
             case AiCreditMode.Disabled:
-                <p>Credit access is disabled.</p>
+                <p>@(RecroDict.GetRgfRecrobyString("CreditAccessDisabled"))</p>
                 break;
             case AiCreditMode.Unlimited:
-                <p>Unlimited access.</p>
+                <p>@(RecroDict.GetRgfRecrobyString("UnlimitedAccess"))</p>
                 break;
             case AiCreditMode.Prepaid:
-                <dl><dt>Balance</dt><dd>@Credit(Response.CreditState.Prepaid?.Balance)</dd>
-                    <dt>Expires on</dt><dd>@if (Response.CreditState.Prepaid?.ExpiresOn is { } expiry) { <time datetime="@expiry.ToString("yyyy-MM-dd")" data-local-date>@expiry.ToString("yyyy-MM-dd")</time> } else { <text>Unknown</text> }</dd>
-                    <dt>Expired</dt><dd>@(Response.CreditState.Prepaid is { } prepaid ? prepaid.IsExpired ? "Yes" : "No" : "Unknown")</dd></dl>
+                <dl>
+                    <dt>@(RecroDict.GetRgfRecrobyString("Balance"))</dt>
+                    <dd>@Credit(Response.CreditState.Prepaid?.Balance)</dd>
+                    <dt>@(RecroDict.GetRgfRecrobyString("ExpiresOn"))</dt>
+                    <dd>
+                        @if (Response.CreditState.Prepaid?.ExpiresOn is { } expiry)
+                        {
+                            <time datetime="@expiry.ToString("yyyy-MM-dd")" data-local-date>@expiry.ToString("yyyy-MM-dd")</time>
+                        }
+                        else
+                        {
+
+                            <text>@(RecroDict.GetRgfUiString("Unknown"))</text>
+                        }
+                    </dd>
+                    <dt>@(RecroDict.GetRgfRecrobyString("Expired"))</dt>
+                    <dd>@(Response.CreditState.Prepaid is { } prepaid ? prepaid.IsExpired ? RecroDict.GetRgfUiString("Yes") : RecroDict.GetRgfUiString("No") : RecroDict.GetRgfUiString("Unknown"))</dd>
+                </dl>
                 break;
             case AiCreditMode.Periodic:
                 @foreach (var period in Response.CreditState.Periods)
                 {
                     <strong>@period.PeriodType</strong>
-                    <dl><dt>Credit limit</dt><dd>@Credit(period.CreditLimit)</dd>
-                        <dt>Used credit</dt><dd>@Credit(period.UsedCredit)</dd>
-                        <dt>Remaining credit</dt><dd>@Credit(period.RemainingCredit)</dd>
-                        <dt>Resets at</dt><dd><time datetime="@Utc(period.ResetsAtUtc)" data-local-time>@Utc(period.ResetsAtUtc)</time></dd></dl>
+                    <dl>
+                        <dt>@(RecroDict.GetRgfRecrobyString("CreditLimit"))</dt>
+                        <dd>@Credit(period.CreditLimit)</dd>
+                        <dt>@(RecroDict.GetRgfRecrobyString("UsedCredit"))</dt>
+                        <dd>@Credit(period.UsedCredit)</dd>
+                        <dt>@(RecroDict.GetRgfRecrobyString("RemainingCredit"))</dt>
+                        <dd>@Credit(period.RemainingCredit)</dd>
+                        <dt>@(RecroDict.GetRgfRecrobyString("ResetsAt"))</dt>
+                        <dd><time datetime="@Utc(period.ResetsAtUtc)" data-local-time>@Utc(period.ResetsAtUtc)</time></dd>
+                    </dl>
                 }
-                @if (Response.CreditState.Periods.Count == 0) { <p>Unknown</p> }
+                @if (Response.CreditState.Periods.Count == 0)
+                {
+                    <p>@(RecroDict.GetRgfUiString("Unknown"))</p>
+                }
                 break;
             default:
-                <p>Unknown</p>
+                <p>@(RecroDict.GetRgfUiString("Unknown"))</p>
                 break;
         }
     </text>;
 
     private RenderFragment TokensContent => @<text>
-        <dl><dt>LLM calls</dt><dd>@Response.CreditUsage!.LlmCallCount</dd></dl>
+        <dl><dt>@(RecroDict.GetRgfRecrobyString("LlmCalls"))</dt><dd>@Response.CreditUsage!.LlmCallCount</dd></dl>
         @if (Response.CreditUsage.Tokens is { } tokens)
         {
-            <strong>Aggregated token statistics</strong>
+            <strong>@(RecroDict.GetRgfRecrobyString("TokenStatistics"))</strong>
             <dl>@TokenFields(tokens)</dl>
         }
     </text>;
 
-    private static RenderFragment TokenFields(RgfAiTokenUsage? tokens) => @<text>
-        <dt>Input tokens</dt><dd>@Count(tokens?.InputTokens)</dd>
-        <dt>Output tokens</dt><dd>@Count(tokens?.OutputTokens)</dd>
-        <dt>Total tokens</dt><dd>@Count(tokens?.TotalTokens)</dd>
-        <dt>Cached input tokens</dt><dd>@Count(tokens?.CachedInputTokens)</dd>
-        <dt>Reasoning tokens</dt><dd>@Count(tokens?.ReasoningTokens)</dd>
+    private RenderFragment TokenFields(RgfAiTokenUsage? tokens) => @<text>
+        <dt>@(RecroDict.GetRgfRecrobyString("InputTokens"))</dt>
+        <dd>@Count(tokens?.InputTokens)</dd>
+        <dt>@(RecroDict.GetRgfRecrobyString("OutputTokens"))</dt>
+        <dd>@Count(tokens?.OutputTokens)</dd>
+        <dt>@(RecroDict.GetRgfRecrobyString("TotalTokens"))</dt>
+        <dd>@Count(tokens?.TotalTokens)</dd>
+        <dt>@(RecroDict.GetRgfRecrobyString("CachedInputTokens"))</dt>
+        <dd>@Count(tokens?.CachedInputTokens)</dd>
+        <dt>@(RecroDict.GetRgfRecrobyString("ReasoningTokens"))</dt>
+        <dd>@Count(tokens?.ReasoningTokens)</dd>
     </text>;
 }

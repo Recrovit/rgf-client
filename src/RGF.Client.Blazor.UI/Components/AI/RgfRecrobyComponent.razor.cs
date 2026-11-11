@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.JSInterop;
 using Recrovit.RecroGridFramework.Abstraction.Contracts.AI;
 using Recrovit.RecroGridFramework.Abstraction.Contracts.Services;
+using Recrovit.RecroGridFramework.Abstraction.Infrastructure.Events;
 using Recrovit.RecroGridFramework.Client.AI;
 using Recrovit.RecroGridFramework.Client.AI.Transport;
 using System.Runtime.CompilerServices;
@@ -16,12 +17,25 @@ namespace Recrovit.RecroGridFramework.Client.Blazor.UI.Components.AI;
 public partial class RgfRecrobyComponent : IAsyncDisposable
 {
     private static readonly ConditionalWeakTable<IServiceProvider, RgfRecrobyCatalogCache> Catalogs = new();
-    [Inject] private IServiceProvider Services { get; set; } = null!;
-    [Inject] private IJSRuntime JS { get; set; } = null!;
+    [Inject]
+    private IRecroDictService RecroDict { get; set; } = null!;
+
+    [Inject]
+    private IRecroSecService RecroSec { get; set; } = null!;
+
+    [Inject]
+    private IServiceProvider Services { get; set; } = null!;
+
+    [Inject]
+    private IJSRuntime JS { get; set; } = null!;
+
     /// <summary>Optional callback forwarded unchanged for manual chat send exceptions.</summary>
-    [Parameter] public EventCallback<Exception> SendFailed { get; set; }
+    [Parameter]
+    public EventCallback<Exception> SendFailed { get; set; }
+
     /// <summary>External session to retain; when null the component creates its own API-backed session.</summary>
     [Parameter] public RgfAiConversationSession? Session { get; set; }
+
 
     private RgfAiConversationSession? _session;
     private RgfAiConversationSession? _subscribed;
@@ -37,12 +51,13 @@ public partial class RgfRecrobyComponent : IAsyncDisposable
     private readonly object _disposalSync = new();
     private Task? _disposal;
     private bool _catalogLoading;
+    private string? _lastRenderedLanguage;
     private RgfAiConversationSession ActiveSession => Session ?? _session!;
     private bool SelectionDisabled => ActiveSession.IsProcessing || ActiveSession.Conversation.IsPendingWorkflow;
     private string SelectedProvider { get => Provider?.Id ?? string.Empty; set => SelectProvider(value); }
     private string SelectedModel { get => Model?.Id ?? string.Empty; set => SelectModel(value); }
     private string SelectedEffort { get => ActiveSession.Conversation.AiReasoningEffortOverride ?? string.Empty; set => SelectEffort(value); }
-    private string DisplayEffort => ActiveSession.Conversation.AiReasoningEffortOverride ?? Model?.DefaultEffort ?? "Default";
+    private string DisplayEffort => ActiveSession.Conversation.AiReasoningEffortOverride ?? Model?.DefaultEffort ?? RecroDict.GetRgfUiString("Default");
 
     private string SelectedFormat
     {
@@ -53,9 +68,18 @@ public partial class RgfRecrobyComponent : IAsyncDisposable
                 ActiveSession.Conversation.ResponseFormat = format;
         }
     }
-    private string DisplayFormat => SelectedFormat == nameof(RgfAiResponseFormat.PlainText) ? "Plain text" : SelectedFormat;
-    private static readonly KeyValuePair<string, string>[] FormatItems = Enum.GetValues<RgfAiResponseFormat>()
-        .Select(format => new KeyValuePair<string, string>(format.ToString(), format == RgfAiResponseFormat.PlainText ? "Plain text" : format.ToString())).ToArray();
+    private string DisplayFormat => FormatLabel(SelectedFormat);
+    private IEnumerable<KeyValuePair<string, string>> FormatItems => Enum.GetNames<RgfAiResponseFormat>()
+        .Select(format => new KeyValuePair<string, string>(format, FormatLabel(format)));
+
+    private string FormatLabel(string format) => format switch
+    {
+        nameof(RgfAiResponseFormat.PlainText) => RecroDict.GetRgfRecrobyString("PlainText"),
+        nameof(RgfAiResponseFormat.Minimal) => RecroDict.GetRgfRecrobyString("FormatMinimal"),
+        nameof(RgfAiResponseFormat.Normal) => RecroDict.GetRgfRecrobyString("FormatNormal"),
+        nameof(RgfAiResponseFormat.Maximum) => RecroDict.GetRgfRecrobyString("FormatMaximum"),
+        _ => format
+    };
 
     private RgfAiProviderCatalogItem? Provider
     {
@@ -73,14 +97,30 @@ public partial class RgfRecrobyComponent : IAsyncDisposable
     private IEnumerable<KeyValuePair<string, string>> ModelItems =>
         Provider?.Models.Select(model => new KeyValuePair<string, string>(model.Id, model.Id)) ?? [];
     private IEnumerable<KeyValuePair<string, string>> EffortItems =>
-        new[] { new KeyValuePair<string, string>(string.Empty, "Default") }.Concat(
+        new[] { new KeyValuePair<string, string>(string.Empty, RecroDict.GetRgfUiString("Default")) }.Concat(
             Model?.Efforts.Select(effort => new KeyValuePair<string, string>(effort, effort)) ?? []);
 
-    protected override void OnParametersSet()
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        RecroSec.LanguageChangedEvent.Subscribe(OnLanguageChangedAsync);
+    }
+
+    private Task OnLanguageChangedAsync(DataEventArgs<string> _) => InvokeAsync(() =>
+    {
+        if (!_disposed) StateHasChanged();
+    });
+
+    protected override Task OnParametersSetAsync()
     {
         if (Session is null)
             _session ??= new(new RgfAiApiTransport(Services.GetRequiredService<IRgfApiService>()));
-        if (ReferenceEquals(_subscribed, ActiveSession)) return;
+        // A language switch rerenders the Workspace and reapplies its unchanged session.
+        // A subsequent ordinary parameter update must still retry a failed catalog lookup.
+        var languageChanged = _lastRenderedLanguage is not null
+            && !string.Equals(_lastRenderedLanguage, RecroSec.UserLanguage, StringComparison.OrdinalIgnoreCase);
+        if (ReferenceEquals(_subscribed, ActiveSession))
+            return languageChanged ? Task.CompletedTask : LoadCatalogAsync();
         var conversation = ActiveSession.Conversation;
         if (conversation.ResponseFormat is null && conversation.ConversationId is null && conversation.ConversationToken is null
             && conversation.Messages.Count == 0 && !ActiveSession.IsProcessing && !conversation.IsPendingWorkflow)
@@ -89,9 +129,8 @@ public partial class RgfRecrobyComponent : IAsyncDisposable
         _subscribed = ActiveSession;
         _subscribed.StateChanged += SessionChanged;
         _sessionChanged = true;
+        return LoadCatalogAsync();
     }
-
-    protected override Task OnParametersSetAsync() => LoadCatalogAsync();
 
     private async Task LoadCatalogAsync()
     {
@@ -159,6 +198,7 @@ public partial class RgfRecrobyComponent : IAsyncDisposable
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (_disposed) return;
+        _lastRenderedLanguage = RecroSec.UserLanguage;
         _moduleImport ??= JS.InvokeAsync<IJSObjectReference>("import",
             $"{RgfClientConfiguration.AppRootPath}/_content/Recrovit.RecroGridFramework.Client.Blazor.UI/Components/AI/RgfRecrobyComponent.razor.js").AsTask();
         _module = await _moduleImport;
@@ -193,6 +233,7 @@ public partial class RgfRecrobyComponent : IAsyncDisposable
     private async Task DisposeCoreAsync()
     {
         _disposed = true;
+        RecroSec.LanguageChangedEvent.Unsubscribe(OnLanguageChangedAsync);
         _chat?.Dispose();
         _lifetime.Cancel();
         if (_subscribed is not null) _subscribed.StateChanged -= SessionChanged;

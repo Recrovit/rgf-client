@@ -6,7 +6,7 @@
     max-width: 100%;
 }
 
-    .rgf-recroby-selectors > button {
+    .rgf-recroby-selectors ::deep > button {
         max-width: 100%;
         overflow: hidden;
         text-overflow: ellipsis;
@@ -31,13 +31,15 @@
 
     .rgf-recroby-selection-panel:popover-open {
         display: grid;
-        grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+        grid-template-columns: minmax(0, 1fr);
         gap: .5rem;
         align-items: center;
     }
 
     .rgf-recroby-selection-panel ::deep .form-label {
         margin: .25rem 0;
+        overflow-wrap: normal;
+        word-break: normal;
     }
 
     .rgf-recroby-selection-panel ::deep select {

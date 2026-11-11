@@ -1,4 +1,4 @@
-﻿using Bunit;
+using Bunit;
 using Microsoft.Extensions.DependencyInjection;
 using Recrovit.RecroGridFramework.Abstraction.Contracts.Services;
 using Recrovit.RecroGridFramework.Client.AI;
@@ -6,12 +6,97 @@ using Recrovit.RecroGridFramework.Client.AI.Transport;
 using Recrovit.RecroGridFramework.Abstraction.Contracts.AI;
 using Recrovit.RecroGridFramework.Abstraction.Infrastructure.API;
 using Recrovit.RecroGridFramework.Client.Blazor.UI.Components.AI;
+using Recrovit.RecroGridFramework.Client.Blazor.UI.Components.Base;
 using Recrovit.RecroGridFramework.Client.Blazor.UI.Tests.Testing;
 
 namespace Recrovit.RecroGridFramework.Client.Blazor.UI.Tests.Components;
 
 public sealed partial class RgfRecrobyWorkspaceTests
 {
+    [Fact]
+    public async Task OpenWorkspaceUpdatesTooltipsAndAccessibleNamesWhenLanguageAndContextChange()
+    {
+        using var context = Context();
+        var security = context.Services.GetRequiredService<IRecroSecService>();
+        var dictionary = (FakeDashboardRecroDictService)context.Services.GetRequiredService<IRecroDictService>();
+        dictionary.HungarianUi["Send"] = "Küldés";
+        dictionary.HungarianRecrobyUi["ChooseConversationNamed"] = "Beszélgetés kiválasztása: {0}";
+        dictionary.HungarianRecrobyUi["NewChat"] = "Új beszélgetés";
+        dictionary.HungarianRecrobyUi["RenameConversation"] = "Beszélgetés átnevezése";
+        dictionary.HungarianRecrobyUi["RenameConversationNamed"] = "Átnevezés: {0}";
+        dictionary.HungarianUi["ViewPlainText"] = "Eredeti szöveg megtekintése";
+        dictionary.HungarianRecrobyUi["TotalTokens"] = "Összes token";
+
+        var cut = context.Render<RgfRecrobyWorkspace>();
+        cut.Find(".rgf-recroby-launcher").Click();
+        var session = cut.FindComponent<RgfAiChatComponent>().Instance.Session;
+        session.Conversation.ApplyResponse(new()
+        {
+            Success = true,
+            Message = "**Reply**",
+            ResponseFormat = RgfAiResponseFormat.Minimal,
+            CreditUsage = new() { Tokens = new() { TotalTokens = 12 } }
+        });
+        var grid = CreateGrid("Orders");
+        var workspace = context.Services.GetRequiredService<RgfRecrobyWorkspaceService>();
+        Assert.True(await workspace.OpenOrActivateGridAsync(grid));
+        AssertTooltip("Send");
+        AssertTooltip("Orders");
+        AssertTooltip("View plain text");
+        AssertConversationLabels("New chat", "Choose conversation: New chat", "Rename conversation", "Rename New chat");
+        AssertTooltip("New chat");
+        AssertTooltip("Rename conversation");
+        Assert.False(cut.Find("[aria-label=Send]").HasAttribute("title"));
+
+        await dictionary.InitializeAsync("hun");
+        await security.LanguageChangedEvent.InvokeAsync(new("hun"));
+        AssertTooltip("Küldés");
+        AssertConversationLabels("Új beszélgetés", "Beszélgetés kiválasztása: Új beszélgetés", "Beszélgetés átnevezése", "Átnevezés: Új beszélgetés");
+        AssertTooltip("Új beszélgetés");
+        AssertTooltip("Beszélgetés átnevezése");
+        AssertTooltip("Eredeti szöveg megtekintése");
+        Assert.Single(cut.FindAll("[aria-label=Küldés]"));
+        Assert.Single(cut.FindAll("[aria-label='Copy conversation']"));
+        var tokens = cut.Find("button[popovertarget$=-tokens]");
+        Assert.Equal("12", tokens.TextContent.Trim());
+        Assert.Equal("Összes token: 12", tokens.GetAttribute("aria-label"));
+
+        const string title = "Recent <img src=x> & \"orders\"";
+        Rename(cut, title);
+        await cut.InvokeAsync(() =>
+        {
+            grid.Manager!.EntityDesc.Title = "Customer orders";
+            grid.SetManager(grid.Manager);
+        });
+        AssertConversationLabels(title, $"Beszélgetés kiválasztása: {title}", "Beszélgetés átnevezése", $"Átnevezés: {title}");
+        AssertTooltip(title);
+        Assert.Empty(cut.FindAll("[data-action=switch] img"));
+        AssertTooltip("Customer orders");
+        Assert.Same(session, cut.FindComponent<RgfAiChatComponent>().Instance.Session);
+
+        await dictionary.InitializeAsync("eng");
+        await security.LanguageChangedEvent.InvokeAsync(new("eng"));
+        AssertConversationLabels(title, $"Choose conversation: {title}", "Rename conversation", $"Rename {title}");
+        Assert.Equal("Total tokens: 12", cut.Find("button[popovertarget$=-tokens]").GetAttribute("aria-label"));
+
+        void AssertConversationLabels(string switchTooltip, string switchLabel, string renameTooltip, string renameLabel)
+        {
+            Assert.Equal(System.Text.Encodings.Web.HtmlEncoder.Default.Encode(switchTooltip), Button("switch").Instance.Tooltip);
+            Assert.Equal(renameTooltip, Button("rename").Instance.Tooltip);
+            Assert.Equal(switchLabel, cut.Find("[data-action=switch]").GetAttribute("aria-label"));
+            Assert.Equal(renameLabel, cut.Find("[data-action=rename]").GetAttribute("aria-label"));
+        }
+
+        IRenderedComponent<RgfButton> Button(string action) => cut.FindComponents<RgfButton>()
+            .Single(button => Equals(button.Instance.AdditionalAttributes.GetValueOrDefault("data-action"), action));
+        Assert.Single(cut.FindAll("[aria-label=Send]"));
+
+        void AssertTooltip(string text) =>
+            Assert.Contains(context.JSInterop.Invocations["Recrovit.RGF.Blazor.UI.Base.tooltip"], invocation =>
+                invocation.Arguments.Count == 2 && invocation.Arguments[1] is RgfTooltipOptions { Trigger: "hover" } options
+                && System.Net.WebUtility.HtmlDecode(options.Title) == text);
+    }
+
     [Fact]
     public void GridContextNotifiesOnlyAfterActualStateChanges()
     {
@@ -349,6 +434,7 @@ public sealed partial class RgfRecrobyWorkspaceTests
         context.Services.AddScoped<RgfRecrobyWorkspaceService>();
         context.Services.AddScoped<IRgfRecrobyWorkspaceService>(p => p.GetRequiredService<RgfRecrobyWorkspaceService>());
         context.Services.AddSingleton<IRecroDictService, FakeDashboardRecroDictService>();
+        context.Services.AddSingleton<IRecroSecService, FakeRecroSecService>();
         return context;
     }
 
@@ -365,7 +451,7 @@ public sealed partial class RgfRecrobyWorkspaceTests
         Assert.Single(cut.FindAll(".rgf-recroby-conversation-bar [data-action=new]"));
         Assert.Empty(cut.FindAll("[role=tab], .nav-tabs"));
         Assert.Single(cut.FindAll("[data-action=switch]"));
-        Assert.Equal("New chat", cut.Find("[data-action=switch]").GetAttribute("title"));
+        Assert.Equal("Choose conversation: New chat", cut.Find("[data-action=switch]").GetAttribute("aria-label"));
         Assert.Equal("dialog", cut.Find("[data-action=switch]").GetAttribute("aria-haspopup"));
         Assert.Empty(cut.FindAll("header [data-action=new]"));
         Assert.Single(cut.FindAll(".rgf-recroby-choice > .btn-close"));
@@ -663,8 +749,8 @@ public sealed partial class RgfRecrobyWorkspaceTests
         Assert.Equal("General chat", cut.Find("[data-conversation-type=general]").GetAttribute("aria-label"));
         Assert.Equal("General chat", cut.Find("[data-conversation-type=general] .rgf-recroby-group-title").TextContent);
         Assert.Single(cut.FindAll("[data-conversation-type=general] [data-action=select]"));
-        Assert.Equal(title, cut.Find("[data-conversation-type=custom] [data-action=select]").GetAttribute("title"));
-        Assert.Equal("custom: " + title, cut.Find("[data-action=switch]").GetAttribute("title"));
+        Assert.False(cut.Find("[data-conversation-type=custom] [data-action=select]").HasAttribute("title"));
+        Assert.Equal("Choose conversation: custom: " + title, cut.Find("[data-action=switch]").GetAttribute("aria-label"));
         Assert.Equal(title, cut.Find(".rgf-recroby-title").TextContent);
         Assert.Equal("custom: " + title, cut.Find(".rgf-recroby-conversation:not([hidden])").GetAttribute("aria-label"));
         Assert.Empty(cut.FindAll("[role=tab], [role=tabpanel]"));
@@ -886,7 +972,7 @@ public sealed partial class RgfRecrobyWorkspaceTests
         var send = session.SendAsync(prompt, cancellationToken: cancellation.Token);
         cut.WaitForAssertion(() => Assert.Equal(title, cut.Find(".rgf-recroby-title").TextContent));
         Assert.False(send.IsCompleted);
-        Assert.Equal(title, cut.Find("[data-action=switch]").GetAttribute("title"));
+        Assert.Equal("Choose conversation: " + title, cut.Find("[data-action=switch]").GetAttribute("aria-label"));
         cancellation.Cancel();
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => send);
         cut.WaitForAssertion(() => Assert.Equal(title, cut.Find(".rgf-recroby-title").TextContent));
@@ -940,7 +1026,7 @@ public sealed partial class RgfRecrobyWorkspaceTests
         var longTitle = new string('x', 100);
         Rename(cut, longTitle);
         Assert.Equal(longTitle, cut.Find(".rgf-recroby-choice-title").TextContent);
-        Assert.Equal(longTitle, cut.Find("[data-action=switch]").GetAttribute("title"));
+        Assert.Equal("Choose conversation: " + longTitle, cut.Find("[data-action=switch]").GetAttribute("aria-label"));
         Assert.Equal("Rename " + longTitle, cut.Find("[data-action=rename]").GetAttribute("aria-label"));
         Rename(cut, "New chat");
         await cut.FindComponent<RgfAiChatComponent>().Instance.Session.SendAsync("Must not replace manual title", cancellationToken: Xunit.TestContext.Current.CancellationToken);

@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
 using Recrovit.RecroGridFramework.Abstraction.Contracts.AI;
+using Recrovit.RecroGridFramework.Abstraction.Contracts.Services;
+using Recrovit.RecroGridFramework.Abstraction.Infrastructure.Events;
 using Recrovit.RecroGridFramework.Client.AI;
 using Recrovit.RecroGridFramework.Client.Blazor.UI.Components.Base;
 using System.Text;
@@ -11,6 +13,23 @@ namespace Recrovit.RecroGridFramework.Client.Blazor.UI.Components.AI;
 /// <summary>Displays and sends manual turns through a UI-independent conversation session.</summary>
 public partial class RgfAiChatComponent : IDisposable
 {
+    [Inject]
+    private IRecroSecService RecroSec { get; set; } = null!;
+
+    [Inject]
+    private IRecroDictService RecroDict { get; set; } = null!;
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        RecroSec.LanguageChangedEvent.Subscribe(OnLanguageChangedAsync);
+    }
+
+    private Task OnLanguageChangedAsync(DataEventArgs<string> _) => InvokeAsync(() =>
+    {
+        if (!disposed) StateHasChanged();
+    });
+
     /// <summary>Required conversation session; the component subscribes to state but does not own the transport.</summary>
     [Parameter, EditorRequired]
     public RgfAiConversationSession Session { get; set; } = null!;
@@ -63,13 +82,16 @@ public partial class RgfAiChatComponent : IDisposable
         || Session.Conversation.Messages.Any(message => message.Role is RgfAiMessageRole.User or RgfAiMessageRole.Assistant));
     private bool? CopySucceeded => ReferenceEquals(_copiedFirstMessage, Session.Conversation.Messages.FirstOrDefault())
         ? _copySucceeded : null;
-    private string? CopyStatus => CopySucceeded switch { true => "Conversation copied.", false => "Copy failed.", _ => null };
+    private string? CopyStatus => CopySucceeded switch { true => RecroDict.GetRgfRecrobyString("ConversationCopied"), false => RecroDict.GetRgfRecrobyString("CopyFailed"), _ => null };
 
     private RgfAiResponse? PendingResponse => Session.Conversation.IsPendingWorkflow
         ? Session.Conversation.Messages.LastOrDefault() as RgfAiResponse : null;
     private bool TextInputDisabled => Session.IsProcessing || PendingResponse?.ResponseMode == RgfAiResponseMode.ChoiceOnly;
-    private bool HasChoices => PendingResponse is { Choices.Count: > 0, ResponseMode:
-        RgfAiResponseMode.ChoiceOnly or RgfAiResponseMode.ChoiceOrText };
+    private bool HasChoices => PendingResponse is
+    {
+        Choices.Count: > 0, ResponseMode:
+        RgfAiResponseMode.ChoiceOnly or RgfAiResponseMode.ChoiceOrText
+    };
 
     private void SynchronizeChoices()
     {
@@ -284,6 +306,7 @@ public partial class RgfAiChatComponent : IDisposable
     public void Dispose()
     {
         disposed = true;
+        RecroSec.LanguageChangedEvent.Unsubscribe(OnLanguageChangedAsync);
         if (AllowCancellation) _sendCancellation?.Cancel();
         if (subscribedSession != null)
         {

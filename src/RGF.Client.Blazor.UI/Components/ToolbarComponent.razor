@@ -1,4 +1,5 @@
-﻿@using Recrovit.RecroGridFramework.Client.AI
+@using Recrovit.RecroGridFramework.Abstraction.Infrastructure.Events
+@using Recrovit.RecroGridFramework.Client.AI
 @using Recrovit.RecroGridFramework.Client.Blazor.UI.Components.AI
 @using Microsoft.Extensions.DependencyInjection
 @implements IDisposable
@@ -39,8 +40,7 @@
                                         <RgfButton IconName="@(ToolbarParameters.QuickFilterEnabled ? "bi-binoculars-fill" : "bi-binoculars")"
                                                    CssClass="@(ToolbarParameters.QuickFilterEnabled ? "btn-success" : "btn-secondary")"
                                                    Tooltip="@RecroDict.GetRgfUiString("QuickFilter")"
-                                                   OnClick="() => {ToolbarParameters.QuickFilterEnabled = !ToolbarParameters.QuickFilterEnabled;
-                                                            RgfToolbar.OnToolbarCommand(RgfToolbarEventKind.ToggleQuickFilter);}" />
+                                                   OnClick="ToggleQuickFilter" />
                                     }
                                 }
                             </div>
@@ -109,8 +109,9 @@
                             !Manager.EntityDesc.EntityName.Equals("RGRecroChart", StringComparison.OrdinalIgnoreCase))
                         {
                             <div class="btn-group me-2" role="group">
-                                <RgfButton IconName="bi-robot" CssClass="@(IsRecrobyActive ? "btn-success" : "btn-secondary")" Tooltip="Open Recroby"
-                                           AdditionalAttributes="@(new() { ["aria-pressed"] = IsRecrobyActive ? "true" : "false" })"
+                                <RgfButton IconName="bi-robot" CssClass="@(IsRecrobyActive ? "btn-success" : "btn-secondary")"
+                                           Tooltip="@RecroDict.GetRgfRecrobyString("OpenRecroby")"
+                                           AdditionalAttributes="@(new() { ["aria-pressed"] = IsRecrobyActive ? "true" : "false", ["aria-label"] = RecroDict.GetRgfRecrobyString("OpenRecroby") })"
                                            OnClick="async () => { await WorkspaceService.OpenOrActivateGridAsync(EntityComponent.RecrobyGridContext); }" />
                             </div>
                         }
@@ -193,12 +194,29 @@
     private bool IsRecrobyActive => EntityComponent?.RecrobyGridContext is { Manager: not null } context &&
         ReferenceEquals(context, RecrobyWorkspace?.ActiveGridContext);
 
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        RecroSec.LanguageChangedEvent.Subscribe(OnLanguageChangedAsync);
+    }
+
+    private Task OnLanguageChangedAsync(DataEventArgs<string> _) => InvokeAsync(() =>
+    {
+        if (!_disposed) StateHasChanged();
+    });
+
     protected override void OnParametersSet()
     {
         if (ReferenceEquals(_observedWorkspace, RecrobyWorkspace)) return;
-        if (_observedWorkspace is not null) _observedWorkspace.ActiveGridContextChanged -= RefreshRecrobyState;
+        if (_observedWorkspace is not null)
+        {
+            _observedWorkspace.ActiveGridContextChanged -= RefreshRecrobyState;
+        }
         _observedWorkspace = RecrobyWorkspace;
-        if (_observedWorkspace is not null) _observedWorkspace.ActiveGridContextChanged += RefreshRecrobyState;
+        if (_observedWorkspace is not null)
+        {
+            _observedWorkspace.ActiveGridContextChanged += RefreshRecrobyState;
+        }
     }
 
     private void RefreshRecrobyState()
@@ -212,7 +230,11 @@
     void IDisposable.Dispose()
     {
         _disposed = true;
-        if (_observedWorkspace is not null) _observedWorkspace.ActiveGridContextChanged -= RefreshRecrobyState;
+        RecroSec.LanguageChangedEvent.Unsubscribe(OnLanguageChangedAsync);
+        if (_observedWorkspace is not null)
+        {
+            _observedWorkspace.ActiveGridContextChanged -= RefreshRecrobyState;
+        }
         _observedWorkspace = null;
     }
 
@@ -227,6 +249,12 @@
     private string SettingsName => _rgfToolbarRef.GridSetting.SettingsName ?? "";
 
     private RgfToolbarComponent _rgfToolbarRef { get; set; } = null!;
+
+    private void ToggleQuickFilter()
+    {
+        ToolbarParameters.QuickFilterEnabled = !ToolbarParameters.QuickFilterEnabled;
+        _rgfToolbarRef.OnToolbarCommand(RgfToolbarEventKind.ToggleQuickFilter);
+    }
 
     private Task OnGridSettingsChanged(KeyValuePair<object?, string> item)
     {

@@ -64,14 +64,14 @@ public sealed class RgfFilterGenerationTests
         {
             Assert.Equal("Before", editor.FilterSettings.SettingsName);
             Assert.Equal("Existing\n\n---\n\nSemantic summary.", editor.Remark);
-            Assert.Equal("AiNameDescriptionGenerated", Assert.Single(f.Notifications.Events).Body);
+            Assert.Equal("RGF.Recroby.UI.AiNameDescriptionGenerated", Assert.Single(f.Notifications.Events).Body);
         }
         else
         {
             Assert.NotEqual("Generated", editor.FilterSettings.SettingsName);
             Assert.NotEqual("Semantic summary.", editor.Remark);
             if (variant == "switch") Assert.Equal("Other description", editor.Remark);
-            if (variant == "failure") Assert.Equal("AiNameDescriptionFailed", Assert.Single(f.Notifications.Events).Body);
+            if (variant == "failure") Assert.Equal("RGF.Recroby.UI.AiNameDescriptionFailed", Assert.Single(f.Notifications.Events).Body);
             else if (variant == "switch") Assert.Single(f.Notifications.Events);
             else Assert.Empty(f.Notifications.Events);
         }
@@ -206,7 +206,7 @@ public sealed class RgfFilterGenerationTests
         var expected = new string('x', length);
         if (length < 3993) expected += "\n\n---\n\n" + new string('y', Math.Min(18, 4000 - length - 7));
         Assert.Equal(expected, editor.Remark);
-        Assert.Equal("AiNameDescriptionGenerated", Assert.Single(f.Notifications.Events).Body);
+        Assert.Equal("RGF.Recroby.UI.AiNameDescriptionGenerated", Assert.Single(f.Notifications.Events).Body);
     }
 
     [Fact]
@@ -497,7 +497,12 @@ public sealed class RgfFilterGenerationTests
     }
     public class DictionaryProxy : DispatchProxy
     {
-        protected override object? Invoke(MethodInfo? method, object?[]? args) => method!.Name == "GetRgfUiString" ? args![0] : throw new NotSupportedException();
+        protected override object? Invoke(MethodInfo? method, object?[]? args) => method!.Name switch
+        {
+            nameof(IRecroDictService.GetRgfUiString) => args![0],
+            nameof(IRecroDictService.GetRgfRecrobyString) => $"RGF.Recroby.UI.{args![0]}",
+            _ => throw new NotSupportedException()
+        };
     }
     public class SecurityProxy : DispatchProxy
     {

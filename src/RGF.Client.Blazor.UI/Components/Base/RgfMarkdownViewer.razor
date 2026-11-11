@@ -13,18 +13,19 @@
         <div class="rgf-markdown-toolbar">
             @if (ShowCopy)
             {
-                <button type="button" class="@buttonCssClass rgf-markdown-copy" title="Copy" aria-label="Copy"
-                        disabled="@(string.IsNullOrEmpty(Text) || _copying)" @onclick="CopyAsync" @onmouseleave="ResetCopyFeedback">
+                <RgfHtml TagName="button" Disabled="@(string.IsNullOrEmpty(Text) || _copying)" OnClick="CopyAsync"
+                         Tooltip="@RecroDict.GetRgfUiString("Copy")"
+                         AdditionalAttributes="@(new() { ["type"] = "button", ["class"] = $"{buttonCssClass} rgf-markdown-copy", ["aria-label"] = RecroDict.GetRgfUiString("Copy"), ["onmouseleave"] = EventCallback.Factory.Create<MouseEventArgs>(this, ResetCopyFeedback) })">
                     <i class="bi @(_copied ? "bi-check-lg" : "bi-copy")" aria-hidden="true"></i>
-                </button>
+                </RgfHtml>
             }
             @if (ShowToggle)
             {
-                <button type="button" class="@buttonCssClass rgf-markdown-toggle" title="@ToggleLabel"
-                        aria-label="@ToggleLabel" aria-pressed="@(_renderMarkdown ? "true" : "false")"
-                        @onclick="ToggleView">
+                <RgfHtml TagName="button" OnClick="ToggleView"
+                         Tooltip="@ToggleLabel"
+                         AdditionalAttributes="@(new() { ["type"] = "button", ["class"] = $"{buttonCssClass} rgf-markdown-toggle", ["aria-label"] = ToggleLabel, ["aria-pressed"] = _renderMarkdown ? "true" : "false" })">
                     <i class="bi @(_renderMarkdown ? "bi-file-text" : "bi-markdown")" aria-hidden="true"></i>
-                </button>
+                </RgfHtml>
             }
         </div>
     }
@@ -38,10 +39,10 @@
     }
     @if (ShowCopy)
     {
-        <div class="rgf-markdown-copy-status visually-hidden" role="status" aria-live="polite">@(_copied ? "Copied" : null)</div>
+        <div class="rgf-markdown-copy-status visually-hidden" role="status" aria-live="polite">@(_copied ? RecroDict.GetRgfUiString("Copied") : null)</div>
         @if (_copyFailed)
         {
-            <div class="rgf-markdown-copy-error small" role="alert">Copy failed. Check your browser clipboard permissions and try again.</div>
+            <div class="rgf-markdown-copy-error small" role="alert">@(RecroDict.GetRgfUiString("ClipboardCopyFailed"))</div>
         }
     }
 </div>

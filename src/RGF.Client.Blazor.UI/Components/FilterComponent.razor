@@ -16,7 +16,7 @@
                              InputChanged="OnInputChanged" />
             </div>
             <div class="px-1">
-                <RgfButton IconName="bi-stars" CssClass="btn-outline-secondary" Tooltip="@RecroDict.GetRgfUiString("AiGenerateNameDescription")"
+                <RgfButton IconName="bi-stars" CssClass="btn-outline-secondary" Tooltip="@RecroDict.GetRgfRecrobyString("AiGenerateNameDescription")"
                            Disabled="!RgfFilterComp.CanGenerateNameDescription" OnClick="_ => GenerateAsync(RgfFilterComp)" />
             </div>
             @if (RgfFilterComp.IsGeneratingNameDescription)

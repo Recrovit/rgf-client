@@ -184,6 +184,13 @@ public sealed class RgfEntityComponentLoadingTests
             => Task.FromResult(new ConcurrentDictionary<string, string>());
         public string GetRgfUiString(string resourceKey) => resourceKey;
         public string GetRgfUiString(string resourceKey, params object[] args) => resourceKey;
+
+        public string GetRgfRecrobyString(string resourceKey) => IsInitialized
+            ? $"RGF.Recroby.UI.{resourceKey}"
+            : "RecroDict has not been initialized";
+
+        public string GetRgfRecrobyString(string resourceKey, params object[] args) =>
+            RecroDictFormatHelper.Format(GetRgfRecrobyString(resourceKey), args).Value;
     }
 
     private sealed class FakeRecroSecService(string userLanguage) : IRecroSecService

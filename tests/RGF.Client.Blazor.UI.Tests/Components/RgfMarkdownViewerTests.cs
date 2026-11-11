@@ -19,12 +19,12 @@ public sealed class RgfMarkdownViewerTests
         var buttons = cut.FindAll("button");
         Assert.Equal(2, buttons.Count);
         Assert.Equal("Copy", buttons[0].GetAttribute("aria-label"));
-        Assert.Equal("Copy", buttons[0].GetAttribute("title"));
+        Assert.False(buttons[0].HasAttribute("title"));
         Assert.Equal("View plain text", buttons[1].GetAttribute("aria-label"));
     }
 
     [Fact]
-    public void CopyUsesExactOriginalTextInBothViewsAndReportsSuccess()
+    public async Task CopyUsesExactOriginalTextInBothViewsAndReportsSuccess()
     {
         const string text = "  **bold**\r\n\n\t<script>text</script>  ";
         using var context = Context();
@@ -38,6 +38,15 @@ public sealed class RgfMarkdownViewerTests
         cut.Find(".rgf-markdown-toggle").Click();
         cut.Find(".rgf-markdown-copy").Click();
         Assert.Equal(text.Replace("\r\n", "\n"), cut.Find(".rgf-markdown-plain").TextContent);
+        var dictionary = (FakeDashboardRecroDictService)context.Services.GetRequiredService<IRecroDictService>();
+        dictionary.HungarianUi["Copied"] = "Másolva";
+        dictionary.HungarianUi["ViewMarkdown"] = "Markdown nézet";
+        await dictionary.InitializeAsync("hun");
+        await context.Services.GetRequiredService<IRecroSecService>().LanguageChangedEvent.InvokeAsync(new("hun"));
+        Assert.Equal("Másolva", cut.Find("[role=status]").TextContent);
+        Assert.Equal("Markdown nézet", cut.Find(".rgf-markdown-toggle").GetAttribute("aria-label"));
+        Assert.Equal(text.Replace("\r\n", "\n"), cut.Find(".rgf-markdown-plain").TextContent);
+
         var calls = context.JSInterop.Invocations["navigator.clipboard.writeText"];
         Assert.Equal(2, calls.Count);
         Assert.All(calls, call => Assert.Equal(text, Assert.Single(call.Arguments)));
@@ -78,7 +87,7 @@ public sealed class RgfMarkdownViewerTests
         var cut = context.Render<RgfMarkdownViewer>(p => p.Add(c => c.Text, text)
             .Add(c => c.ShowCopy, true).Add(c => c.RenderMarkdown, false));
         Assert.True(cut.Find(".rgf-markdown-copy").HasAttribute("disabled"));
-        Assert.Empty(context.JSInterop.Invocations);
+        Assert.Empty(context.JSInterop.Invocations["navigator.clipboard.writeText"]);
     }
 
     private static BunitContext Context()
@@ -86,6 +95,7 @@ public sealed class RgfMarkdownViewerTests
         var context = new BunitContext();
         context.JSInterop.Mode = JSRuntimeMode.Loose;
         context.Services.AddSingleton<IRecroDictService, FakeDashboardRecroDictService>();
+        context.Services.AddSingleton<IRecroSecService, FakeRecroSecService>();
         return context;
     }
 
@@ -113,7 +123,7 @@ public sealed class RgfMarkdownViewerTests
         cut.Find("button").Click();
         Assert.Equal(text, cut.Find(".rgf-markdown-plain").TextContent);
         Assert.Equal("false", cut.Find("button").GetAttribute("aria-pressed"));
-        Assert.Equal("View Markdown", cut.Find("button").GetAttribute("title"));
+        Assert.Equal("View Markdown", cut.Find("button").GetAttribute("aria-label"));
         Assert.Empty(cut.FindAll("script, strong"));
         cut.Render(p => p.Add(c => c.Text, text).Add(c => c.RenderMarkdown, true));
         Assert.Single(cut.FindAll(".rgf-markdown-plain"));
@@ -156,7 +166,7 @@ public sealed class RgfMarkdownViewerTests
             var button = Assert.Single(cut.FindAll("button"));
             var label = isMarkdown ? "View plain text" : "View Markdown";
             Assert.Equal("button", button.GetAttribute("type"));
-            Assert.Equal(label, button.GetAttribute("title"));
+            Assert.False(button.HasAttribute("title"));
             Assert.Equal(label, button.GetAttribute("aria-label"));
             Assert.Equal(isMarkdown ? "true" : "false", button.GetAttribute("aria-pressed"));
             Assert.Contains("rgf-markdown-toggle", button.ClassList);

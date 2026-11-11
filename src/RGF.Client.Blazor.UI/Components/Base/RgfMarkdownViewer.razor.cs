@@ -5,6 +5,8 @@ using Markdig.Renderers.Html.Inlines;
 using Markdig.Syntax.Inlines;
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
+using Recrovit.RecroGridFramework.Abstraction.Contracts.Services;
+using Recrovit.RecroGridFramework.Abstraction.Infrastructure.Events;
 using System.Globalization;
 using System.Net;
 
@@ -14,6 +16,22 @@ namespace Recrovit.RecroGridFramework.Client.Blazor.UI.Components.Base;
 /// <summary>Displays untrusted Markdown or its original text, with optional copy and local view controls.</summary>
 public partial class RgfMarkdownViewer
 {
+    [Inject]
+    private IRecroSecService RecroSec { get; set; } = null!;
+
+    private bool _disposed;
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        RecroSec.LanguageChangedEvent.Subscribe(OnLanguageChangedAsync);
+    }
+
+    private Task OnLanguageChangedAsync(DataEventArgs<string> _) => InvokeAsync(() =>
+    {
+        if (!_disposed) StateHasChanged();
+    });
+
     private static readonly MarkdownPipeline Pipeline = new MarkdownPipelineBuilder().UsePipeTables().DisableHtml().Build();
     private bool _initialized;
     private string? _previousText;
@@ -36,7 +54,14 @@ public partial class RgfMarkdownViewer
     /// <summary>Shows a button that copies the unchanged original text using the browser Clipboard API.</summary>
     [Parameter] public bool ShowCopy { get; set; }
 
-    private string ToggleLabel => _renderMarkdown ? "View plain text" : "View Markdown";
+    private string ToggleLabel => _renderMarkdown ? RecroDict.GetRgfUiString("ViewPlainText") : RecroDict.GetRgfUiString("ViewMarkdown");
+
+    public override ValueTask DisposeAsync()
+    {
+        _disposed = true;
+        RecroSec.LanguageChangedEvent.Unsubscribe(OnLanguageChangedAsync);
+        return base.DisposeAsync();
+    }
 
     protected override void OnParametersSet()
     {
