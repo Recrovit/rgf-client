@@ -114,6 +114,27 @@ public sealed class RgfProxyTransportIntegrationTests
         Assert.Equal("Bearer test-token", Assert.Single(fixture.ApiRequests).Authorization);
     }
 
+    [Fact]
+    public async Task SameOriginImageGetWithoutOriginForwardsTokenAndConditionalHeaders()
+    {
+        await using var fixture = await ProxyHost.StartAsync();
+        using var client = new HttpClient();
+        using var request = new HttpRequestMessage(HttpMethod.Get,
+            fixture.Origin + "/RGF/API/Media/entity-image?e=10001&t=rg-col-10005&rg-col-10001=1");
+        request.Headers.Add("Sec-Fetch-Site", "same-origin");
+        request.Headers.Add("Sec-Fetch-Mode", "no-cors");
+        request.Headers.Add("Sec-Fetch-Dest", "image");
+        request.Headers.IfNoneMatch.ParseAdd("\"category-image\"");
+        using var response = await client.SendAsync(request, TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.NotModified, response.StatusCode);
+        Assert.Equal("\"category-image\"", response.Headers.ETag?.ToString());
+        Assert.True(response.Headers.CacheControl?.Private);
+        Assert.True(response.Headers.CacheControl?.NoCache);
+        Assert.Equal(string.Empty, Assert.Single(fixture.HostRequests).Origin);
+        Assert.Equal("Bearer test-token", Assert.Single(fixture.ApiRequests).Authorization);
+    }
+
     public sealed class ProgressHub : Hub { }
 
     [Theory]
@@ -205,6 +226,14 @@ public sealed class RgfProxyTransportIntegrationTests
             api.UseWebSockets();
             Capture(api, apiRequests);
             api.MapHub<ProgressHub>("/rgf/progressHub");
+            api.MapGet("/RGF/API/Media/entity-image", (HttpContext context) =>
+            {
+                if (context.Request.Headers.IfNoneMatch != "\"category-image\"" || context.Request.Query["rg-col-10001"] != "1")
+                    return Results.BadRequest();
+                context.Response.Headers.CacheControl = "private, no-cache";
+                context.Response.Headers.ETag = "\"category-image\"";
+                return Results.StatusCode(StatusCodes.Status304NotModified);
+            });
             api.MapMethods("/rgf/api/{**path}", ["GET", "POST"], () => Results.Ok());
             await api.StartAsync(TestContext.Current.CancellationToken);
             try
