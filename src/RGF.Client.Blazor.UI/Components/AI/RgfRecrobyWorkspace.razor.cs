@@ -506,8 +506,15 @@ public partial class RgfRecrobyWorkspace : IAsyncDisposable
 
     private sealed class LazyTransport(RgfRecrobyWorkspace workspace) : IRgfAiTransport
     {
-        private (string? ConversationId, string? Token, GridTarget Target)? _pending;
+        private (string? ConversationId, string? Token, GridTarget Target, FilterBaseline Baseline, long Turn)? _pending;
         private readonly record struct GridTarget(RgfRecrobyGridContext? Context, string? SessionId, string? GridId, int EntityId);
+        private readonly record struct FilterBaseline(IRgManager? Manager, long ActivationVersion, string? Json);
+
+        private static bool HasQuickConditions(IEnumerable<RgfFilter.Condition>? conditions) =>
+            conditions?.Any(condition => condition.IsQuickFilter || HasQuickConditions(condition.Conditions)) == true;
+
+        private static string? CaptureFilter(RgfFilter.Condition[]? conditions) =>
+            HasQuickConditions(conditions) ? null : JsonSerializer.Serialize(conditions);
 
         public async Task<RgfAiResponse> SendAsync(RgfAiRequest request, CancellationToken cancellationToken = default)
         {
@@ -519,6 +526,7 @@ public partial class RgfRecrobyWorkspace : IAsyncDisposable
             GridTurns? turns = null;
             long turn = 0;
             long activationVersion = 0;
+            FilterBaseline baseline = default;
             RgfAiResponse? rejection = null;
             await workspace.InvokeAsync(() =>
             {
@@ -529,21 +537,35 @@ public partial class RgfRecrobyWorkspace : IAsyncDisposable
                 managerIds = (session?.SessionId, session?.GridId);
                 var entityId = manager?.EntityDesc.EntityId ?? 0;
                 request.GridRequest = gridContext?.CreateGridRequest();
+                var applied = manager?.ListHandler.GetGridSettings().Conditions;
+                var appliedJson = CaptureFilter(applied);
+                var requestJson = CaptureFilter(request.GridRequest?.ListParam?.UserFilter);
+                request.GridFilterHasQuickConditions = appliedJson is null ? true
+                    : manager is not null && appliedJson == requestJson ? false : null;
                 target = new(gridContext, request.GridRequest?.SessionId, request.GridRequest?.GridId, entityId);
-                if (_pending is { } pending && pending.ConversationId == request.ConversationId &&
-                    pending.Token == request.ConversationToken && pending.Target != target)
+                var continuation = _pending is { } pending && pending.ConversationId == request.ConversationId &&
+                    pending.Token == request.ConversationToken ? _pending : null;
+                if (continuation is { } previous && previous.Target != target)
                 {
                     rejection = new RgfAiResponse
                     {
                         ErrorCode = "PendingGridChanged",
-                        Message = pending.Target.Context is null
+                        Message = previous.Target.Context is null
                             ? workspace.RecroDict.GetRgfRecrobyString("RecrobyPendingGridAdded")
                             : workspace.RecroDict.GetRgfRecrobyString("RecrobyPendingGridChanged")
                     };
                     return;
                 }
+                baseline = continuation?.Baseline ?? new(manager, activationVersion,
+                    request.GridFilterHasQuickConditions == false && applied is { Length: > 0 } ? appliedJson : null);
                 if (manager is null) return;
                 turns = workspace._gridTurns.GetValue(manager, static _ => new());
+                if (continuation is { } waiting && ReferenceEquals(manager, baseline.Manager) && waiting.Turn != turns.Latest)
+                {
+                    baseline = baseline with { Json = null };
+                    turn = waiting.Turn;
+                    return;
+                }
                 turn = ++turns.Latest;
             });
 
@@ -553,7 +575,7 @@ public partial class RgfRecrobyWorkspace : IAsyncDisposable
                 .SendAsync(request, cancellationToken);
             if (response.Success)
                 _pending = response.WorkflowStatus == "WaitingForInput"
-                    ? (response.ConversationId, response.ConversationToken, target)
+                    ? (response.ConversationId, response.ConversationToken, target, baseline, turn)
                     : null;
             if (response is not { Success: true, FilterAction: { } action }) return response;
 
@@ -564,6 +586,7 @@ public partial class RgfRecrobyWorkspace : IAsyncDisposable
                 if (workspace._disposed || cancellationToken.IsCancellationRequested || IsSuperseded()) return;
 
                 IRgListHandler? list = null;
+                var stale = false;
                 try
                 {
                     if (IsTargetCurrent())
@@ -576,10 +599,11 @@ public partial class RgfRecrobyWorkspace : IAsyncDisposable
                             list = manager.ListHandler;
                             // Keep editor changes separate from the applied conditions until the user accepts them.
                             var applied = RgfGridSettings.DeepCopy(new RgfGridSettings { Conditions = handler.StoreFilter() })!;
-                            list.ApplyFilterState(applied.Conditions!, list.SQLTimeout);
+                            list.ApplyFilterState(applied.Conditions ?? [], list.SQLTimeout);
                             handler.SetNewAiFilterSettings(action.Remark);
                         }
                     }
+                    stale = list is null && action.Operation == RgfAiFilterOperation.ReplaceIfUnchanged && !IsTargetCurrent();
                 }
                 catch (Exception error)
                 {
@@ -590,7 +614,7 @@ public partial class RgfRecrobyWorkspace : IAsyncDisposable
                 if (list is null)
                 {
                     if (!workspace._disposed && !cancellationToken.IsCancellationRequested && !IsSuperseded())
-                        await workspace.ReportFilterLoadFailureAsync(manager);
+                        await workspace.ReportFilterLoadFailureAsync(manager, stale);
                 }
                 else
                     _ = workspace.RefreshAfterFilterLoadAsync(list);
@@ -603,16 +627,25 @@ public partial class RgfRecrobyWorkspace : IAsyncDisposable
             bool IsTargetCurrent() => manager is not null && ReferenceEquals(gridContext?.Manager, manager) &&
                 ReferenceEquals(workspace.ActiveGridContext, gridContext) && activationVersion == workspace._gridActivationVersion &&
                 manager.ListHandler is { Initialized: true } &&
-                action is { Operation: RgfAiFilterOperation.Replace, Conditions.Length: > 0 } &&
+                CanApplyOperation() &&
                 !string.IsNullOrEmpty(action.SessionId) && !string.IsNullOrEmpty(action.GridId) && action.EntityId > 0 &&
                 action.SessionId == target.SessionId && action.GridId == target.GridId && action.EntityId == target.EntityId &&
                 action.SessionId == managerIds.SessionId && action.GridId == managerIds.GridId &&
                 action.SessionId == manager.SessionParams.SessionId && action.GridId == manager.SessionParams.GridId &&
                 action.EntityId == manager.EntityDesc.EntityId;
+
+            bool CanApplyOperation() => action.Operation switch
+            {
+                RgfAiFilterOperation.Replace => action.Conditions is { Length: > 0 },
+                RgfAiFilterOperation.ReplaceIfUnchanged => action.Conditions is not null && baseline.Json is not null &&
+                    ReferenceEquals(manager, baseline.Manager) && activationVersion == baseline.ActivationVersion &&
+                    baseline.Json == CaptureFilter(manager!.ListHandler.GetGridSettings().Conditions),
+                _ => false
+            };
         }
     }
 
-    private async Task ReportFilterLoadFailureAsync(IRgManager? manager)
+    private async Task ReportFilterLoadFailureAsync(IRgManager? manager, bool stale)
     {
         try
         {
@@ -620,7 +653,8 @@ public partial class RgfRecrobyWorkspace : IAsyncDisposable
                 ?.GetNotificationManager(RgfToastEventArgs.NotificationManagerScope);
             if (toast is not null)
                 await toast.RaiseEventAsync(new RgfToastEventArgs("Recroby",
-                    "The generated filter could not be loaded into the Grid.", RgfToastType.Error), this);
+                    RecroDict.GetRgfRecrobyString(stale ? "ModifyStaleFilter" : "FilterLoadFailed"),
+                    RgfToastType.Error), this);
         }
         catch (Exception error)
         {

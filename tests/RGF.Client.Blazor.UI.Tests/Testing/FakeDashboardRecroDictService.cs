@@ -145,6 +145,7 @@ internal sealed class FakeDashboardRecroDictService : IRecroDictService
         ["ReasoningTokens"] = "Reasoning tokens",
         ["RecrobyPendingGridAdded"] = "This workflow started without a Grid. Close the active Grids to continue, or start a new conversation.",
         ["RecrobyPendingGridChanged"] = "Return to the original Grid to continue this workflow, or start a new conversation.",
+        ["FilterLoadFailed"] = "Localized filter load failure",
         ["RemainingCredit"] = "Remaining credit",
         ["RenameConversation"] = "Rename conversation",
         ["RenameConversationNamed"] = "Rename {0}",

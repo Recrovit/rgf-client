@@ -488,6 +488,107 @@ public sealed class EntityComponentTests
         Assert.Null(dialog.Instance.FilterSettings.FilterSettingsId);
     }
 
+    [Theory]
+    [InlineData("apply")]
+    [InlineData("clear")]
+    [InlineData("stale")]
+    [InlineData("pending")]
+    [InlineData("pending-stale")]
+    [InlineData("pending-superseded")]
+    [InlineData("quick")]
+    public async Task RecrobyModifyAppliesOnlyAgainstItsOriginalFilter(string scenario)
+    {
+        using var context = CreateTestContext(true);
+        context.Services.AddScoped<RgfRecrobyWorkspaceService>();
+        await RgfClientBlazorUiTestState.LoadUiResourcesAsync(context);
+        var workspace = context.Render<RgfRecrobyWorkspace>();
+        var entity = CreateEntityParameters(RfgDisplayMode.Grid);
+        using var grid = RenderWorkspace(context, entity);
+        var manager = entity.Manager!;
+        var handler = await manager.GetFilterHandlerAsync();
+        var list = manager.ListHandler;
+        RgfFilter.Condition Condition(string value) => new()
+        {
+            Id = 1, Alias = "Name", LogicalOperator = RgfFilter.LogicalOperator.And,
+            QueryOperator = RgfFilter.QueryOperator.Equal, Param1 = value
+        };
+        handler.ApplyFilterState([Condition("original")], 41);
+        if (scenario == "quick")
+        {
+            await handler.SetQuickFilterAsync(new RgfProperty { Id = 3, Alias = "Quick" }, "quick");
+            Assert.Contains(list.GetGridSettings().Conditions!, condition => condition.IsQuickFilter);
+        }
+        var session = workspace.FindComponent<RgfAiChatComponent>().Instance.Session;
+        var api = (PendingRgfApiService)context.Services.GetRequiredService<IRgfApiService>();
+        var token = Xunit.TestContext.Current.CancellationToken;
+        if (scenario.StartsWith("pending", StringComparison.Ordinal))
+        {
+            api.RecrobyResponse = request =>
+            {
+                Assert.False(request.GridFilterHasQuickConditions);
+                return Task.FromResult(new RgfAiResponse
+                {
+                    Success = true, WorkflowStatus = "WaitingForInput", ConversationId = "pending", ConversationToken = "token",
+                    ResponseMode = RgfAiResponseMode.FreeText, Message = "Which condition?"
+                });
+            };
+            await session.SendAsync("Change the filter", cancellationToken: token);
+            Assert.True(session.Conversation.IsPendingWorkflow);
+            if (scenario == "pending-stale")
+            {
+                await workspace.InvokeAsync(() => handler.ApplyFilterState([Condition("concurrent")], 41));
+            }
+            if (scenario == "pending-superseded")
+            {
+                workspace.Find("[data-action=new]").Click();
+                api.RecrobyResponse = _ => Task.FromResult(new RgfAiResponse { Success = true, Message = "Other answer" });
+                var other = workspace.FindComponents<RgfAiChatComponent>().Last().Instance.Session;
+                Assert.NotSame(session, other);
+                await other.SendAsync("Other question", cancellationToken: token);
+            }
+        }
+        api.GridRequests.Clear();
+        api.RecrobyResponse = async request =>
+        {
+            Assert.Equal(scenario == "quick", request.GridFilterHasQuickConditions);
+            if (scenario == "stale")
+            {
+                // Change the same object in place to verify that the baseline is independent.
+                await workspace.InvokeAsync(() => list.GetGridSettings().Conditions![0].Param1 = "concurrent");
+            }
+            var response = FilterReply(request, scenario == "clear" ? [] : [Condition("modified")]);
+            response.FilterAction = response.FilterAction! with { Operation = RgfAiFilterOperation.ReplaceIfUnchanged };
+            return response;
+        };
+        await session.SendAsync("Change the name to modified", cancellationToken: token);
+        if (scenario is "stale" or "pending-stale" or "pending-superseded" or "quick")
+        {
+            Assert.Empty(api.GridRequests);
+            if (scenario == "quick")
+            {
+                Assert.Contains(list.GetGridSettings().Conditions!, condition => condition.IsQuickFilter);
+            }
+            else
+            {
+                Assert.Equal(scenario == "pending-superseded" ? "original" : "concurrent",
+                    Assert.Single(list.GetGridSettings().Conditions!).DynValue1.StringValue);
+            }
+        }
+        else
+        {
+            Assert.Single(api.GridRequests);
+            if (scenario == "clear")
+            {
+                Assert.Empty(list.GetGridSettings().Conditions!);
+                Assert.Empty(handler.Conditions);
+            }
+            else
+            {
+                Assert.Equal("modified", Assert.Single(list.GetGridSettings().Conditions!).DynValue1.StringValue);
+            }
+        }
+    }
+
     [Fact]
     public async Task RecrobyKeepsTheLatestGridTurnAndRejectsAReplacedManager()
     {
@@ -554,6 +655,7 @@ public sealed class EntityComponentTests
         Assert.Empty(api.GridRequests);
         Assert.Equal("newer", Assert.Single(manager.ListHandler.GetGridSettings().Conditions!).Param1.ToString());
         Assert.Equal(RgfToastType.Error, Assert.Single(toasts).ToastType);
+        Assert.Equal("Localized filter load failure", Assert.Single(toasts).Body);
         toasts.Clear();
         api.RecrobyResponse = async request =>
         {

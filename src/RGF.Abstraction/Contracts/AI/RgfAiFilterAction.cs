@@ -12,7 +12,10 @@ namespace Recrovit.RecroGridFramework.Abstraction.Contracts.AI;
 public enum RgfAiFilterOperation
 {
     /// <summary>Replaces all active filter conditions.</summary>
-    Replace = 1
+    Replace = 1,
+
+    /// <summary>Replaces the applied filter, including with an empty filter, if the original Grid state still matches.</summary>
+    ReplaceIfUnchanged = 2
 }
 
 /// <summary>Server-validated filter conditions and their target Grid.</summary>
