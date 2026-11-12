@@ -1,0 +1,10 @@
+.rgf-form-dialog-host,
+.rgf-form-overlays {
+    display: contents;
+}
+
+    .rgf-form-dialog-host:has(> .rgf-mobile-fullscreen) > .rgf-form-overlays:has(> div > .modal) {
+        display: block;
+        position: relative;
+        z-index: 1056;
+    }

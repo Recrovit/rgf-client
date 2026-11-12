@@ -9,6 +9,16 @@ var Blazor = window.Recrovit.RGF.Blazor;
 
 Blazor.UI = {
     Base: {
+        // RGF-DOC: rgf.client.blazor-ui.entity-ui
+        isMobileBrowserMode: (() => {
+            const ua = window.navigator.userAgent || '';
+            const hints = window.navigator.userAgentData;
+            const desktop = /\b(Macintosh|Windows NT|X11|Linux x86_64)\b/i.test(ua) ||
+                /^(Windows|macOS|Linux|Chrome OS)$/i.test(hints?.platform || '');
+            // Android tablet UAs omit Mobile, and Chromium can report mobile=false for them.
+            const mobile = !desktop && (hints?.mobile === true || /\b(Android|Mobile)\b/i.test(ua));
+            return () => mobile;
+        })(),
         setFocus: function (selector) {
             var element = $(selector);
             if (element.length) {
@@ -21,6 +31,9 @@ Blazor.UI = {
             try {
                 var element = $(selector);
                 if (element.length && element.is(':visible')) {
+                    if (IsMobileBrowserMode && element[0].closest('.modal')?.matches(Blazor.UI.Dialog.fullscreenSelector)) {
+                        return true;
+                    }
 
                     if (closestSelector) {
                         var e2 = element.closest(closestSelector);
@@ -123,8 +136,63 @@ Blazor.UI = {
         }
     },
     Dialog: {
-        initialize: function (dialogId, resizable, uniqueName, focusId, isInline) {
+        fullscreenSelector: '[data-rgf-fullscreen-on-mobile="true"]',
+        observeDialogRemoval: function (dialog, onRemove) {
+            const observer = new MutationObserver(() => {
+                if (!dialog.isConnected) {
+                    observer.disconnect();
+                    onRemove();
+                }
+            });
+            observer.observe(document.body, { childList: true, subtree: true });
+        },
+        sizeMobileDialog: function (dialog) {
+            const viewport = window.visualViewport;
+            if (!viewport) return;
+
+            const update = () => {
+                dialog.style.setProperty('--rgf-viewport-width', `${viewport.width}px`);
+                dialog.style.setProperty('--rgf-viewport-height', `${viewport.height}px`);
+                dialog.style.setProperty('--rgf-viewport-left', `${viewport.offsetLeft}px`);
+                dialog.style.setProperty('--rgf-viewport-top', `${viewport.offsetTop}px`);
+            };
+            update();
+            viewport.addEventListener('resize', update);
+            viewport.addEventListener('scroll', update);
+            Blazor.UI.Dialog.observeDialogRemoval(dialog, () => {
+                viewport.removeEventListener('resize', update);
+                viewport.removeEventListener('scroll', update);
+            });
+        },
+        initialize: function (dialogId, resizable, uniqueName, focusId, isInline, fullscreenOnMobile) {
             var dialog = document.getElementById(dialogId);
+            if (!dialog) {
+                return;
+            }
+
+            const previousFocus = document.activeElement;
+            const parentForm = dialog.parentElement?.closest('.rgf-mobile-fullscreen') ||
+                dialog.closest('.rgf-form-overlays')?.parentElement?.querySelector(':scope > .rgf-mobile-fullscreen');
+            if (!isInline && parentForm) {
+                dialog.classList.add('rgf-mobile-form-overlay');
+                Blazor.UI.Dialog.observeDialogRemoval(dialog, () => {
+                    if (document.activeElement !== document.body || !parentForm.isConnected) return;
+                    const returnTarget = previousFocus?.isConnected && parentForm.contains(previousFocus)
+                        ? previousFocus
+                        : parentForm.querySelector(':scope > .modal-dialog > .modal-content > .modal-header .btn-close');
+                    returnTarget?.focus({ preventScroll: true });
+                });
+            }
+
+            if (!isInline && fullscreenOnMobile && IsMobileBrowserMode) {
+                dialog.classList.add('rgf-mobile-fullscreen');
+                Blazor.UI.Dialog.sizeMobileDialog(dialog);
+                const content = dialog.querySelector(':scope > .modal-dialog > .modal-content');
+                const close = content?.querySelector(':scope > .modal-header .btn-close');
+                (close || document.getElementById(focusId) || content)?.focus({ preventScroll: true });
+                return;
+            }
+
             if (!isInline) {
                 $('div.modal-dialog', dialog).draggable({ handle: '.modal-header, .dialog-header' });
                 $('div.modal-dialog', dialog).height('auto');
@@ -138,13 +206,16 @@ Blazor.UI = {
                 }
             }
             if (focusId != null) {
-                document.getElementById(focusId).focus();
+                document.getElementById(focusId)?.focus();
             }
             else {
                 $('.btn-primary:first', dialog).focus();
             }
         },
         saveDialogPos: function (name, dialogId) {
+            if (dialogId != null && IsMobileBrowserMode && document.getElementById(dialogId)?.matches(Blazor.UI.Dialog.fullscreenSelector)) {
+                return;
+            }
             const key = `RGF.DialogPos.${name}`;
             if (dialogId == undefined) {
                 localStorage.removeItem(key);
@@ -161,6 +232,9 @@ Blazor.UI = {
             }
         },
         loadDialogPos: function (name, dialogId, verticalCenter) {
+            if (IsMobileBrowserMode && document.getElementById(dialogId)?.matches(Blazor.UI.Dialog.fullscreenSelector)) {
+                return;
+            }
             var content = $('div.modal-content:first', '#' + dialogId);
             var dialog = content.parent('div.modal-dialog');
             if (name != null) {
@@ -758,3 +832,4 @@ Blazor.UI = {
 const BlazorBase = Blazor.UI.Base;
 const BlazorGrids = Blazor.UI.Grid;
 const BlazorSplitter = Blazor.UI.Splitter;
+const IsMobileBrowserMode = Blazor.UI.Base.isMobileBrowserMode();

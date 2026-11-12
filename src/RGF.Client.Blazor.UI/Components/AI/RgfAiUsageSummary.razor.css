@@ -58,6 +58,14 @@
         column-gap: .5rem;
     }
 
+    .rgf-ai-usage-panel[id$="-tokens"] dl {
+        grid-template-columns: max-content max-content;
+    }
+
+    .rgf-ai-usage-panel[id$="-tokens"] dt {
+        white-space: nowrap;
+    }
+
     .rgf-ai-usage-panel dt, .rgf-ai-usage-panel dd {
         min-width: 0;
         margin: 0;

@@ -16,6 +16,12 @@ public class RgfDialogParameters
 
     public bool IsInline { get; set; }
 
+    /// <summary>Allows the built-in dialog to fill the viewport in browser mobile mode.</summary>
+    public bool? FullscreenOnMobile { get; set; }
+
+    /// <summary>Provides a fallback title for the fullscreen header.</summary>
+    public string? MobileTitle { get; set; }
+
     public DialogType DialogType { get; set; } = DialogType.Default;
 
     public bool? ShowCloseButton { get; set; }

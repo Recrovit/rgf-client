@@ -3,14 +3,14 @@
 <RgfFormComponent @ref="_rgfFormRef" EntityParameters="EntityParameters" FormComponent="this"
                   FormGroupLayoutTemplate="FormGroupLayoutTemplate">
     <FormTemplate Context="RgfForm">
-        <EditForm EditContext="RgfForm.CurrentEditContext" class="needs-validation">
+        <EditForm EditContext="RgfForm.CurrentEditContext" id="@(_tabsId + "-form")" class="needs-validation">
             <div class="card">
                 @if (RgfForm.IsFormDataBeingSet)
                 {
                     <SpinnerComponent ContainerClass="spinner-flex" Style="width: 3rem; height: 3rem;" />
                 }
                 <div class="dialog-header card-header">
-                    <ul class="nav nav-tabs card-header-tabs" id="@_tabsId" role="tablist">
+                    <ul class="nav nav-tabs card-header-tabs rgf-form-tabs" id="@_tabsId" role="tablist">
                         @for (var idx = 0; idx < RgfForm.FormData.FormTabs.Count; idx++)
                         {
                             var tab = RgfForm.FormData.FormTabs[idx];
@@ -121,7 +121,7 @@
         }
         foreach (var prop in Manager.EntityDesc.Properties.Where(e => e.FormTab == 1 && e.Editable).OrderBy(e => e.FormPos))
         {
-            if (await _jsRuntime.InvokeAsync<bool>(RGFClientBlazorUIConfiguration.JsBlazorUiNamespace + ".Base.ensureVisible", $"div.rg-property[name='{prop.ClientName}'] .rg-cru", true))
+            if (await _jsRuntime.InvokeAsync<bool>(RGFClientBlazorUIConfiguration.JsBlazorUiNamespace + ".Base.ensureVisible", $"#{_tabsId}-form div.rg-property[name='{prop.ClientName}'] .rg-cru", true))
             {
                 break;
             }
@@ -129,11 +129,11 @@
     }
 
     public RenderFragment<RgfFormGroupLayoutParameters> FormGroupLayoutTemplate => (param) =>
-    @<div class="rg-group row my-2 g-2">
+    @<div class="rg-group row my-2 g-2 rgf-form-default-group">
         @foreach (var prop in param.FormGroup.Properties)
-    {
-        @param.BaseFormComponent.GetFormItemLayoutTemplate(new RgfFormItemParameters(param.BaseFormComponent, param.FormGroup, prop))
-    }
+        {
+            @param.BaseFormComponent.GetFormItemLayoutTemplate(new RgfFormItemParameters(param.BaseFormComponent, param.FormGroup, prop))
+        }
     </div>;
 
     private void ActivateTab(int index)

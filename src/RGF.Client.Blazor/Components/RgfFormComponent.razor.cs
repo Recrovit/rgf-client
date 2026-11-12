@@ -81,6 +81,11 @@ public partial class RgfFormComponent : ComponentBase, IDisposable
         FormParameters.DialogParameters.EventDispatcher.Subscribe(RgfDialogEventKind.Close, OnDialogCloseAsync, true);
         //FormParameters.DialogParameters.Width ??= "80%";
         FormParameters.DialogParameters.Resizable ??= true;
+        // RGF-DOC: rgf.client.blazor-ui.entity-ui
+        FormParameters.DialogParameters.FullscreenOnMobile ??= true;
+        FormParameters.DialogParameters.MobileTitle ??= string.IsNullOrWhiteSpace(Manager.EntityDesc.MenuTitle)
+            ? Manager.EntityDesc.EntityName
+            : Manager.EntityDesc.MenuTitle;
         FormParameters.DialogParameters.NoHeader = FormParameters.DialogParameters.HeaderTemplate == null;
     }
 

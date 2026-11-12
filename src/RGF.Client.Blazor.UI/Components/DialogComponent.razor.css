@@ -6,6 +6,87 @@
     margin: auto;
 }
 
+.modal:not(.rgf-mobile-fullscreen) > .modal-dialog > .modal-content > .modal-header.rgf-mobile-only,
+.modal:not(.rgf-mobile-fullscreen) > .modal-dialog > .modal-content > .modal-header > .rgf-mobile-only,
+.modal:not(.rgf-mobile-fullscreen) > .modal-dialog > .modal-content > .modal-header > .modal-title > .rgf-mobile-only,
+.rgf-mobile-fullscreen > .modal-dialog > .modal-content > .modal-header > .modal-title > .rgf-desktop-only {
+    display: none;
+}
+
+.modal.rgf-mobile-fullscreen {
+    overflow: visible;
+    overscroll-behavior: none;
+}
+
+.rgf-mobile-fullscreen > .modal-dialog {
+    position: absolute;
+    inset: var(--rgf-viewport-top, 0px) auto auto var(--rgf-viewport-left, 0px);
+    width: var(--rgf-viewport-width, 100%);
+    height: var(--rgf-viewport-height, 100%);
+    max-width: none;
+    margin: 0;
+    transform: none;
+}
+
+    .rgf-mobile-fullscreen > .modal-dialog > .modal-content {
+        width: 100% !important;
+        height: 100% !important;
+        min-width: 0 !important;
+        min-height: 0 !important;
+        max-width: none !important;
+        max-height: none !important;
+        margin: 0;
+        border: 0;
+        border-radius: 0;
+        padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+    }
+
+        .rgf-mobile-fullscreen > .modal-dialog > .modal-content > .modal-body {
+            min-height: 0;
+            overflow: auto;
+            overscroll-behavior: contain;
+            scroll-padding-block: 1rem;
+        }
+
+        .rgf-mobile-fullscreen > .modal-dialog > .modal-content > .modal-footer .rgf-dialog-actions {
+            flex-wrap: wrap;
+        }
+
+        .rgf-mobile-fullscreen > .modal-dialog > .modal-content > .modal-header ::deep .btn-close,
+        .rgf-mobile-fullscreen > .modal-dialog > .modal-content > .modal-footer ::deep .btn {
+            min-width: 44px;
+            min-height: 44px;
+        }
+
+        .rgf-mobile-fullscreen > .modal-dialog > .modal-content > .modal-body ::deep .rgf-form-tabs {
+            flex-wrap: nowrap;
+            overflow-x: auto;
+            white-space: nowrap;
+        }
+
+        .rgf-mobile-fullscreen > .modal-dialog > .modal-content > .modal-body ::deep .rgf-form-default-group > [data-rgf-form-item] {
+            flex: 0 0 100%;
+            width: 100%;
+            min-width: 0;
+        }
+
+            .rgf-mobile-fullscreen > .modal-dialog > .modal-content > .modal-body ::deep .rgf-form-default-group > [data-rgf-form-item].rg-collection {
+                overflow-x: auto;
+            }
+
+            .rgf-mobile-fullscreen > .modal-dialog > .modal-content > .modal-body ::deep .rgf-form-default-group > [data-rgf-form-item] :is(.form-control, .form-select) {
+                font-size: max(1rem, 16px);
+            }
+
+.rgf-mobile-form-overlay:not(.rgf-mobile-fullscreen) > .modal-dialog {
+    max-width: calc(100% - 2 * var(--bs-modal-margin));
+}
+
+    .rgf-mobile-form-overlay:not(.rgf-mobile-fullscreen) > .modal-dialog > .modal-content {
+        min-width: min(100%, 400px) !important;
+        max-width: 100% !important;
+    }
+
 div.rgf-dialog-column-settings {
     max-height: calc(100vh - 50px);
     overflow-y: auto;

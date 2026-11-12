@@ -2,18 +2,38 @@
 {
     <div class="modal-backdrop show"></div>
 }
-<div id="@_dialogId" class="@(DialogParameters.IsInline ? null : "modal fade show")" tabindex="-1" role="dialog" style="display:block">
-    <div class="@(DialogParameters.IsInline ? null: "modal-dialog modal-dialog-scrollable")">
+<div id="@_dialogId" class="@(DialogParameters.IsInline ? null : "modal fade show")" data-rgf-fullscreen-on-mobile="@(CanUseMobileFullscreen ? "true" : null)" tabindex="-1" role="dialog" style="display:block">
+    <div class="@(DialogParameters.IsInline ? null : "modal-dialog modal-dialog-scrollable")">
         <div @attributes="Attributes">
-            @if (DialogParameters.NoHeader != true)
+            @if (!DialogParameters.NoHeader || CanUseMobileFullscreen)
             {
-                <div class="@($"modal-header {ThemeColor}")">
+                <div class="@($"modal-header {ThemeColor}{(DialogParameters.NoHeader ? " rgf-mobile-only" : "")}")">
                     <div class="modal-title fs-5">
-                        @DialogParameters.Header
+                        @if (CanUseMobileFullscreen && DialogParameters.HeaderTemplate != null &&
+                            (DialogParameters.NoHeader || !string.IsNullOrEmpty(DialogParameters.Title)))
+                        {
+                            @if (!DialogParameters.NoHeader)
+                            {
+                                <span class="rgf-desktop-only">@DialogParameters.Title</span>
+                            }
+                            <div class="rgf-mobile-only">@DialogParameters.HeaderTemplate</div>
+                        }
+                        else if (CanUseMobileFullscreen && (DialogParameters.NoHeader || DialogParameters.Header == null))
+                        {
+                            <span class="rgf-mobile-only">@(string.IsNullOrEmpty(DialogParameters.Title) ? DialogParameters.MobileTitle : DialogParameters.Title)</span>
+                        }
+                        else
+                        {
+                            @DialogParameters.Header
+                        }
                     </div>
-                    @if (DialogParameters.ShowCloseButton == true)
+                    @if (!DialogParameters.NoHeader && DialogParameters.ShowCloseButton == true)
                     {
                         <RgfButton CssClass="btn-close" OnClick="OnClose" />
+                    }
+                    else if (CanUseMobileFullscreen)
+                    {
+                        <button type="button" class="btn-close rgf-mobile-only" aria-label="@RecroDict.GetRgfUiString("Close")" @onclick="OnClose"></button>
                     }
                 </div>
             }
@@ -26,13 +46,13 @@
                     @DialogParameters.FooterTemplate
                 }
                 <div class="d-flex flex-wrap justify-content-between align-items-center">
-                    <div class="d-flex justify-content-start">
+                    <div class="d-flex justify-content-start rgf-dialog-actions">
                         @foreach (var button in DialogParameters.LeftButtons ?? [])
                         {
                             @CreateButton(button)
                         }
                     </div>
-                    <div class="d-flex justify-content-end">
+                    <div class="d-flex justify-content-end rgf-dialog-actions">
                         @foreach (var button in DialogParameters.PredefinedButtons ?? [])
                         {
                             @CreateButton(button)
@@ -57,6 +77,8 @@
     [Parameter, EditorRequired]
     public RgfDialogParameters DialogParameters { get; set; } = null!;
 
+    private bool CanUseMobileFullscreen => !DialogParameters.IsInline && DialogParameters.FullscreenOnMobile == true;
+
     private string? _show { get; set; } = "display:block";
     private string _dialogId = RgfBaseComponent.GetNextId();
     private bool _isDestroyed = false;
@@ -75,13 +97,13 @@
         <RgfButton Id="@(button.IsPrimary ? _nextButtonId : null)" Title="@button.Title" CssClass="@(button.CssClass ?? (button.IsPrimary ? "btn-primary" : "btn-secondary"))"
                    IconName="@button.IconName" Disabled="@button.Disabled" MinWidth="@button.MinWidth" OnClick="button.Callback">
             @if (!string.IsNullOrEmpty(button.ChildText))
-        {
-            @button.ChildText
-        }
-        else if (button.ChildContent != null)
-        {
-            @button.ChildContent
-        }
+            {
+                @button.ChildText
+            }
+            else if (button.ChildContent != null)
+            {
+                @button.ChildContent
+            }
         </RgfButton>
     </div>;
 
@@ -151,7 +173,7 @@
 
         if (firstRender)
         {
-            await _jsRuntime.InvokeVoidAsync(RGFClientBlazorUIConfiguration.JsBlazorUiNamespace + ".Dialog.initialize", _dialogId, DialogParameters.Resizable, DialogParameters.UniqueName, _focusId, DialogParameters.IsInline);
+            await _jsRuntime.InvokeVoidAsync(RGFClientBlazorUIConfiguration.JsBlazorUiNamespace + ".Dialog.initialize", _dialogId, DialogParameters.Resizable, DialogParameters.UniqueName, _focusId, DialogParameters.IsInline, CanUseMobileFullscreen);
         }
         var eventArg = new RgfEventArgs<RgfDialogEventArgs>(this, RgfDialogEventArgs.CreateAfterRenderEvent(firstRender));
         await DialogParameters.EventDispatcher.DispatchEventAsync(eventArg.Args.EventKind, eventArg);

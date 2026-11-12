@@ -6,6 +6,8 @@ This file contains the consolidated release history for the `rgf-client` solutio
 
 ### Features Added
 
+- Built-in Blazor Form dialogs fill the viewport in browser mobile mode, with a scrollable body and persistent access to the header and actions. Set `FullscreenOnMobile` to `false` to keep the standard dialog presentation.
+
 - Generate a Filter remark and, when empty, a name from current editor conditions with AI, localized feedback and protection against stale results. Generated text extends the editable remark, and unsaved text survives reopening the editor. Saving persists the remark; saving a renamed Filter creates a private copy.
 
 - Copy the current Recroby conversation as Markdown, including any visible chat error, or copy an individual user message as original text.
