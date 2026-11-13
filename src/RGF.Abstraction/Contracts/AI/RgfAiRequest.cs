@@ -13,10 +13,6 @@ public class RgfAiRequest
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public RgfGridRequest? GridRequest { get; set; }
 
-    /// <summary>Whether the applied filter contains Quick Filter state omitted from the Grid JSON. Null means unknown.</summary>
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public bool? GridFilterHasQuickConditions { get; set; }
-
     /// <summary>Optional user message structure; null preserves existing generation behavior. A pending run retains its original format.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public RgfAiResponseFormat? ResponseFormat { get; set; }

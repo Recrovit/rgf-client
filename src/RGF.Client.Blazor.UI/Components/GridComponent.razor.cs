@@ -46,9 +46,16 @@ public partial class GridComponent : ComponentBase, IDisposable
         base.OnInitialized();
         _selfRef = DotNetObjectReference.Create(this);
         GridParameters.EventDispatcher.Subscribe(RgfListEventKind.CreateRowData, OnCreateAttributes);
+        EntityParameters.FilterParameters.EventDispatcher.Subscribe(RgfFilterEventKind.AiFilterApplied, OnAiFilterAppliedAsync);
         GridParameters.EnableMultiRowSelection ??= true;
         EntityParameters.ToolbarParameters.EventDispatcher.Subscribe([RgfToolbarEventKind.Read, RgfToolbarEventKind.Edit], OnSetFormItem);
     }
+
+    private Task OnAiFilterAppliedAsync(IRgfEventArgs<RgfFilterEventArgs> _) => InvokeAsync(() =>
+    {
+        _quickFilters = new();
+        StateHasChanged();
+    });
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {

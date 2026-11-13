@@ -25,29 +25,18 @@ internal sealed class RgfRecrobyFilterActionHandler(
         (long Assignment, long Initialization) ManagerVersion, (string? SessionId, string? GridId) ManagerIds,
         string? CreateSnapshot = null, string? ModifySnapshot = null);
 
-    internal static (RgfFilter.Condition[]? Conditions, string? Json) InspectAppliedFilter(IRgManager? manager, RgfAiRequest request)
+    internal static RequestContext CaptureSnapshots(RequestContext context, RgfAiRequest request)
     {
-        var applied = manager?.ListHandler.GetGridSettings().Conditions;
-        var appliedJson = CaptureFilter(applied);
-        var requestJson = CaptureFilter(request.GridRequest?.ListParam?.UserFilter);
-        request.GridFilterHasQuickConditions = appliedJson is null ? true
-            : manager is not null && appliedJson == requestJson ? false : null;
-        return (applied, appliedJson);
-    }
-
-    internal static RequestContext CaptureSnapshots(RequestContext context, RgfAiRequest request,
-        RgfFilter.Condition[]? applied, string? appliedJson) =>
-        context with
+        var applied = context.Manager?.ListHandler.GetGridSettings().Conditions;
+        var appliedJson = applied is { Length: > 0 } ? CaptureFilter(applied) : null;
+        return context with
         {
             CreateSnapshot = context.Manager is not null ? CaptureCreateFilter(applied) : null,
-            ModifySnapshot = request.GridFilterHasQuickConditions == false && applied is { Length: > 0 } ? appliedJson : null
+            ModifySnapshot = appliedJson == CaptureFilter(request.GridRequest?.ListParam?.UserFilter) ? appliedJson : null
         };
+    }
 
-    private static bool HasQuickConditions(IEnumerable<RgfFilter.Condition>? conditions) =>
-        conditions?.Any(condition => condition.IsQuickFilter || HasQuickConditions(condition.Conditions)) == true;
-
-    private static string? CaptureFilter(RgfFilter.Condition[]? conditions) =>
-        HasQuickConditions(conditions) ? null : JsonSerializer.Serialize(conditions);
+    private static string CaptureFilter(RgfFilter.Condition[]? conditions) => JsonSerializer.Serialize(conditions);
 
     // The wire format omits IsQuickFilter, so capture its position in the condition tree separately.
     private static string CaptureCreateFilter(RgfFilter.Condition[]? conditions) =>

@@ -383,6 +383,8 @@ public partial class RgfEntityComponent : ComponentBase, IDisposable
             return;
         }
 
+        EntityParameters.ToolbarParameters.QuickFilterEnabled = false;
+        StateHasChanged();
         await EntityParameters.FilterParameters.EventDispatcher.RaiseEventAsync(RgfFilterEventKind.AiFilterApplied, handler);
     });
 

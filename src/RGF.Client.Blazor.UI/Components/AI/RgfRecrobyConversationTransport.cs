@@ -34,7 +34,6 @@ internal sealed class RgfRecrobyConversationTransport(
             var managerIds = (session?.SessionId, session?.GridId);
             var entityId = manager?.EntityDesc.EntityId ?? 0;
             request.GridRequest = gridContext?.CreateGridRequest();
-            var (applied, appliedJson) = InspectAppliedFilter(manager, request);
 
             var target = new GridTarget(gridContext, request.GridRequest?.SessionId, request.GridRequest?.GridId, entityId);
             var continuation = _pending is { } pending && pending.ConversationId == request.ConversationId &&
@@ -52,7 +51,7 @@ internal sealed class RgfRecrobyConversationTransport(
             }
 
             current = new(target, manager, managerVersion, managerIds);
-            original = continuation?.Context ?? CaptureSnapshots(current, request, applied, appliedJson);
+            original = continuation?.Context ?? CaptureSnapshots(current, request);
         });
 
         ThrowIfAbandoned();

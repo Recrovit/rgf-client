@@ -876,6 +876,60 @@ public sealed class EntityComponentTests
     }
 
     [Theory]
+    [InlineData(RgfAiFilterOperation.Replace)]
+    [InlineData(RgfAiFilterOperation.ReplaceIfUnchanged)]
+    public async Task ApplyingRecrobyFilterTurnsOffQuickFilterAndClearsItsInputs(RgfAiFilterOperation operation)
+    {
+        using var context = CreateTestContext(true);
+        RgfBlazorConfiguration.RegisterComponent<Recrovit.RecroGridFramework.Client.Blazor.UI.Components.MenuComponent>(RgfBlazorConfiguration.ComponentType.Menu);
+        context.ComponentFactories.AddStub<Recrovit.RecroGridFramework.Client.Blazor.UI.Components.MenuComponent>();
+        context.Services.AddScoped<RgfRecrobyWorkspaceService>();
+        await RgfClientBlazorUiTestState.LoadUiResourcesAsync(context);
+        var api = (PendingRgfApiService)context.Services.GetRequiredService<IRgfApiService>();
+        api.GridProperties =
+        [
+            new() { Id = 1, Alias = "Name", ColTitle = "Name", ColPos = 1, Readable = true,
+                ListType = PropertyListType.String, FormType = PropertyFormType.TextBox }
+        ];
+        var workspace = context.Render<RgfRecrobyWorkspace>();
+        var entity = CreateEntityParameters(RfgDisplayMode.Grid);
+        entity.ToolbarParameters.QuickFilterEnabled = true;
+        using var grid = RenderWorkspace(context, entity, standardGrid: true);
+        var ui = grid.FindComponent<Recrovit.RecroGridFramework.Client.Blazor.UI.Components.GridComponent>();
+        // Seed the input cache without starting a second Grid refresh during test setup.
+        var inputCache = (RgfDynamicDictionary)ui.Instance.GetType()
+            .GetField("_quickFilters", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!
+            .GetValue(ui.Instance)!;
+        await grid.InvokeAsync(() =>
+        {
+            inputCache.SetMember("1", "previous");
+            entity.Manager!.ListHandler.ApplyFilterState(
+                [new() { Id = 1, Alias = "Name", QueryOperator = RgfFilter.QueryOperator.Like, Param1 = "previous", IsQuickFilter = true }],
+                null);
+        });
+        ui.Render();
+        Assert.Equal("previous", grid.Find(".quick-filter input").GetAttribute("value"));
+
+        api.RecrobyResponse = request =>
+        {
+            var response = FilterReply(request,
+                [new() { Id = 1, Alias = "Name", QueryOperator = RgfFilter.QueryOperator.Equal, Param1 = "new" }]);
+            response.FilterAction = response.FilterAction! with { Operation = operation };
+            return Task.FromResult(response);
+        };
+        await workspace.FindComponent<RgfAiChatComponent>().Instance.Session.SendAsync("Apply filter",
+            cancellationToken: Xunit.TestContext.Current.CancellationToken);
+
+        Assert.False(entity.ToolbarParameters.QuickFilterEnabled);
+        Assert.Empty(grid.FindAll(".quick-filter"));
+        grid.WaitForAssertion(() => Assert.False(grid.Find("button:has(.bi-binoculars)").HasAttribute("disabled")));
+        grid.Find("button:has(.bi-binoculars)").Click();
+        Assert.True(entity.ToolbarParameters.QuickFilterEnabled);
+        Assert.True(string.IsNullOrEmpty(grid.Find(".quick-filter input").GetAttribute("value")));
+        Assert.Equal("new", Assert.Single(entity.Manager!.ListHandler.GetGridSettings().Conditions!).DynValue1.StringValue);
+    }
+
+    [Theory]
     [InlineData("apply")]
     [InlineData("clear")]
     [InlineData("stale")]
@@ -883,6 +937,12 @@ public sealed class EntityComponentTests
     [InlineData("pending-stale")]
     [InlineData("pending-other-chat")]
     [InlineData("quick")]
+    [InlineData("quick-only")]
+    [InlineData("quick-stale")]
+    [InlineData("pending-quick")]
+    [InlineData("quick-rejected")]
+    [InlineData("quick-request-mismatch")]
+    [InlineData("quick-refresh-failed")]
     public async Task RecrobyModifyAppliesOnlyAgainstItsOriginalFilter(string scenario)
     {
         using var context = CreateTestContext(true);
@@ -899,26 +959,24 @@ public sealed class EntityComponentTests
             Id = 1, Alias = "Name", LogicalOperator = RgfFilter.LogicalOperator.And,
             QueryOperator = RgfFilter.QueryOperator.Equal, Param1 = value
         };
-        handler.ApplyFilterState([Condition("original")], 41);
-        if (scenario == "quick")
+        handler.ApplyFilterState(scenario == "quick-only" ? [] : [Condition("original")], 41);
+        var hasQuick = scenario.Contains("quick", StringComparison.Ordinal);
+        if (hasQuick)
         {
             await handler.SetQuickFilterAsync(new RgfProperty { Id = 3, Alias = "Quick" }, "quick");
             Assert.Contains(list.GetGridSettings().Conditions!, condition => condition.IsQuickFilter);
         }
+        var original = JsonSerializer.Serialize(list.GetGridSettings().Conditions);
         var session = workspace.FindComponent<RgfAiChatComponent>().Instance.Session;
         var api = (PendingRgfApiService)context.Services.GetRequiredService<IRgfApiService>();
         var token = Xunit.TestContext.Current.CancellationToken;
         if (scenario.StartsWith("pending", StringComparison.Ordinal))
         {
-            api.RecrobyResponse = request =>
+            api.RecrobyResponse = _ => Task.FromResult(new RgfAiResponse
             {
-                Assert.False(request.GridFilterHasQuickConditions);
-                return Task.FromResult(new RgfAiResponse
-                {
-                    Success = true, WorkflowStatus = "WaitingForInput", ConversationId = "pending", ConversationToken = "token",
-                    ResponseMode = RgfAiResponseMode.FreeText, Message = "Which condition?"
-                });
-            };
+                Success = true, WorkflowStatus = "WaitingForInput", ConversationId = "pending", ConversationToken = "token",
+                ResponseMode = RgfAiResponseMode.FreeText, Message = "Which condition?"
+            });
             await session.SendAsync("Change the filter", cancellationToken: token);
             Assert.True(session.Conversation.IsPendingWorkflow);
             if (scenario == "pending-stale")
@@ -935,9 +993,41 @@ public sealed class EntityComponentTests
             }
         }
         api.GridRequests.Clear();
+        if (scenario == "quick-request-mismatch")
+        {
+            manager.CreateGridRequestCreated += (_, args) =>
+            {
+                if (args.Request.ListParam?.UserFilter is { Length: 2 } conditions)
+                {
+                    conditions[1].Conditions[0].Param1 = "different request";
+                }
+            };
+        }
+        var modifyToasts = ((FakeEventNotificationService)context.Services.GetRequiredService<IRgfEventNotificationService>()).Toasts;
+        modifyToasts.Clear();
+        api.FailGridRequest = scenario == "quick-refresh-failed";
         api.RecrobyResponse = async request =>
         {
-            Assert.Equal(scenario == "quick", request.GridFilterHasQuickConditions);
+            if (hasQuick)
+            {
+                var sent = JsonSerializer.Serialize(request.GridRequest!.ListParam.UserFilter);
+                if (scenario == "quick-request-mismatch")
+                {
+                    Assert.NotEqual(original, sent);
+                }
+                else
+                {
+                    Assert.Equal(original, sent);
+                }
+            }
+            if (scenario == "quick-rejected")
+            {
+                return new RgfAiResponse { Success = true, Message = "Unsupported" };
+            }
+            if (scenario == "quick-stale")
+            {
+                await workspace.InvokeAsync(() => list.GetGridSettings().Conditions![1].Conditions[0].Param1 = "concurrent");
+            }
             if (scenario == "stale")
             {
                 // Change the same object in place to verify that the baseline is independent.
@@ -948,12 +1038,14 @@ public sealed class EntityComponentTests
             return response;
         };
         await session.SendAsync("Change the name to modified", cancellationToken: token);
-        if (scenario is "stale" or "pending-stale" or "quick")
+        if (scenario is "stale" or "pending-stale" or "quick-stale" or "quick-rejected" or "quick-request-mismatch")
         {
             Assert.Empty(api.GridRequests);
-            if (scenario == "quick")
+            if (hasQuick)
             {
-                Assert.Contains(list.GetGridSettings().Conditions!, condition => condition.IsQuickFilter);
+                var quick = Assert.Single(list.GetGridSettings().Conditions!, condition => condition.IsQuickFilter);
+                Assert.Equal(scenario == "quick-stale" ? "concurrent" : "quick", Assert.Single(quick.Conditions).DynValue1.StringValue);
+                Assert.Contains(handler.Conditions, condition => condition.IsQuickFilter);
             }
             else
             {
@@ -963,6 +1055,10 @@ public sealed class EntityComponentTests
         else
         {
             Assert.Single(api.GridRequests);
+            if (scenario == "quick-refresh-failed")
+            {
+                grid.WaitForAssertion(() => Assert.Single(modifyToasts, toast => toast.Body == "Refresh"));
+            }
             if (scenario == "clear")
             {
                 Assert.Empty(list.GetGridSettings().Conditions!);
@@ -971,6 +1067,8 @@ public sealed class EntityComponentTests
             else
             {
                 Assert.Equal("modified", Assert.Single(list.GetGridSettings().Conditions!).DynValue1.StringValue);
+                Assert.DoesNotContain(list.GetGridSettings().Conditions!, condition => condition.IsQuickFilter);
+                Assert.DoesNotContain(handler.Conditions, condition => condition.IsQuickFilter);
             }
         }
     }
@@ -2634,14 +2732,38 @@ public sealed class EntityComponentTests
             : entity.ToolbarParameters.EventDispatcher.DispatchEventAsync(RgfToolbarEventKind.RecroChart,
                 new RgfEventArgs<RgfToolbarEventArgs>(entity, new(RgfToolbarEventKind.RecroChart)));
 
-    private static IRenderedComponent<RgfEntityComponent> RenderWorkspace(BunitContext context, RgfEntityParameters entity, bool standardChart = false, int? initialChartSettingsId = null)
+    private static IRenderedComponent<RgfEntityComponent> RenderWorkspace(BunitContext context, RgfEntityParameters entity, bool standardChart = false, int? initialChartSettingsId = null, bool standardGrid = false)
     {
         entity.ChartParameters.SupportsWorkspace |= !standardChart;
         return context.Render<RgfEntityComponent>(parameters => parameters
             .Add(component => component.EntityParameters, entity)
-            .Add(component => component.GridTemplate, _ => builder => { builder.OpenComponent<StatefulView>(0); builder.CloseComponent(); })
+            .Add(component => component.GridTemplate, current => builder =>
+            {
+                if (standardGrid)
+                {
+                    builder.OpenComponent<Recrovit.RecroGridFramework.Client.Blazor.UI.Components.GridComponent>(0);
+                    builder.AddAttribute(1, "EntityParameters", current);
+                }
+                else
+                {
+                    builder.OpenComponent<StatefulView>(0);
+                }
+                builder.CloseComponent();
+            })
             .Add(component => component.TreeTemplate, _ => builder => builder.AddMarkupContent(0, "<div class='tree'>Tree</div>"))
-            .Add(component => component.ToolbarTemplate, _ => builder => builder.AddMarkupContent(0, "<div class='toolbar'>Toolbar</div>"))
+            .Add(component => component.ToolbarTemplate, current => builder =>
+            {
+                if (standardGrid)
+                {
+                    builder.OpenComponent<Recrovit.RecroGridFramework.Client.Blazor.UI.Components.ToolbarComponent>(0);
+                    builder.AddAttribute(1, "EntityParameters", current);
+                    builder.CloseComponent();
+                }
+                else
+                {
+                    builder.AddMarkupContent(0, "<div class='toolbar'>Toolbar</div>");
+                }
+            })
             .Add(component => component.FilterTemplate, _ => builder => builder.AddMarkupContent(0, "<div class='filter'>Filter</div>"))
             .Add(component => component.PagerTemplate, _ => builder => builder.AddMarkupContent(0, "<div class='pager'>Pager</div>"))
             .Add(component => component.FormTemplate, _ => builder => { })
@@ -2863,6 +2985,10 @@ public sealed class EntityComponentTests
                     : new ApiResponse<ResultType> { Success = false });
             }
             if (typeof(ResultType) == typeof(RgfResult<List<RgfChartSettings>>)) return SavedChartResponse<ResultType>();
+            if (typeof(ResultType) == typeof(string) && request.Uri.EndsWith("/RecroGrid.xml", StringComparison.OrdinalIgnoreCase))
+            {
+                return Task.FromResult<IRgfApiResponse<ResultType>>(new ApiResponse<ResultType> { Success = true });
+            }
             object result = typeof(ResultType) == typeof(RgfResult<Dictionary<string, string>>)
                 ? new RgfResult<Dictionary<string, string>> { Success = true, Messages = new(), Result = [] }
                 : throw new NotSupportedException($"Unsupported GET {typeof(ResultType)}");
