@@ -1372,12 +1372,15 @@ public sealed class EntityComponentTests
         };
         api.GridRequests.Clear();
         toasts.Clear();
-        await second.SendAsync("replace", cancellationToken: Xunit.TestContext.Current.CancellationToken);
+        var history = second.Conversation.Messages.ToArray();
+        var rejected = await second.SendAsync("replace", cancellationToken: Xunit.TestContext.Current.CancellationToken);
+        Assert.False(rejected.Success);
+        Assert.Equal("RecrobyFilterNotApplied", rejected.ErrorCode);
+        Assert.Equal(history, second.Conversation.Messages);
         Assert.Empty(api.GridRequests);
         Assert.Empty(replacement.ListHandler.GetGridSettings().Conditions ?? []);
         Assert.Equal("original Grid", Assert.Single(manager.ListHandler.GetGridSettings().Conditions!).Param1.ToString());
         Assert.Equal(RgfToastType.Error, Assert.Single(toasts).ToastType);
-        Assert.Equal("Generated filter summary", second.Conversation.Messages.Last().Message);
 
         api.RecrobyResponse = request =>
         {
@@ -1744,7 +1747,7 @@ public sealed class EntityComponentTests
         await oldSend;
         Assert.Empty(api.GridRequests);
         Assert.Empty(managers[1].ListHandler.GetGridSettings().Conditions ?? []);
-        Assert.Null(Assert.IsType<RgfAiResponse>(originalA.Conversation.Messages.Last()).FilterAction);
+        Assert.DoesNotContain(originalA.Conversation.Messages.OfType<RgfAiResponse>(), response => response.FilterAction is not null);
 
         managers[1].ListHandler.ApplyFilterState([new() { Id = 1, Alias = "B", Param1 = "B filter" }], null);
         RgfAiRequest? sent = null;

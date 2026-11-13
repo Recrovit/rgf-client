@@ -61,6 +61,8 @@ public partial class RgfAiChatComponent : IDisposable
     [Inject] private IJSRuntime JS { get; set; } = null!;
 
     private string InputId { get; } = RgfBaseComponent.GetNextId();
+    internal bool HasDraft => !string.IsNullOrEmpty(Prompt);
+
     private string Prompt { get; set; } = string.Empty;
     private RgfAiConversationSession? subscribedSession;
     private volatile bool disposed;
@@ -251,11 +253,10 @@ public partial class RgfAiChatComponent : IDisposable
             return Task.CompletedTask;
         }
         var message = Prompt.Trim();
-        Prompt = string.Empty;
-        return SendTurnAsync(message, message);
+        return SendTurnAsync(message, message, clearPromptOnSuccess: true);
     }
 
-    private async Task SendTurnAsync(string message, string presentationText)
+    private async Task SendTurnAsync(string message, string presentationText, bool clearPromptOnSuccess = false)
     {
         ClearSendError();
         var sendingSession = Session;
@@ -265,6 +266,10 @@ public partial class RgfAiChatComponent : IDisposable
         {
             var response = await sendingSession.SendWithPresentationAsync(message, presentationText, cancellationToken: cancellation.Token);
             if (disposed || !ReferenceEquals(Session, sendingSession)) return;
+            if (response.Success && clearPromptOnSuccess)
+            {
+                Prompt = string.Empty;
+            }
             if (!response.Success)
             {
                 _failedResponse = response;
@@ -273,15 +278,21 @@ public partial class RgfAiChatComponent : IDisposable
                     or RgfAiErrorCodes.AiProviderAuthenticationFailed;
                 var creditRejected = response.ErrorCode != null && CreditErrorCodes.Contains(response.ErrorCode);
                 var invalidContinuation = response.ErrorCode is "InvalidContinuationResponse" or "PendingGridChanged";
+                var safeFailure = response.ErrorCode is "CreateInvalidPlan" or "ModifyUnsupported" or "RecrobyOperationFailed" or "RecrobyWorkflowFailed"
+                    or "RecrobyPendingRunFailed" or "RecrobyFilterNotApplied" or "RecrobyFilterApplicationUncertain";
                 _errorKind = providerMissing || configurationFailure ? "configuration" : creditRejected ? "credit"
                     : invalidContinuation ? "continuation" : "workflow";
                 _sendError = configurationFailure
                     ? "Recroby could not complete the request due to a configuration error. Please contact your system administrator."
                     : providerMissing
                     ? "No AI provider is configured. Configure an AI provider and model to use Recroby."
-                    : (creditRejected || invalidContinuation) && !string.IsNullOrWhiteSpace(response.Message)
+                    : (creditRejected || invalidContinuation || safeFailure) && !string.IsNullOrWhiteSpace(response.Message)
                     ? response.Message
                     : "The Recroby workflow could not complete the request.";
+                if (Guid.TryParseExact(response.DiagnosticId, "N", out var diagnosticId))
+                {
+                    _sendError += $" ({diagnosticId:N})";
+                }
             }
         }
         catch (Exception exception)

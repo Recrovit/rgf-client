@@ -484,7 +484,7 @@ public sealed class RgfRecrobyComponentTests
         Assert.Equal("No AI provider is configured. Configure an AI provider and model to use Recroby.",
             cut.Find("[data-error-kind=configuration]").TextContent);
         var state = cut.FindComponent<RgfAiChatComponent>().Instance.Session.Conversation;
-        Assert.Equal(RgfAiMessageRole.User, Assert.Single(state.Messages).Role);
+        Assert.Empty(state.Messages);
         Assert.Null(state.ConversationId);
         Assert.Null(state.ConversationToken);
     }

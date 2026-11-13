@@ -589,7 +589,7 @@ public sealed partial class RgfRecrobyWorkspaceTests
         cut.Find("[aria-label='Open Recroby']").Click();
         cut.Find("textarea").Change("Hello");
         await cut.FindComponent<RgfAiChatComponent>().Find("[aria-label=Send]").ClickAsync(new());
-        Assert.Equal("Hello", cut.Find(".rgf-recroby-title").TextContent);
+        Assert.Equal("New chat", cut.Find(".rgf-recroby-title").TextContent);
         Assert.Single(cut.FindAll("[data-error-kind=transport]"));
         Assert.False(cut.FindComponent<RgfAiChatComponent>().Instance.Session.IsProcessing);
     }
@@ -773,14 +773,14 @@ public sealed partial class RgfRecrobyWorkspaceTests
         second.Find("textarea").Change("Second");
         var secondClick = second.Find("[aria-label=Send]").ClickAsync(new());
         Assert.Equal(2, api.Requests.Count);
-        Assert.Equal(new[] { "First", "Second" }, cut.FindAll(".rgf-recroby-choice-title").Select(e => e.TextContent));
+        Assert.Equal(new[] { "New chat", "New chat" }, cut.FindAll(".rgf-recroby-choice-title").Select(e => e.TextContent));
         cut.Find("[data-action=switch]").Click();
         cut.FindAll("[data-action=select]")[0].Click();
         Assert.Same(first.Instance.Session, cut.FindComponents<RgfAiChatComponent>()[0].Instance.Session);
         Assert.True(first.Instance.Session.IsProcessing);
         Assert.True(second.Instance.Session.IsProcessing);
         cut.Find("[data-dock=DockBottom]").Click();
-        Assert.Equal("First", cut.Find(".rgf-recroby-title").TextContent);
+        Assert.Equal("New chat", cut.Find(".rgf-recroby-title").TextContent);
         cut.Find("[aria-label='Collapse Recroby']").Click();
         Assert.True(first.Instance.Session.IsProcessing);
         Assert.True(second.Instance.Session.IsProcessing);
@@ -793,7 +793,7 @@ public sealed partial class RgfRecrobyWorkspaceTests
         first.WaitForAssertion(() => Assert.Single(first.FindAll("[data-error-kind=cancelled]")));
         Assert.True(second.Instance.Session.IsProcessing);
         cut.Find("[data-action=switch]").Click();
-        cut.Find("[aria-label='Close Second']").Click();
+        cut.FindAll("[aria-label='Close New chat']")[1].Click();
         await secondClick;
         Assert.All(api.Requests, request => Assert.True(request.CancellationToken.IsCancellationRequested));
     }
@@ -906,7 +906,7 @@ public sealed partial class RgfRecrobyWorkspaceTests
     }
 
     [Fact]
-    public void NewGeneralChatRemovesEmptyRenamedConversationWithDraftAndSettings()
+    public void NewGeneralChatPreservesRenamedConversationWithDraftAndSettings()
     {
         using var context = Context();
         var cut = context.Render<RgfRecrobyWorkspace>();
@@ -915,10 +915,14 @@ public sealed partial class RgfRecrobyWorkspaceTests
         previous.Conversation.AiModelOverride = "custom/model";
         cut.Find("textarea").Change("Unsent draft");
         cut.Find("[data-action=new]").Click();
-        var current = Assert.Single(cut.FindComponents<RgfAiChatComponent>()).Instance.Session;
+        var chats = cut.FindComponents<RgfAiChatComponent>();
+        Assert.Equal(2, chats.Count);
+        Assert.Same(previous, chats[0].Instance.Session);
+        Assert.Equal("Unsent draft", chats[0].FindComponent<RgfInputText>().Instance.Value);
+        var current = chats[1].Instance.Session;
         Assert.NotSame(previous, current);
         Assert.Empty(previous.Conversation.Messages);
-        Assert.DoesNotContain("Unused renamed chat", cut.Markup);
+        Assert.Contains("Unused renamed chat", cut.Markup);
         Assert.Null(current.Conversation.AiModelOverride);
     }
 
@@ -1106,36 +1110,37 @@ public sealed partial class RgfRecrobyWorkspaceTests
     [InlineData("  Hello\r\n  world\t again  ", "Hello world again")]
     [InlineData("1234567890123456789012345678👩🏽‍💻XY", "1234567890123456789012345678👩🏽‍💻…")]
     [InlineData("1234567890123456789012345678e\u0301XY", "1234567890123456789012345678e\u0301…")]
-    public async Task FirstDisplayedPromptTitlesBeforeCompletionAndSurvivesCancellation(string prompt, string title)
+    public async Task FirstDisplayedPromptTitlesAfterAcceptance(string prompt, string title)
     {
         using var context = Context();
-        context.Services.AddSingleton<IRgfApiService>(new QueuedApi());
+        var api = new QueuedApi();
+        context.Services.AddSingleton<IRgfApiService>(api);
         var cut = context.Render<RgfRecrobyWorkspace>();
         var session = cut.FindComponent<RgfAiChatComponent>().Instance.Session;
-        Assert.Equal("New chat", cut.Find(".rgf-recroby-title").TextContent);
         using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(Xunit.TestContext.Current.CancellationToken);
+        cut.Find("[aria-label='Open Recroby']").Click();
         var send = session.SendAsync(prompt, cancellationToken: cancellation.Token);
-        cut.WaitForAssertion(() => Assert.Equal(title, cut.Find(".rgf-recroby-title").TextContent));
+        Assert.Equal("New chat", cut.Find(".rgf-recroby-title").TextContent);
         Assert.False(send.IsCompleted);
-        Assert.Equal("Choose conversation: " + title, cut.Find("[data-action=switch]").GetAttribute("aria-label"));
-        cancellation.Cancel();
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => send);
+        api.Reply(new() { Success = true, Message = "Accepted" });
+        await send;
         cut.WaitForAssertion(() => Assert.Equal(title, cut.Find(".rgf-recroby-title").TextContent));
+        Assert.Equal("Choose conversation: " + title, cut.Find("[data-action=switch]").GetAttribute("aria-label"));
     }
 
     [Fact]
-    public async Task HiddenSendsDoNotTitleAndLaterFailuresCannotRetitle()
+    public async Task FailedHiddenSendDoesNotDisplayOrRetitle()
     {
         using var context = Context();
-        context.Services.AddSingleton<IRgfApiService>(new FailedApi(true));
+        var transport = new ScriptedTransport();
+        var session = new RgfAiConversationSession(transport);
         var cut = context.Render<RgfRecrobyWorkspace>();
-        var session = cut.FindComponent<RgfAiChatComponent>().Instance.Session;
+        await using var owner = context.Services.GetRequiredService<IRgfRecrobyWorkspaceService>().CreateOwner();
+        Assert.True(await owner.OpenOrActivateAsync("test", "hidden-send", "Manual", () => session));
+        transport.Reply(new() { Success = false, Message = "Rejected" });
         await session.SendAsync("Hidden", false, Xunit.TestContext.Current.CancellationToken);
-        Assert.Equal("New chat", cut.Find(".rgf-recroby-title").TextContent);
-        await session.SendAsync("Visible", cancellationToken: Xunit.TestContext.Current.CancellationToken);
-        cut.WaitForAssertion(() => Assert.Equal("Visible", cut.Find(".rgf-recroby-title").TextContent));
-        await session.SendAsync("Later", cancellationToken: Xunit.TestContext.Current.CancellationToken);
-        cut.WaitForAssertion(() => Assert.Equal("Visible", cut.Find(".rgf-recroby-title").TextContent));
+        Assert.Empty(session.Conversation.Messages);
+        Assert.Equal("Manual", cut.Find(".rgf-recroby-title").TextContent);
     }
 
     [Fact]
@@ -1185,7 +1190,7 @@ public sealed partial class RgfRecrobyWorkspaceTests
         var session = cut.FindComponent<RgfAiChatComponent>().Instance.Session;
         using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(Xunit.TestContext.Current.CancellationToken);
         var send = session.SendAsync("Automatic", cancellationToken: cancellation.Token);
-        cut.WaitForAssertion(() => Assert.Equal("Automatic", cut.Find(".rgf-recroby-title").TextContent));
+        Assert.Equal("New chat", cut.Find(".rgf-recroby-title").TextContent);
         Rename(cut, "Manual");
         var stateChanged = typeof(RgfAiConversationSession).GetField("StateChanged", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!;
         var handler = ((Action)stateChanged.GetValue(session)!).GetInvocationList()
@@ -1513,12 +1518,14 @@ public sealed partial class RgfRecrobyWorkspaceTests
     private sealed class QueuedApi : IRgfApiService
     {
         public List<IRgfApiRequest> Requests { get; } = [];
+        private readonly TaskCompletionSource<RgfAiResponse> completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public void Reply(RgfAiResponse response) => completion.SetResult(response);
         public Task<IRgfApiResponse<T>> GetAsync<T>(IRgfApiRequest request) where T : class => throw new NotSupportedException();
         public async Task<IRgfApiResponse<T>> PostAsync<T>(IRgfApiRequest request) where T : class
         {
             Requests.Add(request);
-            await Task.Delay(Timeout.Infinite, request.CancellationToken);
-            throw new InvalidOperationException("Only cancellation completes this fake.");
+            var response = await completion.Task.WaitAsync(request.CancellationToken);
+            return (IRgfApiResponse<T>)(object)new ApiResponse<RgfAiResponse> { Success = true, Result = response };
         }
     }
 

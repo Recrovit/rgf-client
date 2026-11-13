@@ -49,6 +49,7 @@ public partial class RgfRecrobyComponent : IAsyncDisposable
     private const string JsNamespace = RGFClientBlazorUIConfiguration.JsBlazorUiNamespace + ".AI.Selector";
     private bool _disposed;
     private RgfAiChatComponent? _chat;
+    internal bool HasDraft => _chat?.HasDraft == true;
     private readonly object _disposalSync = new();
     private Task? _disposal;
     private bool _catalogLoading;

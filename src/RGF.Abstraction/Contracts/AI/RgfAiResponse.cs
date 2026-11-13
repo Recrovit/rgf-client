@@ -30,6 +30,14 @@ public class RgfAiResponse : RgfAiMessage
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? ErrorCode { get; set; }
 
+    /// <summary>Optional identifier for correlating an unexpected failure with diagnostics.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? DiagnosticId { get; set; }
+
+    /// <summary>Whether the trusted transport supplied a non-pending identity for a failed turn.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool CanContinueAfterFailure { get; set; }
+
     /// <summary>Backend conversation identifier; defaults to empty when no conversation was created.</summary>
     public string ConversationId { get; set; } = string.Empty;
 

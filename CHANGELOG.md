@@ -10,6 +10,8 @@ This file contains the consolidated release history for the `rgf-client` solutio
 
 - Generate a Filter remark and, when empty, a name from current editor conditions with AI, localized feedback and protection against stale results. Generated text extends the editable remark, and unsaved text survives reopening the editor. Saving persists the remark; saving a renamed Filter creates a private copy.
 
+- Failed Recroby turns preserve the editable prompt and displayed conversation. Verified continuation tokens allow another turn in the same conversation, and unexpected failures expose a diagnostic reference.
+
 - Copy the current Recroby conversation as Markdown, including any visible chat error, or copy an individual user message as original text.
 
 - Recroby automatically uses the most recently activated available Grid, including embedded Grids. Closing it restores the previous available Grid. The toolbar activates its Grid and opens Recroby while keeping the selected conversation. The header shows the active Grid. Recroby starts right-docked and collapsed when no saved layout exists.

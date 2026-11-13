@@ -81,7 +81,7 @@ public sealed class RgfAiConversationSessionTests
         Assert.Null(transport.Requests[0].ConversationId);
         Assert.Equal(display ? 2 : 1, state.Messages.Count);
         Assert.Same(response, state.Messages.Last());
-        Assert.Equal(new[] { (true, display ? 1 : 0), (true, display ? 2 : 1), (false, display ? 2 : 1) }, notifications);
+        Assert.Equal(new[] { (true, 0), (true, display ? 2 : 1), (false, display ? 2 : 1) }, notifications);
         Assert.False(session.IsProcessing);
 
         await session.SendAsync("second", display, TestContext.Current.CancellationToken);
@@ -91,7 +91,7 @@ public sealed class RgfAiConversationSessionTests
     }
 
     [Fact]
-    public async Task FirstStateChanged_SeesDisplayedUserMessage()
+    public async Task FirstStateChanged_DoesNotDisplayUnacceptedUserMessage()
     {
         var completion = new TaskCompletionSource<RgfAiResponse>(TaskCreationOptions.RunContinuationsAsynchronously);
         var transport = new FakeTransport((_, token) => completion.Task.WaitAsync(token));
@@ -107,10 +107,8 @@ public sealed class RgfAiConversationSessionTests
             Assert.False(turn.IsCompleted);
             var notification = Assert.Single(notifications);
             Assert.True(notification.Processing);
-            var message = Assert.Single(notification.Messages);
-            Assert.Equal(RgfAiMessageRole.User, message.Role);
-            Assert.Equal("current user message", message.Message);
-            Assert.Same(message, session.Conversation.Messages.Last());
+            Assert.Empty(notification.Messages);
+            Assert.Empty(session.Conversation.Messages);
             Assert.True(session.IsProcessing);
         }
         finally
@@ -150,7 +148,7 @@ public sealed class RgfAiConversationSessionTests
         Assert.Same(failure, await Assert.ThrowsAsync<IOException>(() => session.SendAsync("turn", cancellationToken: TestContext.Current.CancellationToken)));
         Assert.False(session.IsProcessing);
         Assert.Equal(new[] { true, false }, states);
-        Assert.Equal(RgfAiMessageRole.User, Assert.Single(session.Conversation.Messages).Role);
+        Assert.Empty(session.Conversation.Messages);
     }
 
     [Fact]
@@ -168,7 +166,7 @@ public sealed class RgfAiConversationSessionTests
         cancellation.Cancel();
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => turn);
         Assert.False(session.IsProcessing);
-        Assert.Single(session.Conversation.Messages);
+        Assert.Empty(session.Conversation.Messages);
     }
 
     [Fact]
@@ -185,7 +183,33 @@ public sealed class RgfAiConversationSessionTests
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => turn);
         Assert.False(session.IsProcessing);
         Assert.Null(session.Conversation.ConversationId);
-        Assert.Equal(RgfAiMessageRole.User, Assert.Single(session.Conversation.Messages).Role);
+        Assert.Empty(session.Conversation.Messages);
+    }
+
+    [Theory]
+    [InlineData("id", true, "renewed")]
+    [InlineData("other", true, "token")]
+    [InlineData("id", false, "token")]
+    public async Task FailedTurnAcceptsOnlyVerifiedMatchingContinuation(string conversation, bool verified, string expectedToken)
+    {
+        var state = new RgfAiConversationState();
+        var previous = new RgfAiResponse { Success = true, ConversationId = "id", ConversationToken = "token",
+            WorkflowStatus = "WaitingForInput" };
+        state.ApplyResponse(previous);
+        var transport = new FakeTransport((_, _) => Task.FromResult(new RgfAiResponse
+        {
+            ConversationId = conversation, ConversationToken = "renewed", CanContinueAfterFailure = verified
+        }));
+        var session = new RgfAiConversationSession(transport, state);
+
+        await session.SendAsync("Failed turn", cancellationToken: TestContext.Current.CancellationToken);
+
+        Assert.Same(previous, Assert.Single(state.Messages));
+        Assert.Equal(expectedToken, state.ConversationToken);
+        Assert.Equal(expectedToken == "token", state.IsPendingWorkflow);
+        await session.SendAsync("Edited turn", cancellationToken: TestContext.Current.CancellationToken);
+        Assert.Equal("id", transport.Requests[1].ConversationId);
+        Assert.Equal(expectedToken, transport.Requests[1].ConversationToken);
     }
 
     [Fact]

@@ -166,7 +166,8 @@ public sealed partial class RgfRecrobyWorkspaceTests
         {
             Response = new()
             {
-                Success = true, Message = "Modified filter",
+                Success = true, Message = "Modified filter", WorkflowStatus = "Completed",
+                ConversationId = "id", ConversationToken = "next",
                 FilterAction = new(RgfAiFilterOperation.ReplaceIfUnchanged, "session", "grid", 7, [])
             }
         };
@@ -198,7 +199,11 @@ public sealed partial class RgfRecrobyWorkspaceTests
         {
             prepared.SetResult(handler);
         }
-        await send;
+        var response = await send;
+        Assert.False(response.Success);
+        Assert.Equal("RecrobyFilterNotApplied", response.ErrorCode);
+        Assert.Empty(session.Conversation.Messages);
+        Assert.Equal("next", session.Conversation.ConversationToken);
         Assert.Equal(0, ((SnapshotFilter)handler).InitCalls);
         Assert.Equal("new value", fake.Settings.Conditions![0].Conditions[0].Param1);
     }
@@ -236,7 +241,7 @@ public sealed partial class RgfRecrobyWorkspaceTests
             {
                 nameof(IRgFilterHandler.InitFilter) => true,
                 nameof(IRgFilterHandler.StoreFilter) => Array.Empty<RgfFilter.Condition>(),
-                nameof(IRgFilterHandler.SetNewAiFilterSettings) => null,
+                nameof(IRgFilterHandler.SetNewAiFilterSettings) => throw new InvalidOperationException("Notification failed"),
                 _ => throw new NotSupportedException(method)
             };
         };

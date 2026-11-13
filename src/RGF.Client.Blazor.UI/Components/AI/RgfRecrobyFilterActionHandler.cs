@@ -54,7 +54,9 @@ internal sealed class RgfRecrobyFilterActionHandler(
         }
     }
 
-    internal async Task ApplyAsync(RgfAiFilterAction action, RequestContext current, RequestContext original,
+    internal enum ApplyResult { Applied, NotApplied, Uncertain }
+
+    internal async Task<ApplyResult> ApplyAsync(RgfAiFilterAction action, RequestContext current, RequestContext original,
         Action throwIfAbandoned, Func<bool> isAbandoned, CancellationToken cancellationToken)
     {
         var manager = current.Manager;
@@ -64,6 +66,8 @@ internal sealed class RgfRecrobyFilterActionHandler(
         IRgListHandler? list = null;
         IRgFilterHandler? appliedHandler = null;
         var stale = false;
+        var result = ApplyResult.NotApplied;
+        string? expectedFilter = null;
         try
         {
             if (CanApply())
@@ -76,23 +80,57 @@ internal sealed class RgfRecrobyFilterActionHandler(
                     // Keep editor changes separate from the applied conditions until the user accepts them.
                     var applied = RgfGridSettings.DeepCopy(new RgfGridSettings { Conditions = handler.StoreFilter() })!;
                     list = manager.ListHandler;
-                    list.ApplyFilterState(applied.Conditions ?? [], list.SQLTimeout);
-                    handler.SetNewAiFilterSettings(action.Remark);
+                    var conditions = applied.Conditions ?? [];
+                    expectedFilter = CaptureCreateFilter(conditions);
                     appliedHandler = handler;
+                    result = ApplyResult.Uncertain;
+                    list.ApplyFilterState(conditions, list.SQLTimeout);
+                    result = ApplyResult.Applied;
                 }
             }
         }
-        catch (Exception error) when (!cancellationToken.IsCancellationRequested && !isAbandoned())
+        catch (Exception error) when (result == ApplyResult.Uncertain || (!cancellationToken.IsCancellationRequested && !isAbandoned()))
         {
-            list = null;
-            logWarning(error, "The Recroby filter could not be loaded.");
+            if (result == ApplyResult.Uncertain)
+            {
+                try
+                {
+                    var actual = CaptureCreateFilter(list!.GetGridSettings().Conditions);
+                    if (actual == expectedFilter)
+                    {
+                        result = ApplyResult.Applied;
+                    }
+                    else if (actual == original.CreateSnapshot)
+                    {
+                        result = ApplyResult.NotApplied;
+                    }
+                }
+                catch (Exception inspectionError)
+                {
+                    logWarning(inspectionError, "The Recroby filter state could not be verified.");
+                }
+            }
+            if (result != ApplyResult.Applied)
+            {
+                list = null;
+            }
+            logWarning(error, "Recroby could not complete a Grid filter application step.");
         }
 
         if (list is null)
         {
             throwIfAbandoned();
             await ReportFilterLoadFailureAsync(manager, stale);
-            return;
+            return result;
+        }
+
+        try
+        {
+            appliedHandler!.SetNewAiFilterSettings(action.Remark);
+        }
+        catch (Exception error)
+        {
+            logWarning(error, "The Recroby filter editor settings notification failed.");
         }
 
         try
@@ -104,6 +142,7 @@ internal sealed class RgfRecrobyFilterActionHandler(
             logWarning(error, "The Recroby filter applied notification failed.");
         }
         _ = gridRefresher.RefreshAsync(list, invalidateAggregates: false);
+        return ApplyResult.Applied;
 
         bool CanApply()
         {

@@ -14,10 +14,10 @@ public sealed class RgfAiConversationState
         Messages = messages.AsReadOnly();
     }
 
-    /// <summary>Backend-issued identity from the last successful response; null before the first turn or after reset.</summary>
+    /// <summary>Backend-issued identity from the last accepted response; null before the first turn or after reset.</summary>
     public string? ConversationId { get; private set; }
 
-    /// <summary>Opaque continuation token from the last successful response; the backend owns validation.</summary>
+    /// <summary>Opaque continuation token from the last accepted response; the backend owns validation.</summary>
     public string? ConversationToken { get; private set; }
 
     /// <summary>Optional host-interpreted model alias retained across reset; state does not validate catalog membership.</summary>
@@ -57,12 +57,21 @@ public sealed class RgfAiConversationState
         };
     }
 
-    /// <summary>Updates identity and appends the response only when the turn succeeded.</summary>
+    /// <summary>Updates verified continuation identity and appends successful responses to history.</summary>
     public void ApplyResponse(RgfAiResponse response)
     {
         ArgumentNullException.ThrowIfNull(response);
         if (!response.Success)
         {
+            if (response.CanContinueAfterFailure &&
+                !string.IsNullOrWhiteSpace(response.ConversationId) &&
+                !string.IsNullOrWhiteSpace(response.ConversationToken) &&
+                (ConversationId is null || ConversationId == response.ConversationId))
+            {
+                ConversationId = response.ConversationId;
+                ConversationToken = response.ConversationToken;
+                IsPendingWorkflow = false;
+            }
             return;
         }
 

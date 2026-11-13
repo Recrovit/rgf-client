@@ -31,12 +31,11 @@ public sealed class RgfAiConversationSession
 
     /// <summary>Sends one turn and applies a successful response to the conversation state.</summary>
     /// <param name="instruction">Nonblank current instruction; it is forwarded without trimming.</param>
-    /// <param name="addToPresentationHistory">Whether to display the user instruction; pending workflow replies are appended only on success.</param>
+    /// <param name="addToPresentationHistory">Whether to display the user instruction after success.</param>
     /// <param name="cancellationToken">Cancellation delegated to the transport.</param>
     /// <returns>The original response, including unsuccessful workflow responses.</returns>
     /// <remarks>Only one turn may run per session. Transport and notification exceptions propagate;
-    /// processing is cleared in finally. Ordinary displayed user messages remain after failure or cancellation;
-    /// pending workflow replies are displayed only after a successful response.
+    /// processing is cleared in finally. User messages are displayed only after a successful response.
     /// Do not reset or mutate conversation state while sending.</remarks>
     /// <exception cref="ArgumentException">The instruction is empty or whitespace.</exception>
     /// <exception cref="ArgumentNullException">The instruction is null.</exception>
@@ -51,7 +50,7 @@ public sealed class RgfAiConversationSession
     /// <param name="addToPresentationHistory">Whether to display the user message.</param>
     /// <param name="cancellationToken">Cancellation delegated to the transport.</param>
     /// <returns>The original response, including unsuccessful workflow responses.</returns>
-    /// <remarks>Pending workflow replies enter history only on success, immediately before the assistant response.
+    /// <remarks>User messages enter history only on success, immediately before the assistant response.
     /// All other lifecycle, notification and exception behavior matches SendAsync.</remarks>
     /// <exception cref="ArgumentException">The instruction or presentation text is empty or whitespace.</exception>
     /// <exception cref="ArgumentNullException">The instruction or presentation text is null.</exception>
@@ -68,16 +67,14 @@ public sealed class RgfAiConversationSession
 
         try
         {
-            var deferUserMessage = Conversation.IsPendingWorkflow;
-            if (addToPresentationHistory && !deferUserMessage)
-            {
-                Conversation.AddUserMessage(presentationText);
-            }
             StateChanged?.Invoke();
             var request = Conversation.CreateRequest(instruction);
             var response = await transport.SendAsync(request, cancellationToken);
-            cancellationToken.ThrowIfCancellationRequested();
-            if (addToPresentationHistory && deferUserMessage && response.Success)
+            if (!response.CanContinueAfterFailure)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+            }
+            if (addToPresentationHistory && response.Success)
             {
                 Conversation.AddUserMessage(presentationText);
             }

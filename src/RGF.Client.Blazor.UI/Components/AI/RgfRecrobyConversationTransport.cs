@@ -61,16 +61,42 @@ internal sealed class RgfRecrobyConversationTransport(
         }
 
         var response = await new RgfAiApiTransport(resolveApi()).SendAsync(request, cancellationToken);
-        ThrowIfAbandoned();
+        if (isAbandoned())
+        {
+            throw new OperationCanceledException();
+        }
         if (response is { Success: true, FilterAction: { } action })
         {
             // The conversation keeps response objects as history. Consume the action in this turn.
             response.FilterAction = null;
-            await dispatchAsync(() => filterActionHandler.ApplyAsync(action, current, original, ThrowIfAbandoned,
-                isAbandoned, cancellationToken));
+            var result = ApplyResult.NotApplied;
+            try
+            {
+                await dispatchAsync(async () =>
+                {
+                    result = await filterActionHandler.ApplyAsync(action, current, original, ThrowIfAbandoned,
+                        isAbandoned, cancellationToken);
+                });
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested && !isAbandoned())
+            {
+                // The server has completed the run. Preserve its identity even if cancellation prevented Grid application.
+            }
+            if (result != ApplyResult.Applied)
+            {
+                response.Success = false;
+                response.CanContinueAfterFailure = response.WorkflowStatus == "Completed";
+                response.ErrorCode = result == ApplyResult.Uncertain
+                    ? "RecrobyFilterApplicationUncertain" : "RecrobyFilterNotApplied";
+                response.Message = recroDict.GetRgfRecrobyString(result == ApplyResult.Uncertain
+                    ? "FilterApplicationUncertain" : "FilterLoadFailed");
+            }
         }
-        ThrowIfAbandoned();
-        if (response.Success)
+        if (isAbandoned())
+        {
+            throw new OperationCanceledException();
+        }
+        if (response.Success || response.CanContinueAfterFailure)
         {
             _pending = response.WorkflowStatus == "WaitingForInput"
                 ? (response.ConversationId, response.ConversationToken, original)

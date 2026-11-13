@@ -531,7 +531,7 @@ public partial class RgfRecrobyWorkspace : IAsyncDisposable
         if (conversation is null || conversation.Closing || conversation.Owner is not null) return;
         var session = conversation.Session;
         var state = session.Conversation;
-        if (state.Messages.Count != 0 || session.IsProcessing || state.IsPendingWorkflow
+        if (state.Messages.Count != 0 || conversation.Component?.HasDraft == true || session.IsProcessing || state.IsPendingWorkflow
             || state.ConversationId is not null || state.ConversationToken is not null) return;
 
         // Removing the keyed component from the render tree lets Blazor await its async disposal.
