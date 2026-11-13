@@ -8,6 +8,8 @@ namespace Recrovit.RecroGridFramework.Client.AI;
 /// <summary>Identifies one client Grid instance by reference, retaining its label after the Grid is released.</summary>
 public sealed class RgfRecrobyGridContext
 {
+    private Func<IRgManager, IRgFilterHandler, Task>? _aiFilterAppliedCallback;
+
     /// <summary>The last successfully initialized entity name.</summary>
     public string EntityName { get; private set; } = string.Empty;
 
@@ -25,6 +27,22 @@ public sealed class RgfRecrobyGridContext
 
     /// <summary>Raised after the manager reference or retained display data changes.</summary>
     public event Action? Changed;
+
+    /// <summary>Registers the owning Grid's callback for successfully applied Recroby filters.</summary>
+    public void RegisterAiFilterAppliedCallback(Func<IRgManager, IRgFilterHandler, Task> callback)
+    {
+        ArgumentNullException.ThrowIfNull(callback);
+        if (!IsClosed)
+        {
+            _aiFilterAppliedCallback = callback;
+        }
+    }
+
+    /// <summary>Invokes and awaits the owning Grid's callback if the manager is still current.</summary>
+    public Task NotifyAiFilterAppliedAsync(IRgManager manager, IRgFilterHandler handler) =>
+        !IsClosed && ReferenceEquals(Manager, manager)
+            ? _aiFilterAppliedCallback?.Invoke(manager, handler) ?? Task.CompletedTask
+            : Task.CompletedTask;
 
     /// <summary>Captures the current manager's session, entity and applied filter/sort without loading data.</summary>
     /// <returns>An independent allowlisted snapshot, or null while the manager is unavailable.</returns>
@@ -89,6 +107,7 @@ public sealed class RgfRecrobyGridContext
     {
         if (IsClosed) return;
         IsClosed = true;
+        _aiFilterAppliedCallback = null;
         var hadManager = Manager is not null;
         Manager = null;
         Closed?.Invoke(this);

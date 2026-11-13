@@ -13,6 +13,8 @@
 
 @code {
 
+    private RenderFragment RenderEditorSection(RenderFragment content) => @<div @key="_editorVersion">@content</div>;
+
     [Parameter, EditorRequired]
     public RgfEntityParameters EntityParameters { get; set; } = null!;
 

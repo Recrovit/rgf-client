@@ -94,6 +94,7 @@ internal sealed class FakeDashboardRecroDictService : IRecroDictService
     {
         ["AiGenerateNameDescription"] = "Generate a remark and, if the name is empty, a name with Recroby",
         ["AiNameDescriptionGenerated"] = "The generated text is ready.",
+        ["FilterDraftReplaced"] = "Your unapplied filter edits were replaced.",
         ["AiNameDescriptionFailed"] = "Name and description generation failed.",
         ["Balance"] = "Balance",
         ["CachedInputTokens"] = "Cached input tokens",

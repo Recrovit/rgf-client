@@ -89,6 +89,8 @@ public partial class RgfEntityComponent : ComponentBase, IDisposable
 
         await base.OnInitializedAsync();
 
+        RecrobyGridContext.RegisterAiFilterAppliedCallback(NotifyAiFilterAppliedAsync);
+
         EntityName = EntityParameters.EntityName;
         _chartPresentationMode = !EntityParameters.ChartParameters.SupportsWorkspace || EntityParameters.IsEmbeddedEntity ||
             EntityParameters.ParentEntityParameters != null || ParentEntityComponent != null
@@ -371,6 +373,18 @@ public partial class RgfEntityComponent : ComponentBase, IDisposable
     }
 
     private void OnManagerInitializing(RgManager manager) => RecrobyGridContext.ClearManager(manager);
+
+    // RGF-DOC: rgf.client.recroby.integration
+    private Task NotifyAiFilterAppliedAsync(IRgManager manager, IRgFilterHandler handler) => InvokeAsync(async () =>
+    {
+        if (_disposed || RecrobyGridContext.IsClosed || !ReferenceEquals(Manager, manager) ||
+            !ReferenceEquals(EntityParameters.Manager, manager) || !ReferenceEquals(RecrobyGridContext.Manager, manager))
+        {
+            return;
+        }
+
+        await EntityParameters.FilterParameters.EventDispatcher.RaiseEventAsync(RgfFilterEventKind.AiFilterApplied, handler);
+    });
 
     private async Task PublishRecrobyContextAsync(IRgManager manager)
     {

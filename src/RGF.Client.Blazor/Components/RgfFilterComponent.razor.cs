@@ -50,7 +50,27 @@ public partial class RgfFilterComponent : ComponentBase, IDisposable
     private int _generationVersion;
     private bool _disposed;
     private IRgManager? _draftManager;
+    private RgfEntityParameters? _subscribedEntity;
+    private RgfEventDispatcher<RgfFilterEventKind, RgfFilterEventArgs>? _aiFilterDispatcher;
+    private int _editorVersion;
+    private DraftState? _draftBaseline;
     private static readonly JsonSerializerOptions GenerationJson = new(JsonSerializerDefaults.Web);
+
+    private sealed record DraftState(string Conditions, int? Id, string? Name, string? Remark, string? Role,
+        bool? Readonly, int? Timeout, bool Active);
+
+    private DraftState CaptureDraft() => new(JsonSerializer.Serialize(DraftConditions(Condition?.Conditions ?? []), GenerationJson),
+        FilterSettings.FilterSettingsId, FilterSettings.SettingsName, Remark, FilterSettings.RoleId,
+        FilterSettings.IsReadonly, FilterSettings.SQLTimeout, IsFilterActive);
+
+    // Rendering the Ignore case checkbox can initialize a missing value to false.
+    private static IEnumerable<object> DraftConditions(IEnumerable<RgfFilter.Condition> conditions) => conditions.Select(condition => new
+    {
+        condition.Id, condition.Alias, condition.LogicalOperator, condition.QueryOperator, condition.IsQuickFilter,
+        condition.Param1,
+        Param2 = condition.Param2 ?? (condition.QueryOperator is RgfFilter.QueryOperator.Like or RgfFilter.QueryOperator.NotLike ? (object)false : null),
+        Conditions = condition.Conditions is null ? null : DraftConditions(condition.Conditions)
+    });
 
     public bool IsSavingAsNewFilter => FilterSettings.FilterSettingsId is > 0 &&
         FilterHandler.PredefinedFilters.Any(f => f.FilterSettingsId == FilterSettings.FilterSettingsId &&
@@ -186,34 +206,61 @@ public partial class RgfFilterComponent : ComponentBase, IDisposable
 
     public IRgFilterHandler FilterHandler { get; private set; } = null!;
 
-    protected override void OnInitialized()
+    private void SetFilterParameters()
     {
-        base.OnInitialized();
-
-        EntityParameters.ToolbarParameters.EventDispatcher.Subscribe(RgfToolbarEventKind.ShowFilter, OnShowFilter, true);
-
         FilterParameters = EntityParameters.FilterParameters;
         FilterParameters.DialogParameters.Title = _recroDict.GetRgfUiString("Filter");
-        FilterParameters.DialogParameters.UniqueName = "filter-" + Manager.EntityDesc.NameVersion.ToLower();
         FilterParameters.DialogParameters.ShowCloseButton = true;
-        FilterParameters.DialogParameters.ContentTemplate = FilterTemplate(this);
-        FilterParameters.DialogParameters.FooterTemplate = FooterTemplate(this);
+        FilterParameters.DialogParameters.ContentTemplate = RenderEditorSection(FilterTemplate(this));
+        FilterParameters.DialogParameters.FooterTemplate = RenderEditorSection(FooterTemplate(this));
         FilterParameters.DialogParameters.Resizable = FilterParameters.DialogParameters.Resizable ?? true;
         FilterParameters.DialogParameters.Width ??= "700px";
         FilterParameters.DialogParameters.Height ??= "400px";
     }
 
+    protected override async Task OnParametersSetAsync()
+    {
+        var entityChanged = !ReferenceEquals(_subscribedEntity, EntityParameters);
+        var filterParametersChanged = !ReferenceEquals(FilterParameters, EntityParameters.FilterParameters);
+        if (_showComponent && (entityChanged || filterParametersChanged || !ReferenceEquals(_draftManager, EntityParameters.Manager)))
+        {
+            await CloseDialogAsync();
+        }
+        if (entityChanged)
+        {
+            _subscribedEntity?.UnsubscribeFromAll(this);
+            _subscribedEntity = EntityParameters;
+            EntityParameters.ToolbarParameters.EventDispatcher.Subscribe(RgfToolbarEventKind.ShowFilter, OnShowFilter, true);
+        }
+        if (entityChanged || filterParametersChanged)
+        {
+            SetFilterParameters();
+        }
+    }
+
     protected virtual async Task OnShowFilter(IRgfEventArgs<RgfToolbarEventArgs> args)
     {
         _logger.LogDebug("OnShowFilter | EntityName:{EntityName}", EntityParameters.EntityName);
+        var manager = Manager;
+        var entity = EntityParameters;
+        if (manager is null)
+        {
+            return;
+        }
         var capabilities = _serviceProvider.GetService<RgfRecrobyCapabilityService>();
         AllowFilterToLower = capabilities is null || await capabilities.GetAllowFilterToLowerAsync();
-        if (!ReferenceEquals(_draftManager, Manager))
+        var handler = await manager.GetFilterHandlerAsync();
+        if (_disposed || !ReferenceEquals(entity, EntityParameters) || !ReferenceEquals(manager, EntityParameters.Manager))
         {
-            _draftManager = Manager;
+            return;
+        }
+        StopWatchingFilter();
+        if (!ReferenceEquals(_draftManager, manager))
+        {
+            _draftManager = manager;
             FilterSettings = new RgfFilterSettings();
         }
-        FilterHandler = await Manager.GetFilterHandlerAsync();
+        FilterHandler = handler;
         if (FilterHandler.TakeNewAiFilterSettings() is { } newAiSettings)
         {
             FilterSettings = newAiSettings;
@@ -230,6 +277,7 @@ public partial class RgfFilterComponent : ComponentBase, IDisposable
     private void Open()
     {
         InvalidateGeneration();
+        FilterParameters.DialogParameters.UniqueName = "filter-" + Manager.EntityDesc.NameVersion.ToLower();
         FilterParameters.DialogParameters.EventDispatcher.Unsubscribe(this);//We'll reset it in case the dialog might have overwritten it
         FilterParameters.DialogParameters.EventDispatcher.Subscribe(RgfDialogEventKind.Close, OnDialogCloseAsync, true);
         if (EntityParameters.DialogTemplate != null)
@@ -241,8 +289,71 @@ public partial class RgfFilterComponent : ComponentBase, IDisposable
             _filterDialog = RgfDynamicDialog.Create(FilterParameters.DialogParameters, _logger);
         }
         FilterSettings.SQLTimeout = Manager.ListHandler.SQLTimeout;
+        _draftBaseline = CaptureDraft();
+        _aiFilterDispatcher = FilterParameters.EventDispatcher;
+        _aiFilterDispatcher.Subscribe(RgfFilterEventKind.AiFilterApplied, OnAiFilterAppliedAsync);
+        if (_draftManager is RgManager manager)
+        {
+            manager.Initializing += OnManagerInitializing;
+        }
         _showComponent = true;
         StateHasChanged();
+    }
+
+    private void StopWatchingFilter()
+    {
+        _aiFilterDispatcher?.Unsubscribe(RgfFilterEventKind.AiFilterApplied, OnAiFilterAppliedAsync);
+        _aiFilterDispatcher = null;
+        if (_draftManager is RgManager manager)
+        {
+            manager.Initializing -= OnManagerInitializing;
+        }
+    }
+
+    private void OnManagerInitializing(RgManager manager) => _ = InvokeAsync(() =>
+        !_disposed && _showComponent && ReferenceEquals(_draftManager, manager) ? CloseDialogAsync() : Task.CompletedTask);
+
+    private Task OnAiFilterAppliedAsync(IRgfEventArgs<RgfFilterEventArgs> args) =>
+        args.Sender is IRgFilterHandler handler ? SyncAiFilterAsync(handler) : Task.CompletedTask;
+
+    // RGF-DOC: rgf.client.recroby.integration
+    private async Task SyncAiFilterAsync(IRgFilterHandler handler)
+    {
+        try
+        {
+            await InvokeAsync(async () =>
+            {
+                if (_disposed || !_showComponent || !ReferenceEquals(_draftManager, EntityParameters.Manager) ||
+                    !ReferenceEquals(handler, FilterHandler) || !ReferenceEquals(_subscribedEntity, EntityParameters) ||
+                    !ReferenceEquals(_aiFilterDispatcher, EntityParameters.FilterParameters.EventDispatcher) ||
+                    Manager.ListHandler is not { Initialized: true } ||
+                    handler.TakeNewAiFilterSettings() is not { } settings)
+                {
+                    return;
+                }
+
+                var discardedEdits = CaptureDraft() != _draftBaseline;
+                InvalidateGeneration();
+                _generation = null;
+                Condition = new RgfFilter.Condition { Conditions = handler.Conditions };
+                FilterSettings = settings;
+                FilterSettings.SQLTimeout = Manager.ListHandler.SQLTimeout;
+                IsFilterActive = Manager.IsFiltered || !handler.Conditions.Any();
+                _draftBaseline = CaptureDraft();
+                _editorVersion++;
+                StateHasChanged();
+
+                if (discardedEdits)
+                {
+                    await Manager.ToastManager.RaiseEventAsync(new RgfToastEventArgs(Manager.EntityDesc.MenuTitle,
+                        _recroDict.GetRgfRecrobyString("FilterDraftReplaced"), RgfToastType.Warning), this);
+                }
+            });
+        }
+        catch (Exception error)
+        {
+            _logger.LogError(error, "Could not synchronize the open filter editor.");
+        }
     }
 
     private Task OnDialogCloseAsync(IRgfEventArgs<RgfDialogEventArgs> args) => OnCancel();
@@ -251,12 +362,21 @@ public partial class RgfFilterComponent : ComponentBase, IDisposable
     {
         _logger.LogDebug("CloseDialog | EntityName:{EntityName}", EntityParameters.EntityName);
         InvalidateGeneration();
+        StopWatchingFilter();
         _showComponent = false;
+        FilterParameters.DialogParameters.EventDispatcher.Unsubscribe(this);
         await FilterParameters.DialogParameters.EventDispatcher.RaiseEventAsync(RgfDialogEventKind.Destroy, this);
         StateHasChanged();
     }
 
-    public Task RecreateAsync() => CloseDialogAsync().ContinueWith(_ => Task.Run(Open), TaskContinuationOptions.OnlyOnRanToCompletion);
+    public Task RecreateAsync() => InvokeAsync(async () =>
+    {
+        await CloseDialogAsync();
+        if (!_disposed && ReferenceEquals(_draftManager, EntityParameters.Manager))
+        {
+            Open();
+        }
+    });
 
     public virtual Task OnCancel(MouseEventArgs? args = null)
     {
@@ -317,9 +437,14 @@ public partial class RgfFilterComponent : ComponentBase, IDisposable
             FilterSettings.IsReadonly = false;
             FilterSettings.RoleId = null;
         }
-        var toast = RgfToastEventArgs.CreateActionEvent(_recroDict.GetRgfUiString("Request"), Manager.EntityDesc.MenuTitle, _recroDict.GetRgfUiString("SaveSettings"), FilterSettings.SettingsName);
+        var settings = FilterSettings;
+        var toast = RgfToastEventArgs.CreateActionEvent(_recroDict.GetRgfUiString("Request"), Manager.EntityDesc.MenuTitle, _recroDict.GetRgfUiString("SaveSettings"), settings.SettingsName);
         await Manager.ToastManager.RaiseEventAsync(toast, this);
-        if (await FilterHandler.SaveFilterSettingsAsync(FilterSettings))
+        if (_disposed || !ReferenceEquals(settings, FilterSettings) || !ReferenceEquals(_draftManager, EntityParameters.Manager))
+        {
+            return;
+        }
+        if (await FilterHandler.SaveFilterSettingsAsync(settings))
         {
             await Manager.ToastManager.RaiseEventAsync(toast.RecreateAsSuccess(_recroDict.GetRgfUiString("Processed")), this);
             StateHasChanged();
@@ -348,7 +473,8 @@ public partial class RgfFilterComponent : ComponentBase, IDisposable
     public void Dispose()
     {
         _disposed = true;
+        StopWatchingFilter();
         InvalidateGeneration();
-        EntityParameters?.UnsubscribeFromAll(this);
+        _subscribedEntity?.UnsubscribeFromAll(this);
     }
 }

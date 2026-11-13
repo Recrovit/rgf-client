@@ -586,6 +586,7 @@ public partial class RgfRecrobyWorkspace : IAsyncDisposable
                 if (workspace._disposed || cancellationToken.IsCancellationRequested || IsSuperseded()) return;
 
                 IRgListHandler? list = null;
+                IRgFilterHandler? appliedHandler = null;
                 var stale = false;
                 try
                 {
@@ -601,6 +602,7 @@ public partial class RgfRecrobyWorkspace : IAsyncDisposable
                             var applied = RgfGridSettings.DeepCopy(new RgfGridSettings { Conditions = handler.StoreFilter() })!;
                             list.ApplyFilterState(applied.Conditions ?? [], list.SQLTimeout);
                             handler.SetNewAiFilterSettings(action.Remark);
+                            appliedHandler = handler;
                         }
                     }
                     stale = list is null && action.Operation == RgfAiFilterOperation.ReplaceIfUnchanged && !IsTargetCurrent();
@@ -614,10 +616,22 @@ public partial class RgfRecrobyWorkspace : IAsyncDisposable
                 if (list is null)
                 {
                     if (!workspace._disposed && !cancellationToken.IsCancellationRequested && !IsSuperseded())
+                    {
                         await workspace.ReportFilterLoadFailureAsync(manager, stale);
+                    }
                 }
                 else
+                {
+                    try
+                    {
+                        await gridContext!.NotifyAiFilterAppliedAsync(manager!, appliedHandler!);
+                    }
+                    catch (Exception error)
+                    {
+                        workspace.LogGridError(error, "The Recroby filter applied notification failed.");
+                    }
                     _ = workspace.RefreshAfterFilterLoadAsync(list);
+                }
             });
             cancellationToken.ThrowIfCancellationRequested();
             return response;

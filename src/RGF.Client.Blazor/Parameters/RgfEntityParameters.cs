@@ -105,6 +105,7 @@ public class RgfEntityParameters : RgfSessionParams
 
         EventDispatcher.Unsubscribe(subscriber);
 
+        FilterParameters.EventDispatcher.Unsubscribe(subscriber);
         FilterParameters.DialogParameters.EventDispatcher.Unsubscribe(subscriber);
 
         ToolbarParameters.EventDispatcher.Unsubscribe(subscriber);

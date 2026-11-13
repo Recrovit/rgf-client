@@ -14,7 +14,7 @@ This file contains the consolidated release history for the `rgf-client` solutio
 
 - Recroby automatically uses the most recently activated available Grid, including embedded Grids. Closing it restores the previous available Grid. The toolbar activates its Grid and opens Recroby while keeping the selected conversation. The header shows the active Grid. Recroby starts right-docked and collapsed when no saved layout exists.
 
-- Each built-in Recroby turn sends the active Grid's applied filter and sort. Validated Create results replace the Grid filter while the original target and activation remain current. Modify can edit or clear an applied user filter and skips application when the original conditions have changed, including during clarification. The chat describes the result, and the filter editor uses the description as its editable remark.
+- Each built-in Recroby turn sends the active Grid's applied filter and sort. Validated Create results replace the Grid filter while the original target and activation remain current. Modify can edit or clear an applied user filter and skips application when the original conditions have changed, including during clarification. An open filter editor immediately shows the applied conditions and editable remark. It warns when unapplied edits are replaced.
 
 - Added a reusable secure Markdown viewer with an original-text toggle, standard RGF UI translations, and per-conversation Recroby response formats. New Recroby conversations default to Minimal; server-marked Markdown replies support independent view switching without generating another response. Every assistant reply offers one-click copying of its unchanged original text, with Copy above the optional view toggle and accessible success/failure feedback.
 

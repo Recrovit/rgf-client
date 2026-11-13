@@ -3,6 +3,7 @@ using Recrovit.RecroGridFramework.Client.AI;
 using Recrovit.RecroGridFramework.Client.Blazor.UI.Components.AI;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Recrovit.RecroGridFramework.Abstraction.Contracts.AI;
 using Recrovit.RecroGridFramework.Abstraction.Contracts.API;
 using Recrovit.RecroGridFramework.Abstraction.Contracts.Services;
@@ -17,6 +18,7 @@ using Recrovit.RecroGridFramework.Client.Blazor.UI.Tests.Testing;
 using Recrovit.RecroGridFramework.Client.Events;
 using Recrovit.RecroGridFramework.Client.Handlers;
 using System.Collections.Concurrent;
+using System.Reflection;
 using System.Security.Claims;
 using System.Text.Json;
 
@@ -486,6 +488,391 @@ public sealed class EntityComponentTests
         Assert.Equal(string.Empty, dialog.Instance.FilterSettings.Remark);
         Assert.Equal(string.Empty, dialog.Instance.FilterSettings.SettingsName);
         Assert.Null(dialog.Instance.FilterSettings.FilterSettingsId);
+    }
+
+    [Theory]
+    [InlineData("create", false)]
+    [InlineData("modify", true)]
+    [InlineData("generation", false)]
+    [InlineData("clear", false)]
+    [InlineData("stale", false)]
+    [InlineData("failed", false)]
+    [InlineData("closed", false)]
+    [InlineData("disposed-editor", false)]
+    [InlineData("notification-error", false)]
+    [InlineData("custom-handler", false)]
+    [InlineData("other-grid", false)]
+    [InlineData("switched-grid", false)]
+    [InlineData("closed-grid", false)]
+    [InlineData("disposed-manager", false)]
+    [InlineData("reinitialized-manager", false)]
+    public async Task OpenFilterEditorReflectsOnlySuccessfullyAppliedRecrobyFilters(string scenario, bool accept)
+    {
+        using var context = CreateTestContext(true);
+        context.Services.AddScoped<RgfRecrobyWorkspaceService>();
+        using var logs = new ListLoggerProvider();
+        context.Services.AddLogging(builder => builder.AddProvider(logs));
+        await RgfClientBlazorUiTestState.LoadUiResourcesAsync(context);
+        var workspace = context.Render<RgfRecrobyWorkspace>();
+        var api = (PendingRgfApiService)context.Services.GetRequiredService<IRgfApiService>();
+        api.FilterXml = "<columns><column alias=\"Name\" rgclass=\"rg-text\" /></columns>";
+        api.GridProperties = [new() { Id = 1, Alias = "Name", ClientName = "Name", ColTitle = "Name",
+            Readable = true, ColPos = 1, FormType = PropertyFormType.TextBox }];
+        var entity = CreateEntityParameters(RfgDisplayMode.Grid);
+        using var grid = RenderWorkspace(context, entity);
+        var manager = entity.Manager!;
+        var handler = await manager.GetFilterHandlerAsync();
+        var list = manager.ListHandler;
+        var gridContext = grid.Instance.RecrobyGridContext;
+        IRgFilterHandler appliedHandler = handler;
+        if (scenario == "custom-handler")
+        {
+            appliedHandler = DispatchProxy.Create<IRgFilterHandler, ForwardingProxy>();
+            ((ForwardingProxy)appliedHandler).Target = handler;
+            var customManager = DispatchProxy.Create<IRgManager, ForwardingProxy>();
+            ((ForwardingProxy)customManager).Target = manager;
+            ((ForwardingProxy)customManager).FilterHandler = appliedHandler;
+            await grid.InvokeAsync(() =>
+            {
+                grid.Instance.Manager = customManager;
+                gridContext.SetManager(customManager);
+            });
+            grid.Render(p => p.Add(c => c.EntityParameters, entity));
+        }
+        handler.ApplyFilterState([NameCondition("original")], 41);
+        var saved = new RgfFilterSettings
+        {
+            FilterSettingsId = 7, SettingsName = "Saved original", Remark = "Saved description",
+            RoleId = "shared", IsReadonly = true, Conditions = [NameCondition("saved")]
+        };
+        handler.PredefinedFilters.Add(saved);
+        using var editor = context.Render<Recrovit.RecroGridFramework.Client.Blazor.UI.Components.FilterComponent>(
+            parameters => parameters.Add(component => component.EntityParameters, entity));
+        await OpenFilter(editor, entity);
+        var filter = editor.FindComponent<RgfFilterComponent>().Instance;
+        var dialog = editor.Find("[role=dialog]");
+        var dialogId = dialog.Id;
+        Assert.Equal("original", editor.Find(".modal-body input[type=text], .modal-body input:not([type])").GetAttribute("value"));
+        Assert.Equal("41", editor.Find(".rg-filter-sqltimeout input").GetAttribute("value"));
+
+        var dirty = scenario is "create" or "stale" or "failed";
+        if (dirty)
+        {
+            await editor.InvokeAsync(() => editor.FindComponents<RgfComboBox<int?>>()
+                .Single(combo => combo.Instance.AllowCustom).Instance.OnSelected("7"));
+            ConditionInput().Change("draft condition");
+            editor.Find("textarea").Input("draft description");
+            editor.Find(".rg-filter-sqltimeout input").Change("99");
+        }
+        if (scenario == "closed")
+        {
+            await editor.Find("button.btn-secondary").ClickAsync(new());
+        }
+        if (scenario == "disposed-editor")
+        {
+            await editor.InvokeAsync(filter.Dispose);
+        }
+        var dispatcher = entity.FilterParameters.EventDispatcher;
+        var notifications = new List<IRgfEventArgs<RgfFilterEventArgs>>();
+        var notificationStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseNotification = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var notificationError = new InvalidOperationException("Filter notification failed in the test.");
+        dispatcher.Subscribe(RgfFilterEventKind.AiFilterApplied, async args =>
+        {
+            notifications.Add(args);
+            notificationStarted.TrySetResult();
+            if (scenario == "create")
+            {
+                await releaseNotification.Task;
+            }
+            if (scenario == "notification-error")
+            {
+                throw notificationError;
+            }
+        });
+        Task? generation = null;
+        var generated = new TaskCompletionSource<RgfNameDescriptionResponse>(TaskCreationOptions.RunContinuationsAsynchronously);
+        if (scenario == "generation")
+        {
+            api.NameDescriptionResponse = generated.Task;
+            generation = editor.Find("button:has(.bi-stars)").ClickAsync(new());
+            editor.WaitForAssertion(() => Assert.NotNull(editor.Find(".spinner-border")));
+        }
+        var otherEntity = CreateEntityParameters(RfgDisplayMode.Grid);
+        var otherNotifications = new List<IRgfEventArgs<RgfFilterEventArgs>>();
+        otherEntity.FilterParameters.EventDispatcher.Subscribe(RgfFilterEventKind.AiFilterApplied, otherNotifications.Add);
+        using var otherGrid = scenario is "other-grid" or "switched-grid" ? RenderWorkspace(context, otherEntity) : null;
+        var workspaceService = context.Services.GetRequiredService<RgfRecrobyWorkspaceService>();
+        if (otherGrid is not null)
+        {
+            await workspaceService.OpenOrActivateGridAsync(scenario == "other-grid" ? otherGrid.Instance.RecrobyGridContext : gridContext);
+        }
+        var toasts = ((FakeEventNotificationService)context.Services.GetRequiredService<IRgfEventNotificationService>()).Toasts;
+        toasts.Clear();
+        api.GridRequests.Clear();
+        api.RecrobyResponse = async request =>
+        {
+            if (scenario == "failed")
+            {
+                return new RgfAiResponse { Success = false, Message = "Filter validation failed" };
+            }
+            if (scenario == "stale")
+            {
+                await workspace.InvokeAsync(() => list.GetGridSettings().Conditions![0].Param1 = "concurrent");
+            }
+            if (scenario == "switched-grid")
+            {
+                await workspaceService.OpenOrActivateGridAsync(otherGrid!.Instance.RecrobyGridContext);
+            }
+            if (scenario == "closed-grid")
+            {
+                await grid.InvokeAsync(gridContext.Close);
+            }
+            if (scenario == "disposed-manager")
+            {
+                await workspace.InvokeAsync(manager.Dispose);
+            }
+            if (scenario == "reinitialized-manager")
+            {
+                await workspace.InvokeAsync(async () =>
+                    Assert.True(await Assert.IsType<RgManager>(manager).InitializeAsync(manager.CreateGridRequest(request => request.EntityName = "Orders"))));
+                api.GridRequests.Clear();
+            }
+            var reply = FilterReply(request, scenario == "clear" ? [] : [NameCondition("applied")]);
+            if (scenario is "modify" or "clear" or "stale" or "disposed-manager" or "reinitialized-manager")
+            {
+                reply.FilterAction = reply.FilterAction! with { Operation = RgfAiFilterOperation.ReplaceIfUnchanged };
+            }
+            return reply;
+        };
+        var send = workspace.FindComponent<RgfAiChatComponent>().Instance.Session.SendAsync("Update filter",
+            cancellationToken: Xunit.TestContext.Current.CancellationToken);
+        if (scenario == "create")
+        {
+            try
+            {
+                await notificationStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), Xunit.TestContext.Current.CancellationToken);
+                Assert.False(send.IsCompleted);
+                Assert.Empty(api.GridRequests);
+            }
+            finally
+            {
+                releaseNotification.TrySetResult();
+            }
+        }
+        await send;
+
+        if (scenario is "stale" or "failed" or "other-grid" or "switched-grid" or "closed-grid" or "disposed-manager" or "reinitialized-manager")
+        {
+            Assert.Empty(notifications);
+        }
+        else
+        {
+            var notification = Assert.Single(notifications);
+            Assert.Same(appliedHandler, notification.Sender);
+            Assert.Equal(RgfFilterEventKind.AiFilterApplied, notification.Args.EventKind);
+        }
+        if (scenario == "notification-error")
+        {
+            workspace.WaitForAssertion(() => Assert.Single(api.GridRequests));
+            Assert.Contains(logs.Entries, entry => ReferenceEquals(entry.Exception, notificationError));
+            Assert.DoesNotContain(toasts, toast => toast.ToastType == RgfToastType.Error);
+        }
+        if (scenario == "disposed-editor")
+        {
+            workspace.WaitForAssertion(() => Assert.Single(api.GridRequests));
+            Assert.Equal("applied", Assert.Single(list.GetGridSettings().Conditions!).DynValue1.StringValue);
+            Assert.Equal("Generated filter summary", handler.TakeNewAiFilterSettings()!.Remark);
+            Assert.DoesNotContain(toasts, toast => toast.ToastType == RgfToastType.Error);
+            return;
+        }
+
+        if (generation is not null)
+        {
+            Assert.Empty(editor.FindAll(".spinner-border"));
+            Assert.True(api.NameDescriptionCancellation.IsCancellationRequested);
+            generated.SetResult(new("Stale name", "Stale description"));
+            await generation;
+        }
+
+        if (scenario == "reinitialized-manager")
+        {
+            Assert.Empty(editor.FindAll("[role=dialog]"));
+            Assert.Empty(api.GridRequests);
+            Assert.NotSame(handler, await manager.GetFilterHandlerAsync());
+            handler.SetNewAiFilterSettings("Old handler notification");
+            Assert.Empty(notifications);
+            await dispatcher.RaiseEventAsync(RgfFilterEventKind.AiFilterApplied, handler);
+            Assert.Empty(editor.FindAll("[role=dialog]"));
+            Assert.Equal("Old handler notification", handler.TakeNewAiFilterSettings()!.Remark);
+            return;
+        }
+        if (scenario != "other-grid")
+        {
+            Assert.Empty(otherNotifications);
+        }
+        if (scenario is "stale" or "failed" or "other-grid" or "switched-grid" or "closed-grid" or "disposed-manager")
+        {
+            Assert.Equal(dialogId, editor.Find("[role=dialog]").Id);
+            Assert.Equal(dirty ? "draft condition" : "original", ConditionInput().GetAttribute("value"));
+            Assert.Equal(dirty ? "draft description" : "", DescriptionValue());
+            Assert.DoesNotContain(toasts, toast => toast.ToastType == RgfToastType.Warning);
+            if (scenario == "other-grid")
+            {
+                Assert.Equal("applied", Assert.Single(otherEntity.Manager!.ListHandler.GetGridSettings().Conditions!).DynValue1.StringValue);
+                Assert.Same(await otherEntity.Manager.GetFilterHandlerAsync(), Assert.Single(otherNotifications).Sender);
+            }
+            else
+            {
+                Assert.Empty(api.GridRequests);
+            }
+            return;
+        }
+        if (scenario == "closed")
+        {
+            Assert.Empty(editor.FindAll("[role=dialog]"));
+            await OpenFilter(editor, entity);
+        }
+        else
+        {
+            Assert.Equal(dialogId, editor.Find("[role=dialog]").Id);
+        }
+        editor.WaitForAssertion(() =>
+        {
+            Assert.Equal("Generated filter summary", DescriptionValue());
+            Assert.Equal("41", editor.Find(".rg-filter-sqltimeout input").GetAttribute("value"));
+            if (scenario == "clear")
+            {
+                Assert.Empty(editor.FindAll(".modal-body input[type=text], .modal-body input:not([type])"));
+            }
+            else
+            {
+                Assert.Equal("applied", ConditionInput().GetAttribute("value"));
+            }
+        });
+        Assert.Null(filter.FilterSettings.FilterSettingsId);
+        Assert.Equal("", filter.FilterSettings.SettingsName);
+        Assert.Null(filter.FilterSettings.RoleId);
+        Assert.False(filter.FilterSettings.IsReadonly);
+        Assert.Empty(editor.FindAll(".rg-predef-name option[selected]"));
+        Assert.Equal("Saved description", Assert.Single(handler.PredefinedFilters).Remark);
+        Assert.Equal("saved", Assert.Single(saved.Conditions).DynValue1.StringValue);
+        Assert.Empty(api.SavedFilters);
+        if (dirty)
+        {
+            Assert.Equal("Your unapplied filter edits were replaced.", Assert.Single(toasts, t => t.ToastType == RgfToastType.Warning).Body);
+        }
+        else
+        {
+            Assert.DoesNotContain(toasts, toast => toast.ToastType == RgfToastType.Warning);
+        }
+
+        if (scenario == "clear")
+        {
+            await editor.Find("button.btn-secondary").ClickAsync(new());
+            Assert.Empty(list.GetGridSettings().Conditions!);
+            Assert.Empty(handler.Conditions);
+            return;
+        }
+        ConditionInput().Change("edited after Recroby");
+        Assert.Equal("edited after Recroby", ConditionInput().GetAttribute("value"));
+        Assert.Equal("applied", Assert.Single(list.GetGridSettings().Conditions!).DynValue1.StringValue);
+        await editor.Find(accept ? "button.btn-primary" : "button.btn-secondary").ClickAsync(new());
+        var expected = accept ? "edited after Recroby" : "applied";
+        Assert.Equal(expected, Assert.Single(list.GetGridSettings().Conditions!).DynValue1.StringValue);
+        Assert.Equal(expected, Assert.Single(handler.Conditions).DynValue1.StringValue);
+        await OpenFilter(editor, entity);
+        Assert.Equal(expected, ConditionInput().GetAttribute("value"));
+        Assert.Equal("Generated filter summary", DescriptionValue());
+
+        AngleSharp.Dom.IElement ConditionInput() => editor.Find(".modal-body input[type=text], .modal-body input:not([type])");
+        string DescriptionValue() => editor.Find("textarea").GetAttribute("value") ?? editor.Find("textarea").TextContent;
+        static RgfFilter.Condition NameCondition(string value) => new()
+        {
+            Id = 1, Alias = "Name", LogicalOperator = RgfFilter.LogicalOperator.And,
+            QueryOperator = RgfFilter.QueryOperator.Equal, Param1 = value
+        };
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ReplacingFilterParametersClosesTheEditorAndRebindsNotifications(bool replaceEntity)
+    {
+        using var context = CreateTestContext(true);
+        await RgfClientBlazorUiTestState.LoadUiResourcesAsync(context);
+        var entity = CreateEntityParameters(RfgDisplayMode.Grid);
+        using var grid = RenderWorkspace(context, entity);
+        var manager = entity.Manager!;
+        var handler = await manager.GetFilterHandlerAsync();
+        using var editor = context.Render<Recrovit.RecroGridFramework.Client.Blazor.UI.Components.FilterComponent>(
+            p => p.Add(c => c.EntityParameters, entity));
+        await OpenFilter(editor, entity);
+        Assert.NotEmpty(editor.FindAll("[role=dialog]"));
+
+        var oldDispatcher = entity.FilterParameters.EventDispatcher;
+        var current = replaceEntity ? CreateEntityParameters(RfgDisplayMode.Grid) : entity;
+        current.FilterParameters = new();
+        if (replaceEntity)
+        {
+            grid.Render(p => p.Add(c => c.EntityParameters, current));
+        }
+        editor.Render(p => p.Add(c => c.EntityParameters, current));
+        Assert.Empty(editor.FindAll("[role=dialog]"));
+
+        await OpenFilter(editor, current);
+        handler.SetNewAiFilterSettings("Updated description");
+        await editor.InvokeAsync(() => oldDispatcher.RaiseEventAsync(RgfFilterEventKind.AiFilterApplied, handler));
+        Assert.True(string.IsNullOrEmpty(editor.FindComponent<RgfFilterComponent>().Instance.FilterSettings.Remark));
+
+        await editor.InvokeAsync(() => current.FilterParameters.EventDispatcher.RaiseEventAsync(RgfFilterEventKind.AiFilterApplied, handler));
+        Assert.Equal("Updated description", editor.FindComponent<RgfFilterComponent>().Instance.FilterSettings.Remark);
+    }
+
+    [Fact]
+    public async Task AiFilterNotificationFollowsTheCurrentManagerUntilTheGridDisposes()
+    {
+        using var context = CreateTestContext(true);
+        var entity = CreateEntityParameters(RfgDisplayMode.Grid);
+        using var grid = RenderWorkspace(context, entity);
+        var component = grid.Instance;
+        var gridContext = component.RecrobyGridContext;
+        var firstManager = entity.Manager!;
+        var firstHandler = await firstManager.GetFilterHandlerAsync();
+        var notifications = new List<object>();
+        entity.FilterParameters.EventDispatcher.Subscribe(RgfFilterEventKind.AiFilterApplied, args => { notifications.Add(args.Sender); });
+
+        await gridContext.NotifyAiFilterAppliedAsync(firstManager, firstHandler);
+        Assert.Same(firstHandler, Assert.Single(notifications));
+        gridContext.ClearManager(firstManager);
+        await gridContext.NotifyAiFilterAppliedAsync(firstManager, firstHandler);
+        Assert.Single(notifications);
+
+        var replacement = new RgfEntityParameters("Replacement", firstManager.SessionParams)
+        {
+            DisplayMode = RfgDisplayMode.Grid
+        };
+        var replacementSenders = new List<object>();
+        replacement.FilterParameters.EventDispatcher.Subscribe(RgfFilterEventKind.AiFilterApplied, args => { replacementSenders.Add(args.Sender); });
+        grid.Render(p => p.Add(c => c.EntityParameters, replacement));
+        grid.WaitForAssertion(() =>
+        {
+            Assert.NotNull(gridContext.Manager);
+            Assert.NotSame(firstManager, gridContext.Manager);
+            Assert.Same(replacement.Manager, gridContext.Manager);
+        });
+        var manager = replacement.Manager!;
+        var handler = await manager.GetFilterHandlerAsync();
+        await gridContext.NotifyAiFilterAppliedAsync(firstManager, firstHandler);
+        Assert.Empty(replacementSenders);
+        await gridContext.NotifyAiFilterAppliedAsync(manager, handler);
+        Assert.Same(handler, Assert.Single(replacementSenders));
+        Assert.Single(notifications);
+
+        await grid.InvokeAsync(component.Dispose);
+        Assert.True(gridContext.IsClosed);
+        await gridContext.NotifyAiFilterAppliedAsync(manager, handler);
+        Assert.Single(replacementSenders);
     }
 
     [Theory]
@@ -2150,6 +2537,17 @@ public sealed class EntityComponentTests
         [Parameter] public RgfEntityParameters EntityParameters { get; set; } = null!;
     }
 
+    public class ForwardingProxy : DispatchProxy
+    {
+        public object Target { get; set; } = null!;
+        public IRgFilterHandler? FilterHandler { get; set; }
+
+        protected override object? Invoke(MethodInfo? method, object?[]? args) =>
+            method!.Name == nameof(IRgManager.GetFilterHandlerAsync) && FilterHandler is { } handler
+                ? Task.FromResult(handler)
+                : method.Invoke(Target, args);
+    }
+
     private sealed class PendingRgfApiService(bool complete) : IRgfApiService
     {
         public string FilterXml { get; set; } = "<columns />";
@@ -2158,6 +2556,8 @@ public sealed class EntityComponentTests
         public int CapabilityRequests { get; private set; }
         public List<RgfFilterSettings> SavedFilters { get; } = [];
         public Func<RgfAiRequest, Task<RgfAiResponse>>? RecrobyResponse { get; set; }
+        public Task<RgfNameDescriptionResponse>? NameDescriptionResponse { get; set; }
+        public CancellationToken NameDescriptionCancellation { get; private set; }
         public List<RgfProperty> GridProperties { get; set; } = [];
         public string? DisplayModeOption { get; set; }
         public List<RgfChartSettings> SavedCharts { get; set; } = [];
@@ -2178,6 +2578,12 @@ public sealed class EntityComponentTests
             var json = await request.Content.ReadAsStringAsync();
             var input = JsonSerializer.Deserialize<RgfAiRequest>(json, new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
             return new ApiResponse<T> { Success = true, Result = (T)(object)await RecrobyResponse!(input) };
+        }
+
+        private async Task<IRgfApiResponse<T>> RespondToNameDescriptionAsync<T>(IRgfApiRequest request) where T : class
+        {
+            NameDescriptionCancellation = request.CancellationToken;
+            return new ApiResponse<T> { Success = true, Result = (T)(object)await NameDescriptionResponse! };
         }
 
         public TaskCompletionSource<bool>? GridResponseGate { get; set; }
@@ -2289,6 +2695,10 @@ public sealed class EntityComponentTests
             if (typeof(ResultType) == typeof(RgfResult<List<RgfChartSettings>>)) return SavedChartResponse<ResultType>();
             if (typeof(ResultType) == typeof(RgfAiResponse) && RecrobyResponse is not null)
                 return RespondToRecrobyAsync<ResultType>(request);
+            if (typeof(ResultType) == typeof(RgfNameDescriptionResponse) && NameDescriptionResponse is not null)
+            {
+                return RespondToNameDescriptionAsync<ResultType>(request);
+            }
             if (typeof(ResultType) == typeof(RgfResult<RgfGridResult>) &&
                 string.Equals(request.Uri, "/rgf/api/entity/RecroGrid", StringComparison.Ordinal))
             {
