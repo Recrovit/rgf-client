@@ -52,12 +52,16 @@
             {
                 <RgfButton Id="@_selectorId" CssClass="btn-outline-secondary rgf-recroby-selector" OnClick="ToggleSwitcher"
                            Tooltip="@SwitcherTooltip"
-                           AdditionalAttributes="@(new() { ["data-action"] = "switch", ["aria-label"] = SwitcherLabel, ["aria-haspopup"] = "dialog", ["aria-expanded"] = _switcherOpen.ToString().ToLowerInvariant(), ["aria-controls"] = _selectorId + "-list" })">
+                           AdditionalAttributes="@(new() { ["data-action"] = "switch", ["aria-label"] = SwitcherAccessibleLabel, ["aria-haspopup"] = "dialog", ["aria-expanded"] = _switcherOpen.ToString().ToLowerInvariant(), ["aria-controls"] = _selectorId + "-list" })">
                     @if (HasMultipleTypes && _active != null)
                     {
                         <span class="rgf-recroby-type">@TypeLabel(_active.RecrobyType)</span>
                     }
                     <span class="rgf-recroby-title">@(_active is null ? null : DisplayTitle(_active))</span>
+                    @if (!_switcherOpen && HasUnreadConversations)
+                    {
+                        <span class="rgf-recroby-unread" aria-hidden="true"></span>
+                    }
                     <i class="bi bi-chevron-down" aria-hidden="true"></i>
                 </RgfButton>
             }
@@ -87,6 +91,11 @@
                                              Tooltip="@HtmlEncoder.Default.Encode(DisplayTitle(conversation))"
                                              AdditionalAttributes="@(new() { ["type"] = "button", ["data-action"] = "select", ["aria-controls"] = $"recroby-panel-{conversation.Id:N}", ["aria-pressed"] = (conversation == _active).ToString().ToLowerInvariant(), ["data-bs-container"] = $"#{_selectorId}-list" })">
                                         <span class="rgf-recroby-choice-title">@DisplayTitle(conversation)</span>
+                                        @if (conversation.HasUnreadResponse)
+                                        {
+                                            <span class="rgf-recroby-unread" aria-hidden="true"></span>
+                                            <span class="visually-hidden"> @RecroDict.GetRgfRecrobyString("ConversationUnread")</span>
+                                        }
                                         @if (conversation == _active)
                                         {
                                             <i class="bi bi-check-lg" aria-hidden="true"></i>

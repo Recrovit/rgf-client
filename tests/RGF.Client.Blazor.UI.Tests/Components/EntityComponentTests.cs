@@ -413,7 +413,7 @@ public sealed class EntityComponentTests
         AssertConditions(handler.Conditions);
         Assert.DoesNotContain(handler.Conditions, condition => condition.IsQuickFilter);
         Assert.All(Assert.Single(handler.Conditions).Conditions, condition => Assert.True(condition.ClientId > 0));
-        Assert.Equal("Refresh", Assert.Single(toasts).Body);
+        Assert.Single(toasts, toast => toast.Body == "Refresh");
         Assert.NotEmpty(Assert.Single(handler.Conditions).Conditions);
         handler.Conditions[0].Conditions[0].Param1 = "unconfirmed edit";
         Assert.True(handler.ResetFilter());
@@ -662,7 +662,7 @@ public sealed class EntityComponentTests
         }
         await send;
 
-        if (scenario is "stale" or "failed" or "other-grid" or "switched-grid" or "closed-grid" or "disposed-manager" or "reinitialized-manager")
+        if (scenario is "stale" or "failed" or "other-grid" or "closed-grid" or "disposed-manager" or "reinitialized-manager")
         {
             Assert.Empty(notifications);
         }
@@ -711,7 +711,7 @@ public sealed class EntityComponentTests
         {
             Assert.Empty(otherNotifications);
         }
-        if (scenario is "stale" or "failed" or "other-grid" or "switched-grid" or "closed-grid" or "disposed-manager")
+        if (scenario is "stale" or "failed" or "other-grid" or "closed-grid" or "disposed-manager")
         {
             Assert.Equal(dialogId, editor.Find("[role=dialog]").Id);
             Assert.Equal(dirty ? "draft condition" : "original", ConditionInput().GetAttribute("value"));
@@ -881,7 +881,7 @@ public sealed class EntityComponentTests
     [InlineData("stale")]
     [InlineData("pending")]
     [InlineData("pending-stale")]
-    [InlineData("pending-superseded")]
+    [InlineData("pending-other-chat")]
     [InlineData("quick")]
     public async Task RecrobyModifyAppliesOnlyAgainstItsOriginalFilter(string scenario)
     {
@@ -925,7 +925,7 @@ public sealed class EntityComponentTests
             {
                 await workspace.InvokeAsync(() => handler.ApplyFilterState([Condition("concurrent")], 41));
             }
-            if (scenario == "pending-superseded")
+            if (scenario == "pending-other-chat")
             {
                 workspace.Find("[data-action=new]").Click();
                 api.RecrobyResponse = _ => Task.FromResult(new RgfAiResponse { Success = true, Message = "Other answer" });
@@ -948,7 +948,7 @@ public sealed class EntityComponentTests
             return response;
         };
         await session.SendAsync("Change the name to modified", cancellationToken: token);
-        if (scenario is "stale" or "pending-stale" or "pending-superseded" or "quick")
+        if (scenario is "stale" or "pending-stale" or "quick")
         {
             Assert.Empty(api.GridRequests);
             if (scenario == "quick")
@@ -957,8 +957,7 @@ public sealed class EntityComponentTests
             }
             else
             {
-                Assert.Equal(scenario == "pending-superseded" ? "original" : "concurrent",
-                    Assert.Single(list.GetGridSettings().Conditions!).DynValue1.StringValue);
+                Assert.Equal("concurrent", Assert.Single(list.GetGridSettings().Conditions!).DynValue1.StringValue);
             }
         }
         else
@@ -976,8 +975,199 @@ public sealed class EntityComponentTests
         }
     }
 
+    [Theory]
+    [InlineData("modify", "new-chat")]
+    [InlineData("modify", "reply")]
+    [InlineData("modify", "failure")]
+    [InlineData("create", "reply")]
+    [InlineData("create", "create")]
+    [InlineData("modify", "create")]
+    [InlineData("create", "modify")]
+    [InlineData("create", "quick")]
+    [InlineData("create", "quick-changed")]
+    [InlineData("create", "cancel")]
+    [InlineData("create", "toast-failure")]
+    public async Task RecrobyAppliesConcurrentResultsOnlyWhileTheirOriginalFilterMatches(string operation, string concurrent)
+    {
+        using var context = CreateTestContext(true);
+        context.Services.AddScoped<RgfRecrobyWorkspaceService>();
+        await RgfClientBlazorUiTestState.LoadUiResourcesAsync(context);
+        var workspace = context.Render<RgfRecrobyWorkspace>();
+        var entity = CreateEntityParameters(RfgDisplayMode.Grid);
+        using var grid = RenderWorkspace(context, entity);
+        var manager = entity.Manager!;
+        var handler = await manager.GetFilterHandlerAsync();
+        var list = manager.ListHandler;
+        RgfFilter.Condition NameCondition(string value) => new()
+        {
+            Id = 1, Alias = "Name", LogicalOperator = RgfFilter.LogicalOperator.And,
+            QueryOperator = RgfFilter.QueryOperator.Equal, Param1 = value
+        };
+
+        if (operation == "modify" || concurrent == "modify")
+        {
+            handler.ApplyFilterState([NameCondition("original")], 41);
+        }
+        if (concurrent.StartsWith("quick", StringComparison.Ordinal))
+        {
+            await handler.SetQuickFilterAsync(new RgfProperty { Id = 3, Alias = "Quick" }, "quick");
+            Assert.Contains(list.GetGridSettings().Conditions!, condition => condition.IsQuickFilter);
+        }
+
+        var api = (PendingRgfApiService)context.Services.GetRequiredService<IRgfApiService>();
+        var token = Xunit.TestContext.Current.CancellationToken;
+        await context.Services.GetRequiredService<RgfRecrobyWorkspaceService>().OpenOrActivateGridAsync(grid.Instance.RecrobyGridContext);
+        var first = workspace.FindComponent<RgfAiChatComponent>();
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        api.RecrobyResponse = async request =>
+        {
+            var isFirst = request.CurrentUserMessage == "first";
+            if (isFirst)
+            {
+                started.SetResult();
+                await release.Task;
+            }
+            else if (concurrent is "reply" or "failure")
+            {
+                return new RgfAiResponse { Success = concurrent == "reply", Message = "Other answer" };
+            }
+
+            var reply = FilterReply(request, [NameCondition(isFirst ? "first" : "second")]);
+            if ((isFirst ? operation : concurrent) == "modify")
+            {
+                reply.FilterAction = reply.FilterAction! with { Operation = RgfAiFilterOperation.ReplaceIfUnchanged };
+            }
+            return reply;
+        };
+
+        var notifications = (FakeEventNotificationService)context.Services.GetRequiredService<IRgfEventNotificationService>();
+        notifications.Toasts.Clear();
+        notifications.FailReplyToast = concurrent == "toast-failure";
+        api.GridRequests.Clear();
+        first.Find("textarea").Change("first");
+        var send = first.Find("[aria-label=Send]").ClickAsync(new());
+        try
+        {
+            await started.Task.WaitAsync(TimeSpan.FromSeconds(5), token);
+            if (concurrent == "cancel")
+            {
+                first.Find("[aria-label='Cancel request']").Click();
+                workspace.Find("[data-action=new]").Click();
+            }
+            else if (concurrent == "quick-changed")
+            {
+                // The server representation is identical. Changing the Quick Filter marker still invalidates Create.
+                await workspace.InvokeAsync(() => list.GetGridSettings().Conditions!.Last().IsQuickFilter = false);
+            }
+            else if (concurrent != "quick")
+            {
+                workspace.Find("[data-action=new]").Click();
+                if (concurrent is not ("new-chat" or "toast-failure"))
+                {
+                    var second = workspace.FindComponents<RgfAiChatComponent>().Last().Instance.Session;
+                    var reply = await second.SendAsync("second", cancellationToken: token);
+                    Assert.Equal(concurrent != "failure", reply.Success);
+                }
+            }
+        }
+        finally
+        {
+            release.TrySetResult();
+        }
+
+        await send.WaitAsync(TimeSpan.FromSeconds(5), token);
+        if (concurrent is "cancel" or "quick-changed")
+        {
+            Assert.Empty(api.GridRequests);
+            if (concurrent == "cancel")
+            {
+                Assert.Empty(list.GetGridSettings().Conditions ?? []);
+                Assert.Empty(first.Instance.Session.Conversation.Messages.OfType<RgfAiResponse>());
+                Assert.Single(first.FindAll("[data-error-kind=cancelled]"));
+                Assert.Empty(workspace.FindAll(".rgf-recroby-unread"));
+                Assert.Empty(((FakeEventNotificationService)context.Services.GetRequiredService<IRgfEventNotificationService>()).Toasts);
+            }
+            return;
+        }
+
+        var expected = concurrent is "create" or "modify" ? "second" : "first";
+        if (concurrent == "toast-failure")
+        {
+            Assert.Equal(1, notifications.ReplyToastAttempts);
+            Assert.Equal("Generated filter summary", Assert.Single(first.Instance.Session.Conversation.Messages.OfType<RgfAiResponse>()).Message);
+            Assert.Single(workspace.FindAll("[data-action=switch] .rgf-recroby-unread"));
+        }
+        Assert.Single(api.GridRequests);
+        Assert.Equal(expected, Assert.Single(list.GetGridSettings().Conditions!).DynValue1.StringValue);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RecrobyRechecksAfterLoadingTheFilterHandler(bool cancel)
+    {
+        using var context = CreateTestContext(true);
+        context.Services.AddScoped<RgfRecrobyWorkspaceService>();
+        await RgfClientBlazorUiTestState.LoadUiResourcesAsync(context);
+        var workspace = context.Render<RgfRecrobyWorkspace>();
+        using var manager = new RgManager(new() { SessionId = "session", GridId = "grid" }, context.Services);
+        Assert.True(await manager.InitializeAsync(manager.CreateGridRequest(request => request.EntityName = "Orders")));
+        var grid = new RgfRecrobyGridContext();
+        grid.SetManager(manager);
+        await context.Services.GetRequiredService<RgfRecrobyWorkspaceService>().OpenOrActivateGridAsync(grid);
+
+        var api = (PendingRgfApiService)context.Services.GetRequiredService<IRgfApiService>();
+        var handlerStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseHandler = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        api.BeforeFilterResponse = async () =>
+        {
+            handlerStarted.SetResult();
+            await releaseHandler.Task;
+        };
+        api.RecrobyResponse = request => Task.FromResult(FilterReply(request, [Condition("AI")]));
+        api.GridRequests.Clear();
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(Xunit.TestContext.Current.CancellationToken);
+        var session = workspace.FindComponent<RgfAiChatComponent>().Instance.Session;
+        var send = session.SendAsync("Generate filter", cancellationToken: cancellation.Token);
+        try
+        {
+            await handlerStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), cancellation.Token);
+            if (cancel)
+            {
+                cancellation.Cancel();
+            }
+            else
+            {
+                await workspace.InvokeAsync(() => manager.ListHandler.ApplyFilterState([Condition("manual")], null));
+            }
+        }
+        finally
+        {
+            releaseHandler.TrySetResult();
+        }
+
+        if (cancel)
+        {
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => send);
+            Assert.Empty(manager.ListHandler.GetGridSettings().Conditions ?? []);
+            Assert.Empty(session.Conversation.Messages.OfType<RgfAiResponse>());
+        }
+        else
+        {
+            await send;
+            Assert.Equal("manual", Assert.Single(manager.ListHandler.GetGridSettings().Conditions!).DynValue1.StringValue);
+        }
+        Assert.Empty(api.GridRequests);
+
+        static RgfFilter.Condition Condition(string value) => new()
+        {
+            Id = 1, Alias = "Name", QueryOperator = RgfFilter.QueryOperator.Equal, Param1 = value
+        };
+    }
+
     [Fact]
-    public async Task RecrobyKeepsTheLatestGridTurnAndRejectsAReplacedManager()
+    public async Task RecrobyProtectsTheOriginalGridAndRejectsAReplacedManager()
     {
         using var context = CreateTestContext(true);
         context.Services.AddScoped<RgfRecrobyWorkspaceService>();
@@ -1028,21 +1218,24 @@ public sealed class EntityComponentTests
         handler.InitFilter(JsonSerializer.Serialize(manager.ListHandler.GetGridSettings().Conditions));
 
         var alternate = new RgfRecrobyGridContext();
-        alternate.SetManager(manager);
+        using var otherManager = new RgManager(new() { SessionId = "session", GridId = "other" }, context.Services);
+        Assert.True(await otherManager.InitializeAsync(otherManager.CreateGridRequest(request => request.EntityName = "Orders")));
+        alternate.SetManager(otherManager);
         var toasts = ((FakeEventNotificationService)context.Services.GetRequiredService<IRgfEventNotificationService>()).Toasts;
         toasts.Clear();
         api.GridRequests.Clear();
         api.RecrobyResponse = async request =>
         {
-            Assert.True(await services.RegisterGridAsync(alternate));
-            Assert.True(await services.OpenOrActivateGridAsync(gridContext));
-            return FilterReply(request, [new() { Id = 1, Param1 = "stale after A to B to A" }]);
+            Assert.True(await services.OpenOrActivateGridAsync(alternate));
+            return FilterReply(request, [new() { Id = 1, Param1 = "original Grid" }]);
         };
-        await second.SendAsync("switch away and back", cancellationToken: Xunit.TestContext.Current.CancellationToken);
-        Assert.Empty(api.GridRequests);
-        Assert.Equal("newer", Assert.Single(manager.ListHandler.GetGridSettings().Conditions!).Param1.ToString());
-        Assert.Equal(RgfToastType.Error, Assert.Single(toasts).ToastType);
-        Assert.Equal("Localized filter load failure", Assert.Single(toasts).Body);
+        await second.SendAsync("switch away", cancellationToken: Xunit.TestContext.Current.CancellationToken);
+        Assert.Single(api.GridRequests);
+        Assert.Equal("original Grid", Assert.Single(manager.ListHandler.GetGridSettings().Conditions!).Param1.ToString());
+        Assert.Empty(otherManager.ListHandler.GetGridSettings().Conditions ?? []);
+        Assert.DoesNotContain(toasts, toast => toast.ToastType == RgfToastType.Error);
+        Assert.True(await services.OpenOrActivateGridAsync(gridContext));
+        api.GridRequests.Clear();
         toasts.Clear();
         api.RecrobyResponse = async request =>
         {
@@ -1056,12 +1249,24 @@ public sealed class EntityComponentTests
         };
         await second.SendAsync("invalidate and restore", cancellationToken: Xunit.TestContext.Current.CancellationToken);
         Assert.Empty(api.GridRequests);
-        Assert.Equal("newer", Assert.Single(manager.ListHandler.GetGridSettings().Conditions!).Param1.ToString());
+        Assert.Equal("original Grid", Assert.Single(manager.ListHandler.GetGridSettings().Conditions!).Param1.ToString());
         Assert.Equal(RgfToastType.Error, Assert.Single(toasts).ToastType);
         await workspace.InvokeAsync(alternate.Close);
 
         using var replacement = new RgManager(new(manager.SessionParams), context.Services);
         Assert.True(await replacement.InitializeAsync(replacement.CreateGridRequest(request => request.EntityName = "Orders")));
+        toasts.Clear();
+        api.RecrobyResponse = async request =>
+        {
+            var baseline = manager.ListHandler.GetGridSettings().Conditions!;
+            Assert.True(await manager.InitializeAsync(manager.CreateGridRequest(r => r.EntityName = "Orders")));
+            manager.ListHandler.ApplyFilterState(baseline, manager.ListHandler.SQLTimeout);
+            api.GridRequests.Clear();
+            return FilterReply(request, [new() { Id = 1, Param1 = "old initialization" }]);
+        };
+        await second.SendAsync("reinitialize", cancellationToken: Xunit.TestContext.Current.CancellationToken);
+        Assert.Empty(api.GridRequests);
+        Assert.Equal(RgfToastType.Error, Assert.Single(toasts).ToastType);
         api.RecrobyResponse = async request =>
         {
             await workspace.InvokeAsync(() => gridContext.SetManager(replacement));
@@ -1072,7 +1277,7 @@ public sealed class EntityComponentTests
         await second.SendAsync("replace", cancellationToken: Xunit.TestContext.Current.CancellationToken);
         Assert.Empty(api.GridRequests);
         Assert.Empty(replacement.ListHandler.GetGridSettings().Conditions ?? []);
-        Assert.Equal("newer", Assert.Single(manager.ListHandler.GetGridSettings().Conditions!).Param1.ToString());
+        Assert.Equal("original Grid", Assert.Single(manager.ListHandler.GetGridSettings().Conditions!).Param1.ToString());
         Assert.Equal(RgfToastType.Error, Assert.Single(toasts).ToastType);
         Assert.Equal("Generated filter summary", second.Conversation.Messages.Last().Message);
 
@@ -1089,7 +1294,7 @@ public sealed class EntityComponentTests
 
         api.RecrobyResponse = async request =>
         {
-            await workspace.InvokeAsync(() => gridContext.ClearManager(replacement));
+            await workspace.InvokeAsync(gridContext.Close);
             return FilterReply(request, [new() { Id = 1, Param1 = "closed Grid" }]);
         };
         toasts.Clear();
@@ -2552,6 +2757,7 @@ public sealed class EntityComponentTests
     {
         public string FilterXml { get; set; } = "<columns />";
         public int FilterRequests { get; private set; }
+        public Func<Task>? BeforeFilterResponse { get; set; }
         public string? CapabilitiesJson { get; set; }
         public int CapabilityRequests { get; private set; }
         public List<RgfFilterSettings> SavedFilters { get; } = [];
@@ -2683,14 +2889,23 @@ public sealed class EntityComponentTests
             if (typeof(ResultType) == typeof(RgfResult<RgfFilterResult>))
             {
                 FilterRequests++;
-                return Task.FromResult<IRgfApiResponse<ResultType>>(new ApiResponse<ResultType>
+                return FilterResponseAsync<ResultType>();
+            }
+
+            async Task<IRgfApiResponse<T>> FilterResponseAsync<T>() where T : class
+            {
+                if (BeforeFilterResponse is not null)
+                {
+                    await BeforeFilterResponse();
+                }
+                return new ApiResponse<T>
                 {
                     Success = true,
-                    Result = (ResultType)(object)new RgfResult<RgfFilterResult>
+                    Result = (T)(object)new RgfResult<RgfFilterResult>
                     {
                         Success = true, Messages = new(), Result = new() { XmlFilter = FilterXml, FilterSettings = [] }
                     }
-                });
+                };
             }
             if (typeof(ResultType) == typeof(RgfResult<List<RgfChartSettings>>)) return SavedChartResponse<ResultType>();
             if (typeof(ResultType) == typeof(RgfAiResponse) && RecrobyResponse is not null)
@@ -2733,17 +2948,33 @@ public sealed class EntityComponentTests
     {
         public List<RgfToastEventArgs> Toasts { get; } = [];
 
-        public IRgfNotificationManager GetNotificationManager(string scope) => new FakeNotificationManager(Toasts);
+        public bool FailReplyToast { get; set; }
+        public int ReplyToastAttempts { get; private set; }
+
+        public IRgfNotificationManager GetNotificationManager(string scope) => new FakeNotificationManager(this);
+
+        public void Record(RgfToastEventArgs toast)
+        {
+            if (toast.ToastType == RgfToastType.Info && toast.Body.StartsWith("New reply in conversation", StringComparison.Ordinal))
+            {
+                ++ReplyToastAttempts;
+                if (FailReplyToast)
+                {
+                    throw new InvalidOperationException("Toast subscriber failed.");
+                }
+            }
+            Toasts.Add(toast);
+        }
 
         public bool RemoveNotificationManager(string scope) => true;
     }
 
-    private sealed class FakeNotificationManager(List<RgfToastEventArgs> toasts) : IRgfNotificationManager
+    private sealed class FakeNotificationManager(FakeEventNotificationService notifications) : IRgfNotificationManager
     {
         public IRgfObservableEvent<TArgs> GetObservableEvents<TArgs>() where TArgs : EventArgs => throw new NotSupportedException();
         public Task RaiseEventAsync<TArgs>(TArgs args, object sender) where TArgs : EventArgs
         {
-            if (args is RgfToastEventArgs toast) toasts.Add(toast);
+            if (args is RgfToastEventArgs toast) notifications.Record(toast);
             return Task.CompletedTask;
         }
         public IRgfObserver<IRgfEventArgs<TArgs>> Subscribe<TArgs>(Action<IRgfEventArgs<TArgs>> handler) where TArgs : EventArgs => new FakeObserver<IRgfEventArgs<TArgs>>();

@@ -481,6 +481,9 @@ try {
         const row=group.querySelector('.rgf-recroby-choice');
         for(let i=2;i<=30;i++) {const copy=row.cloneNode(true);copy.classList.remove('active');copy.querySelector('i')?.remove();copy.querySelector('[data-action=select]').setAttribute('aria-pressed','false');copy.querySelector('.rgf-recroby-choice-title').textContent='Conversation '+i+' '+ 'VeryLongConversationTitle'.repeat(5);group.append(copy);}
         document.querySelector('.rgf-recroby-title').textContent='VeryLongConversationTitle'.repeat(20);
+        const unread = '<span class="rgf-recroby-unread" aria-hidden="true"></span>';
+        document.querySelector('[data-action=switch] i').insertAdjacentHTML('beforebegin', unread);
+        group.querySelector('.rgf-recroby-choice:nth-child(2) [data-action=select]').insertAdjacentHTML('beforeend', unread);
         document.querySelector('.rgf-recroby-switcher').insertAdjacentHTML('afterbegin','<input type="search" class="form-control form-control-sm" aria-label="Search conversations">');
     })()`);
     for (const [width, height] of [[1200, 800], [390, 700]]) {
@@ -509,6 +512,9 @@ try {
             await layout({mode,isCollapsed:false,height:240,dockHeight:200});
             assert.equal((await rect('.rgf-recroby-conversation-bar')).height, barHeight, 'many conversations and long titles keep a single-height bar');
             assert.ok(await evaluate("document.querySelector('.rgf-recroby-title').scrollWidth > document.querySelector('.rgf-recroby-title').clientWidth"), 'active long title is truncated');
+            const selectorDot = await rect('[data-action=switch] .rgf-recroby-unread');
+            const selector = await rect('[data-action=switch]');
+            assert.ok(selectorDot.width >= 8 && selectorDot.right < selector.right, 'the closed switcher dot fits beside a long title');
             await click('[data-action=switch]');
             const popup=await rect('.rgf-recroby-switcher'), anchor=await rect('[data-action=switch]');
             assert.ok(popup.y >= 7 && popup.bottom <= height-7 && popup.x >= 7 && popup.right <= width-7, 'popover fits the viewport in every layout');
@@ -521,6 +527,9 @@ try {
             assert.ok(await evaluate("document.querySelector('.rgf-recroby-switcher-list').scrollHeight > document.querySelector('.rgf-recroby-switcher-list').clientHeight"), 'long list scrolls independently');
             assert.ok(await evaluate("(() => {const popup=document.querySelector('.rgf-recroby-switcher'), r=popup.getBoundingClientRect();return popup.contains(document.elementFromPoint(r.x+10,r.y+10));})()"), 'top layer is visible outside the clipped workspace');
             assert.ok(await evaluate("getComputedStyle(document.querySelector('.rgf-recroby-choice-title')).webkitLineClamp === '2'"), 'list titles are capped at two lines');
+            const rowDot = await rect('.rgf-recroby-choice .rgf-recroby-unread');
+            const rowTitle = await rect('.rgf-recroby-choice:nth-child(2) .rgf-recroby-choice-title');
+            assert.ok(rowDot.width >= 8 && rowDot.x >= rowTitle.right && rowDot.right < popup.right, 'the unread row dot fits beside a long title');
             await evaluate("document.querySelector('[data-action=select]').focus()");
             await cdp('Input.dispatchKeyEvent',{type:'keyDown',key:'End'});
             assert.equal(await evaluate("document.activeElement === [...document.querySelectorAll('[data-action=select]')].at(-1)"),true, 'End reaches the final conversation');

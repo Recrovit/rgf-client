@@ -76,6 +76,7 @@ public sealed class RgfAiConversationSession
             StateChanged?.Invoke();
             var request = Conversation.CreateRequest(instruction);
             var response = await transport.SendAsync(request, cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
             if (addToPresentationHistory && deferUserMessage && response.Success)
             {
                 Conversation.AddUserMessage(presentationText);

@@ -9,6 +9,7 @@ namespace Recrovit.RecroGridFramework.Client.AI;
 public sealed class RgfRecrobyGridContext
 {
     private Func<IRgManager, IRgFilterHandler, Task>? _aiFilterAppliedCallback;
+    private long _managerAssignmentVersion;
 
     /// <summary>The last successfully initialized entity name.</summary>
     public string EntityName { get; private set; } = string.Empty;
@@ -18,6 +19,10 @@ public sealed class RgfRecrobyGridContext
 
     /// <summary>The current initialized manager, or null while unavailable. Does not own the manager.</summary>
     public IRgManager? Manager { get; private set; }
+
+    /// <summary>Identifies the current manager assignment and initialization for in-flight Grid operations.</summary>
+    public (long Assignment, long Initialization) ManagerVersion =>
+        (_managerAssignmentVersion, (Manager as RgManager)?.InitializationVersion ?? 0);
 
     /// <summary>Whether the owning Grid has permanently closed.</summary>
     public bool IsClosed { get; private set; }
@@ -89,6 +94,10 @@ public sealed class RgfRecrobyGridContext
         if (ReferenceEquals(Manager, manager) && EntityName == entityName && DisplayName == displayName) return;
         EntityName = entityName;
         DisplayName = displayName;
+        if (!ReferenceEquals(Manager, manager))
+        {
+            ++_managerAssignmentVersion;
+        }
         Manager = manager;
         Changed?.Invoke();
     }
@@ -98,6 +107,7 @@ public sealed class RgfRecrobyGridContext
     public void ClearManager(IRgManager manager)
     {
         if (Manager is null || !ReferenceEquals(Manager, manager)) return;
+        ++_managerAssignmentVersion;
         Manager = null;
         Changed?.Invoke();
     }
@@ -109,6 +119,7 @@ public sealed class RgfRecrobyGridContext
         IsClosed = true;
         _aiFilterAppliedCallback = null;
         var hadManager = Manager is not null;
+        ++_managerAssignmentVersion;
         Manager = null;
         Closed?.Invoke(this);
         if (hadManager) Changed?.Invoke();

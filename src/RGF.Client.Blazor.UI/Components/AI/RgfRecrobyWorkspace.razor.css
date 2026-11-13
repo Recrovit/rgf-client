@@ -54,6 +54,7 @@
 .rgf-recroby-switcher:popover-open { display: flex; overflow: visible; flex-direction: column; gap: .5rem; }
 .rgf-recroby-switcher > input { flex-shrink: 0; }
 .rgf-recroby-switcher-list { min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+.rgf-recroby-unread { flex: 0 0 .625rem; height: .625rem; border-radius: 50%; background: var(--bs-primary, #0d6efd); }
 .rgf-recroby-group-title { padding: .25rem .5rem; font-weight: 600; }
 .rgf-recroby-choice { display: flex; align-items: center; gap: .5rem; padding: .25rem .5rem; border-radius: .25rem; }
 .rgf-recroby-choice.active { background: var(--bs-primary-bg-subtle, #cfe2ff); }

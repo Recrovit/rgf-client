@@ -1,3 +1,5 @@
+using Recrovit.RecroGridFramework.Abstraction.Infrastructure.Events;
+using Recrovit.RecroGridFramework.Client.Events;
 using Bunit;
 using Microsoft.Extensions.DependencyInjection;
 using Recrovit.RecroGridFramework.Abstraction.Contracts.Services;
@@ -606,6 +608,154 @@ public sealed partial class RgfRecrobyWorkspaceTests
         cut.Find("[data-action=new]").Click();
         Assert.Single(first.FindAll($"[data-error-kind={errorKind}]"));
         Assert.Empty(cut.FindComponents<RgfAiChatComponent>()[1].FindAll("[role=alert]"));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ReplyNotificationsFollowConversationVisibility(bool collapsed)
+    {
+        using var context = Context();
+        var notifications = new CapturingNotifications();
+        context.Services.AddSingleton<IRgfEventNotificationService>(notifications);
+        var cut = context.Render<RgfRecrobyWorkspace>();
+        await using var owner = context.Services.GetRequiredService<IRgfRecrobyWorkspaceService>().CreateOwner();
+        var title = "<img src=x> & test";
+        var transport = new ScriptedTransport();
+        var session = new RgfAiConversationSession(transport);
+        Assert.True(await owner.OpenOrActivateAsync("custom", "test", title, () => session));
+        var token = Xunit.TestContext.Current.CancellationToken;
+
+        transport.Reply(new() { Success = true, Message = "Visible reply" });
+        await session.SendAsync("visible", cancellationToken: token);
+        Assert.Empty(notifications.Toasts);
+        Assert.Empty(cut.FindAll(".rgf-recroby-unread"));
+
+        var next = transport.QueueReply();
+        var send = session.SendAsync("waiting", cancellationToken: token);
+        Assert.Empty(notifications.Toasts);
+        if (collapsed)
+        {
+            cut.Find("[aria-label='Collapse Recroby']").Click();
+        }
+        else
+        {
+            cut.Find("[data-action=new]").Click();
+        }
+        next.SetResult(new() { Success = true, WorkflowStatus = "WaitingForInput", Message = "Which one?" });
+        await send;
+
+        cut.WaitForAssertion(() =>
+        {
+            var toast = Assert.Single(notifications.Toasts);
+            Assert.Equal(RgfToastType.Info, toast.ToastType);
+            Assert.Equal("New reply in conversation \u201c&lt;img src=x&gt; &amp; test\u201d.", toast.Body);
+            Assert.Contains("Conversations with unread replies", cut.Find("[data-action=switch]").GetAttribute("aria-label"));
+            Assert.Single(cut.FindAll("[data-action=switch] .rgf-recroby-unread"));
+            var marked = cut.Find("[data-conversation-type=custom] [data-action=select]");
+            Assert.Contains(title, marked.TextContent);
+            Assert.Contains("Unread reply", marked.TextContent);
+            Assert.Single(marked.QuerySelectorAll(".rgf-recroby-unread"));
+        });
+
+        transport.Reply(new() { Success = false, Message = "Failed" });
+        Assert.False((await session.SendAsync("failed", cancellationToken: token)).Success);
+        cut.Render();
+        Assert.Single(notifications.Toasts);
+        transport.Reply(new() { Success = true, Message = "Follow-up" });
+        await session.SendAsync("follow-up", cancellationToken: token);
+        cut.WaitForAssertion(() => Assert.Equal(2, notifications.Toasts.Count));
+
+        if (collapsed)
+        {
+            cut.Find("[data-action=switch]").Click();
+            cut.Find("[data-conversation-type=custom] [data-action=select]").Click();
+            Assert.Single(cut.FindAll("[data-action=switch] .rgf-recroby-unread"));
+            cut.Find("[aria-label='Open Recroby']").Click();
+        }
+        else
+        {
+            cut.Find("[data-action=switch]").Click();
+            cut.Find("[data-conversation-type=custom] [data-action=select]").Click();
+        }
+
+        Assert.Empty(cut.FindAll(".rgf-recroby-unread"));
+        Assert.Equal(2, notifications.Toasts.Count);
+        Assert.Contains("Follow-up", cut.Markup);
+    }
+
+    [Fact]
+    public async Task UnreadStateFollowsConversationThroughSearchRenameGridActivationAndClose()
+    {
+        using var context = Context();
+        var notifications = new CapturingNotifications();
+        context.Services.AddSingleton<IRgfEventNotificationService>(notifications);
+        var cut = context.Render<RgfRecrobyWorkspace>();
+        var service = context.Services.GetRequiredService<IRgfRecrobyWorkspaceService>();
+        await using var owner = service.CreateOwner();
+        var transport = new ScriptedTransport();
+        var session = new RgfAiConversationSession(transport);
+        Assert.True(await owner.OpenOrActivateAsync("custom", "search", "Original", () => session));
+        Rename(cut, "Renamed");
+        for (var i = 0; i < 8; ++i)
+        {
+            cut.Find("[data-action=new]").Click();
+            AddHistoryToActive(cut);
+            Rename(cut, $"Other {i}");
+        }
+        transport.Reply(new() { Success = true, Message = "Unread" });
+        await session.SendAsync("background", cancellationToken: Xunit.TestContext.Current.CancellationToken);
+        cut.WaitForAssertion(() => Assert.Contains("Renamed", Assert.Single(notifications.Toasts).Body));
+
+        var gridService = context.Services.GetRequiredService<RgfRecrobyWorkspaceService>();
+        Assert.True(await gridService.OpenOrActivateGridAsync(CreateGrid("A")));
+        Assert.True(await gridService.OpenOrActivateGridAsync(CreateGrid("B")));
+        Assert.Single(cut.FindAll("[data-action=switch] .rgf-recroby-unread"));
+        cut.Find("[data-action=switch]").Click();
+        cut.Find("input[type=search]").Input("Other");
+        Assert.Empty(cut.FindAll("[data-conversation-type=custom]"));
+        cut.Find("input[type=search]").Input("renamed");
+        Assert.Single(cut.FindAll("[data-conversation-type=custom] .rgf-recroby-unread"));
+        await cut.Find("[aria-label='Close Renamed']").ClickAsync(new());
+        Assert.Empty(cut.FindAll(".rgf-recroby-unread"));
+        Assert.Single(notifications.Toasts);
+    }
+
+    private sealed class ScriptedTransport : IRgfAiTransport
+    {
+        private Task<RgfAiResponse> _reply = null!;
+
+        public void Reply(RgfAiResponse response) => _reply = Task.FromResult(response);
+
+        public TaskCompletionSource<RgfAiResponse> QueueReply()
+        {
+            var completion = new TaskCompletionSource<RgfAiResponse>(TaskCreationOptions.RunContinuationsAsynchronously);
+            _reply = completion.Task;
+            return completion;
+        }
+
+        public Task<RgfAiResponse> SendAsync(RgfAiRequest request, CancellationToken cancellationToken = default) => _reply;
+    }
+
+    private sealed class CapturingNotifications : IRgfEventNotificationService, IRgfNotificationManager
+    {
+        public List<RgfToastEventArgs> Toasts { get; } = [];
+        public IRgfNotificationManager GetNotificationManager(string scope) => this;
+        public bool RemoveNotificationManager(string scope) => true;
+
+        public Task RaiseEventAsync<TArgs>(TArgs args, object sender) where TArgs : EventArgs
+        {
+            if (args is RgfToastEventArgs toast)
+            {
+                Toasts.Add(toast);
+            }
+            return Task.CompletedTask;
+        }
+
+        public IRgfObservableEvent<TArgs> GetObservableEvents<TArgs>() where TArgs : EventArgs => throw new NotSupportedException();
+        public IRgfObserver<IRgfEventArgs<TArgs>> Subscribe<TArgs>(Action<IRgfEventArgs<TArgs>> handler) where TArgs : EventArgs => throw new NotSupportedException();
+        public IRgfObserver<IRgfEventArgs<TArgs>> Subscribe<TArgs>(Func<IRgfEventArgs<TArgs>, Task> handler) where TArgs : EventArgs => throw new NotSupportedException();
+        public void Dispose() { }
     }
 
     [Fact]

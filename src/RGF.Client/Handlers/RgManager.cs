@@ -10,6 +10,7 @@ using Recrovit.RecroGridFramework.Client.Models;
 using Recrovit.RecroGridFramework.Client.Services;
 using System.ComponentModel;
 using System.Reflection;
+using System.Text.Json;
 
 namespace Recrovit.RecroGridFramework.Client.Handlers;
 
@@ -136,8 +137,11 @@ public class RgManager : IRgManager
     /// <summary>Raised before initialization starts, including reinitialization of an existing manager.</summary>
     public event Action<RgManager>? Initializing;
 
+    internal long InitializationVersion { get; private set; }
+
     public async Task<bool> InitializeAsync(RgfGridRequest request)
     {
+        ++InitializationVersion;
         Initializing?.Invoke(this);
         _filterHandler = null;
         SelectParam = request.SelectParam;
@@ -219,6 +223,8 @@ public class RgManager : IRgManager
     {
         if (_filterHandler == null)
         {
+            var initializationVersion = InitializationVersion;
+            var initialFilter = ListHandler?.GetGridSettings().Conditions;
             string? xmlFilter = null;
             List<RgfFilterSettings>? filterSettings = null;
             var res = await _rgfService.GetFilterAsync(CreateGridRequest());
@@ -242,9 +248,22 @@ public class RgManager : IRgManager
             // A concurrent caller may have initialized and updated the filter during the API request.
             if (_filterHandler is not null) return _filterHandler;
             ObjectDisposedException.ThrowIf(ListHandler is null, this);
-            string condition = EntityDesc.Options.GetStringValue("RGO_FilterParams");
+            if (initializationVersion != InitializationVersion)
+            {
+                throw new InvalidOperationException("The Grid was reinitialized while loading its filter handler.");
+            }
+
+            // Lazy initialization must preserve conditions applied while the filter metadata was loading.
+            var applied = ListHandler.GetGridSettings().Conditions;
+            var hasAppliedFilter = applied is { Length: > 0 } || !ReferenceEquals(initialFilter, applied);
+            var condition = hasAppliedFilter
+                ? JsonSerializer.Serialize(applied ?? [])
+                : EntityDesc.Options.GetStringValue("RGO_FilterParams");
             _filterHandler = new RgFilterHandler(this, xmlFilter, condition, filterSettings);
-            ListHandler.InitFilter(_filterHandler.StoreFilter());
+            if (!hasAppliedFilter)
+            {
+                ListHandler.InitFilter(_filterHandler.StoreFilter());
+            }
         }
         return _filterHandler!;
     }

@@ -172,6 +172,23 @@ public sealed class RgfAiConversationSessionTests
     }
 
     [Fact]
+    public async Task Cancellation_DiscardsAReplyReturnedAfterCancellation()
+    {
+        using var cancellation = new CancellationTokenSource();
+        var reply = new TaskCompletionSource<RgfAiResponse>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var session = new RgfAiConversationSession(new FakeTransport((_, _) => reply.Task));
+        var turn = session.SendAsync("turn", cancellationToken: cancellation.Token);
+
+        cancellation.Cancel();
+        reply.SetResult(new() { Success = true, ConversationId = "late", Message = "Late reply" });
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => turn);
+        Assert.False(session.IsProcessing);
+        Assert.Null(session.Conversation.ConversationId);
+        Assert.Equal(RgfAiMessageRole.User, Assert.Single(session.Conversation.Messages).Role);
+    }
+
+    [Fact]
     public async Task FailedAiResponse_IsReturnedAndUsesStateFailureSemantics()
     {
         var state = new RgfAiConversationState();
