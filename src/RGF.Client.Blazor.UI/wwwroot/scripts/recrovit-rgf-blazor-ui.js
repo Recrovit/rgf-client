@@ -137,6 +137,52 @@ Blazor.UI = {
     },
     Dialog: {
         fullscreenSelector: '[data-rgf-fullscreen-on-mobile="true"]',
+        mobileStack: [],
+        focusMobileDialog: function (dialog, focusId) {
+            const content = dialog.querySelector(':scope > .modal-dialog > .modal-content');
+            const close = content?.querySelector(':scope > .modal-header .btn-close');
+            const target = close || document.getElementById(focusId);
+            target?.focus({ preventScroll: true });
+            if (content && !dialog.contains(document.activeElement)) {
+                content.tabIndex = -1;
+                content.focus({ preventScroll: true });
+            }
+        },
+        trackMobileDialog: function (dialog, focusId) {
+            const dialogs = Blazor.UI.Dialog;
+            const stack = dialogs.mobileStack;
+            const previousFocus = document.activeElement;
+            const entry = { dialog, focusId, previousFocus };
+            const backdrop = dialog.previousElementSibling;
+            const zIndex = Number(stack.at(-1)?.dialog.style.zIndex || 1053) + 2;
+            dialog.style.zIndex = zIndex;
+            if (backdrop?.matches('.modal-backdrop')) {
+                backdrop.style.zIndex = zIndex - 1;
+            }
+            stack.push(entry);
+
+            const keepFocus = (event) => {
+                if (stack.at(-1) === entry && dialog.isConnected && !dialog.contains(event.target)) {
+                    dialogs.focusMobileDialog(dialog, focusId);
+                }
+            };
+            document.addEventListener('focusin', keepFocus);
+            dialogs.observeDialogRemoval(dialog, () => {
+                document.removeEventListener('focusin', keepFocus);
+                const index = stack.indexOf(entry);
+                const wasTop = index === stack.length - 1;
+                stack.splice(index, 1);
+                if (!wasTop || document.activeElement !== document.body) return;
+
+                const next = stack.findLast(item => item.dialog.isConnected);
+                if (previousFocus?.isConnected && (!next || next.dialog.contains(previousFocus))) {
+                    previousFocus.focus({ preventScroll: true });
+                }
+                else if (next) {
+                    dialogs.focusMobileDialog(next.dialog, next.focusId);
+                }
+            });
+        },
         observeDialogRemoval: function (dialog, onRemove) {
             const observer = new MutationObserver(() => {
                 if (!dialog.isConnected) {
@@ -170,26 +216,21 @@ Blazor.UI = {
                 return;
             }
 
-            const previousFocus = document.activeElement;
             const parentForm = dialog.parentElement?.closest('.rgf-mobile-fullscreen') ||
                 dialog.closest('.rgf-form-overlays')?.parentElement?.querySelector(':scope > .rgf-mobile-fullscreen');
+            const fullscreen = !isInline && fullscreenOnMobile && IsMobileBrowserMode;
             if (!isInline && parentForm) {
                 dialog.classList.add('rgf-mobile-form-overlay');
-                Blazor.UI.Dialog.observeDialogRemoval(dialog, () => {
-                    if (document.activeElement !== document.body || !parentForm.isConnected) return;
-                    const returnTarget = previousFocus?.isConnected && parentForm.contains(previousFocus)
-                        ? previousFocus
-                        : parentForm.querySelector(':scope > .modal-dialog > .modal-content > .modal-header .btn-close');
-                    returnTarget?.focus({ preventScroll: true });
-                });
+            }
+            const stacked = !isInline && IsMobileBrowserMode;
+            if (stacked) {
+                Blazor.UI.Dialog.trackMobileDialog(dialog, focusId);
             }
 
-            if (!isInline && fullscreenOnMobile && IsMobileBrowserMode) {
+            if (fullscreen) {
                 dialog.classList.add('rgf-mobile-fullscreen');
                 Blazor.UI.Dialog.sizeMobileDialog(dialog);
-                const content = dialog.querySelector(':scope > .modal-dialog > .modal-content');
-                const close = content?.querySelector(':scope > .modal-header .btn-close');
-                (close || document.getElementById(focusId) || content)?.focus({ preventScroll: true });
+                Blazor.UI.Dialog.focusMobileDialog(dialog, focusId);
                 return;
             }
 
@@ -210,6 +251,9 @@ Blazor.UI = {
             }
             else {
                 $('.btn-primary:first', dialog).focus();
+            }
+            if (stacked && !dialog.contains(document.activeElement)) {
+                Blazor.UI.Dialog.focusMobileDialog(dialog, focusId);
             }
         },
         saveDialogPos: function (name, dialogId) {

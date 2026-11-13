@@ -3,7 +3,7 @@
         <FilterConditionComponent FilterComponent="RgfFilterComp" Condition="RgfFilterComp.Condition" />
     </FilterTemplate>
     <FooterTemplate Context="RgfFilterComp">
-        <div class="rg-filter-settings">
+        <div class="rg-filter-settings rgf-filter-settings">
             <div class="rg-filter-sqltimeout">
                 <label class="col-form-label text-nowrap pe-1">@RecroDict.GetRgfUiString("SQLTimeout"):</label>
                 <RgfInputNumber TValue="int?" @bind-Value="RgfFilterComp.FilterSettings.SQLTimeout" HideSpinButton="true" Min="0" MinWidth="2.6rem"

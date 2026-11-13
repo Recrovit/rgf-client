@@ -16,14 +16,16 @@ public class RgfDialogParameters
 
     public bool IsInline { get; set; }
 
-    /// <summary>Allows the built-in dialog to fill the viewport in browser mobile mode.</summary>
-    public bool? FullscreenOnMobile { get; set; }
+    // RGF-DOC: rgf.client.blazor-ui.entity-ui
+    /// <summary>Defaults to true for built-in non-inline dialogs in browser mobile mode. Set to false to use the standard dialog.</summary>
+    public bool? FullscreenOnMobile { get; set; } = true;
 
     /// <summary>Provides a fallback title for the fullscreen header.</summary>
     public string? MobileTitle { get; set; }
 
     public DialogType DialogType { get; set; } = DialogType.Default;
 
+    /// <summary>Set to false to suppress the built-in header close button and modal Escape dismissal.</summary>
     public bool? ShowCloseButton { get; set; }
 
     public bool? Resizable { get; set; }

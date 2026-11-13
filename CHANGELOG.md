@@ -6,7 +6,7 @@ This file contains the consolidated release history for the `rgf-client` solutio
 
 ### Features Added
 
-- Built-in Blazor Form dialogs fill the viewport in browser mobile mode, with a scrollable body and persistent access to the header and actions. Set `FullscreenOnMobile` to `false` to keep the standard dialog presentation.
+- Built-in non-inline Blazor dialogs fill the viewport by default in browser mobile mode. Set `FullscreenOnMobile` to `false` to use the standard dialog presentation. Confirmation dialogs require an explicit response, including when opened over another dialog.
 
 - Generate a Filter remark and, when empty, a name from current editor conditions with AI, localized feedback and protection against stale results. Generated text extends the editable remark, and unsaved text survives reopening the editor. Saving persists the remark; saving a renamed Filter creates a private copy.
 

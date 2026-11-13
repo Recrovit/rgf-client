@@ -1,9 +1,9 @@
-<ul class="list-unstyled ps-4">
+<ul class="list-unstyled ps-4 rgf-filter-conditions">
     @for (int idx = 0; idx < Condition.Conditions?.Count; idx++)
     {
         var item = Condition.Conditions[idx];
         <li>
-            <div class="d-flex flex-row align-items-center">
+            <div class="d-flex flex-row align-items-center rgf-filter-condition-row">
                 <div class="p-1">
                     <RgfComboBox TValue="RgfFilter.LogicalOperator" @bind-Value="item.LogicalOperator" Disabled="idx == 0 || item.IsQuickFilter" DataSource="LogicalOperators" Width="fit-content" />
                 </div>
@@ -45,19 +45,19 @@
                 }
                 else
                 {
-                    <div class="p-1">
+                    <div class="p-1 rgf-filter-condition-field">
                         <RgfComboBox TValue="int" Value="item.Id" ValueExpression="() => item.Id" Disabled="item.IsQuickFilter"
                                      DataSource="Columns"
                                      ValueChanged="(value) => OnChangeProperty(value, item)" />
                     </div>
-                    <div class="p-1">
+                    <div class="p-1 rgf-filter-condition-field">
                         <RgfComboBox TValue="RgfFilter.QueryOperator" Value="item.QueryOperator" ValueExpression="() => item.QueryOperator" Disabled="item.IsQuickFilter"
                                      DataSource="GetQueryOperators(item)"
                                      ValueChanged="(value) => OnChangeQueryOperator(value, item)" />
                     </div>
                     @if (!(new[] { RgfFilter.QueryOperator.IsNull, RgfFilter.QueryOperator.IsNotNull, RgfFilter.QueryOperator.Exists }.Contains(item.QueryOperator)))
                     {
-                        <div class="p-1">
+                        <div class="p-1 rgf-filter-condition-field">
                             @switch (prop.ClientDataType)
                             {
                                 case ClientDataType.Integer:
@@ -102,7 +102,7 @@
                         @if (new[] { RgfFilter.QueryOperator.Interval, RgfFilter.QueryOperator.IntervalE }.Contains(item.QueryOperator))
                         {
                             <span>-</span>
-                            <div class="p-1">
+                            <div class="p-1 rgf-filter-condition-field">
                                 @switch (prop.ClientDataType)
                                 {
                                     case ClientDataType.Integer:

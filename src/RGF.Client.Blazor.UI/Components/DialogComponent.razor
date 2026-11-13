@@ -31,7 +31,7 @@
                     {
                         <RgfButton CssClass="btn-close" OnClick="OnClose" />
                     }
-                    else if (CanUseMobileFullscreen)
+                    else if (CanUseMobileFullscreen && CanDismiss)
                     {
                         <button type="button" class="btn-close rgf-mobile-only" aria-label="@RecroDict.GetRgfUiString("Close")" @onclick="OnClose"></button>
                     }
@@ -77,7 +77,9 @@
     [Parameter, EditorRequired]
     public RgfDialogParameters DialogParameters { get; set; } = null!;
 
+    // RGF-DOC: rgf.client.blazor-ui.entity-ui
     private bool CanUseMobileFullscreen => !DialogParameters.IsInline && DialogParameters.FullscreenOnMobile == true;
+    private bool CanDismiss => DialogParameters.ShowCloseButton != false;
 
     private string? _show { get; set; } = "display:block";
     private string _dialogId = RgfBaseComponent.GetNextId();
@@ -135,7 +137,7 @@
         DialogParameters.EventDispatcher.RaiseEventAsync(RgfDialogEventKind.Initialized, this);
 
         KeysToPrevent = ["Escape"];
-        OnKeyDown = (args) => args.Code == "Escape" ? OnClose() : Task.CompletedTask;
+        OnKeyDown = (args) => args.Code == "Escape" && (DialogParameters.IsInline || CanDismiss) ? OnClose() : Task.CompletedTask;
     }
 
     protected override void OnParametersSet()

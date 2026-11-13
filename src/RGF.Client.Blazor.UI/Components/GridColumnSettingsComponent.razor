@@ -1,17 +1,19 @@
 ﻿<RgfGridColumnSettingsComponent @ref="_rgfColSettingsRef" BaseDataComponent="BaseDataComponent">
     <SettingsTemplate Context="RgfColSettings">
-        <table class="tablesorter">
-            <thead>
-                <tr>
-                    <th class="sort" @onclick="(arg) => Sort(1)">@RecroDict.GetRgfUiString("Name")</th>
-                    <th class="sort" @onclick="(arg) => Sort(2)" style="text-align:center">@RecroDict.GetRgfUiString("Position")</th>
-                    <th style="text-align:center">@RecroDict.GetRgfUiString("Width")</th>
-                </tr>
-            </thead>
-            <tbody>
-                @RenderProperties(Columns ?? RgfColSettings.Columns)
-            </tbody>
-        </table>
+        <div class="rgf-column-settings-table">
+            <table class="tablesorter">
+                <thead>
+                    <tr>
+                        <th class="sort" @onclick="(arg) => Sort(1)">@RecroDict.GetRgfUiString("Name")</th>
+                        <th class="sort" @onclick="(arg) => Sort(2)" style="text-align:center">@RecroDict.GetRgfUiString("Position")</th>
+                        <th style="text-align:center">@RecroDict.GetRgfUiString("Width")</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @RenderProperties(Columns ?? RgfColSettings.Columns)
+                </tbody>
+            </table>
+        </div>
     </SettingsTemplate>
 </RgfGridColumnSettingsComponent>
 
