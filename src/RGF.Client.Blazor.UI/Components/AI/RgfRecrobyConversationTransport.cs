@@ -15,7 +15,8 @@ internal sealed class RgfRecrobyConversationTransport(
     Func<Action, Task> dispatch,
     Func<Func<Task>, Task> dispatchAsync,
     Func<bool> isAbandoned,
-    RgfRecrobyFilterActionHandler filterActionHandler) : IRgfAiTransport
+    RgfRecrobyFilterActionHandler filterActionHandler,
+    Action<Exception, string> logWarning) : IRgfAiTransport
 {
     private (string? ConversationId, string? Token, RequestContext Context)? _pending;
 
@@ -69,23 +70,29 @@ internal sealed class RgfRecrobyConversationTransport(
         {
             // The conversation keeps response objects as history. Consume the action in this turn.
             response.FilterAction = null;
-            var result = ApplyResult.NotApplied;
+            var result = ApplyResult.Uncertain;
+            var dispatchFailed = false;
             try
             {
-                await dispatchAsync(async () =>
-                {
-                    result = await filterActionHandler.ApplyAsync(action, current, original, ThrowIfAbandoned,
-                        isAbandoned, cancellationToken);
-                });
+                await dispatchAsync(() => filterActionHandler.ApplyAsync(action, current, original,
+                    isAbandoned, () => Volatile.Read(ref dispatchFailed), cancellationToken, outcome => result = outcome));
             }
-            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested && !isAbandoned())
+            catch (Exception error)
             {
-                // The server has completed the run. Preserve its identity even if cancellation prevented Grid application.
+                Volatile.Write(ref dispatchFailed, true);
+                if (error is not OperationCanceledException || (!cancellationToken.IsCancellationRequested && !isAbandoned()))
+                {
+                    logWarning(error, "The Recroby Grid filter dispatcher failed.");
+                }
             }
             if (result != ApplyResult.Applied)
             {
                 response.Success = false;
-                response.CanContinueAfterFailure = response.WorkflowStatus == "Completed";
+                response.CanContinueAfterFailure = response.WorkflowStatus == "Completed" &&
+                    !string.IsNullOrWhiteSpace(response.WorkflowRunId) &&
+                    !string.IsNullOrWhiteSpace(response.ConversationId) &&
+                    !string.IsNullOrWhiteSpace(response.ConversationToken) &&
+                    (request.ConversationId is null || request.ConversationId == response.ConversationId);
                 response.ErrorCode = result == ApplyResult.Uncertain
                     ? "RecrobyFilterApplicationUncertain" : "RecrobyFilterNotApplied";
                 response.Message = recroDict.GetRgfRecrobyString(result == ApplyResult.Uncertain

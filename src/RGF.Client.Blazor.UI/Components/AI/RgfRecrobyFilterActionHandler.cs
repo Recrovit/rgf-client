@@ -56,40 +56,43 @@ internal sealed class RgfRecrobyFilterActionHandler(
 
     internal enum ApplyResult { Applied, NotApplied, Uncertain }
 
-    internal async Task<ApplyResult> ApplyAsync(RgfAiFilterAction action, RequestContext current, RequestContext original,
-        Action throwIfAbandoned, Func<bool> isAbandoned, CancellationToken cancellationToken)
+    internal async Task ApplyAsync(RgfAiFilterAction action, RequestContext current, RequestContext original,
+        Func<bool> isAbandoned, Func<bool> isDispatchFailed, CancellationToken cancellationToken, Action<ApplyResult> reportResult)
     {
         var manager = current.Manager;
         var target = current.Target;
         var gridContext = target.Context;
-        throwIfAbandoned();
         IRgListHandler? list = null;
         IRgFilterHandler? appliedHandler = null;
         var stale = false;
         var result = ApplyResult.NotApplied;
+        string? previousFilter = null;
         string? expectedFilter = null;
         try
         {
-            if (CanApply())
+            if (!ShouldStop() && CanApply())
             {
                 var handler = await manager!.GetFilterHandlerAsync();
-                throwIfAbandoned();
-                if (CanApply() && handler is not null &&
+                if (!ShouldStop() && CanApply() && handler is not null &&
                     handler.InitFilter(JsonSerializer.Serialize(action.Conditions)))
                 {
                     // Keep editor changes separate from the applied conditions until the user accepts them.
                     var applied = RgfGridSettings.DeepCopy(new RgfGridSettings { Conditions = handler.StoreFilter() })!;
                     list = manager.ListHandler;
                     var conditions = applied.Conditions ?? [];
+                    previousFilter = CaptureCreateFilter(list.GetGridSettings().Conditions);
                     expectedFilter = CaptureCreateFilter(conditions);
                     appliedHandler = handler;
-                    result = ApplyResult.Uncertain;
-                    list.ApplyFilterState(conditions, list.SQLTimeout);
-                    result = ApplyResult.Applied;
+                    if (!ShouldStop())
+                    {
+                        result = ApplyResult.Uncertain;
+                        list.ApplyFilterState(conditions, list.SQLTimeout);
+                        result = ApplyResult.Applied;
+                    }
                 }
             }
         }
-        catch (Exception error) when (result == ApplyResult.Uncertain || (!cancellationToken.IsCancellationRequested && !isAbandoned()))
+        catch (Exception error)
         {
             if (result == ApplyResult.Uncertain)
             {
@@ -100,28 +103,28 @@ internal sealed class RgfRecrobyFilterActionHandler(
                     {
                         result = ApplyResult.Applied;
                     }
-                    else if (actual == original.CreateSnapshot)
+                    else if (actual == previousFilter)
                     {
                         result = ApplyResult.NotApplied;
                     }
                 }
                 catch (Exception inspectionError)
                 {
-                    logWarning(inspectionError, "The Recroby filter state could not be verified.");
+                    LogUnexpectedWarning(inspectionError, "The Recroby filter state could not be verified.");
                 }
             }
-            if (result != ApplyResult.Applied)
-            {
-                list = null;
-            }
-            logWarning(error, "Recroby could not complete a Grid filter application step.");
+            LogUnexpectedWarning(error, "Recroby could not complete a Grid filter application step.");
         }
 
-        if (list is null)
+        // Publish the verified outcome before awaiting UI notifications that can fail independently.
+        reportResult(result);
+        if (result != ApplyResult.Applied)
         {
-            throwIfAbandoned();
-            await ReportFilterLoadFailureAsync(manager, stale);
-            return result;
+            if (!ShouldStop())
+            {
+                await ReportFilterLoadFailureAsync(manager, stale, LogUnexpectedWarning);
+            }
+            return;
         }
 
         try
@@ -130,7 +133,7 @@ internal sealed class RgfRecrobyFilterActionHandler(
         }
         catch (Exception error)
         {
-            logWarning(error, "The Recroby filter editor settings notification failed.");
+            LogUnexpectedWarning(error, "The Recroby filter editor settings notification failed.");
         }
 
         try
@@ -139,10 +142,19 @@ internal sealed class RgfRecrobyFilterActionHandler(
         }
         catch (Exception error)
         {
-            logWarning(error, "The Recroby filter applied notification failed.");
+            LogUnexpectedWarning(error, "The Recroby filter applied notification failed.");
         }
-        _ = gridRefresher.RefreshAsync(list, invalidateAggregates: false);
-        return ApplyResult.Applied;
+        _ = gridRefresher.RefreshAsync(list!, invalidateAggregates: false);
+
+        bool ShouldStop() => cancellationToken.IsCancellationRequested || isDispatchFailed() || isAbandoned();
+
+        void LogUnexpectedWarning(Exception error, string message)
+        {
+            if (error is not OperationCanceledException || (!cancellationToken.IsCancellationRequested && !isAbandoned()))
+            {
+                logWarning(error, message);
+            }
+        }
 
         bool CanApply()
         {
@@ -184,7 +196,7 @@ internal sealed class RgfRecrobyFilterActionHandler(
         }
     }
 
-    private async Task ReportFilterLoadFailureAsync(IRgManager? manager, bool stale)
+    private async Task ReportFilterLoadFailureAsync(IRgManager? manager, bool stale, Action<Exception, string> reportWarning)
     {
         try
         {
@@ -199,7 +211,7 @@ internal sealed class RgfRecrobyFilterActionHandler(
         }
         catch (Exception error)
         {
-            logWarning(error, "The Recroby filter error notification could not be shown.");
+            reportWarning(error, "The Recroby filter error notification could not be shown.");
         }
     }
 }

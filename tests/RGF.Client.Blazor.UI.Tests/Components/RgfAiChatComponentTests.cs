@@ -550,6 +550,7 @@ public sealed class RgfAiChatComponentTests
     [InlineData("CreateInvalidPlan")]
     [InlineData("RecrobyWorkflowFailed")]
     [InlineData("RecrobyFilterNotApplied")]
+    [InlineData("RecrobyFilterApplicationUncertain")]
     public async Task FailedTurnKeepsExactPromptAndCanSendAnEditedPrompt(string code)
     {
         using var context = CreateContext();

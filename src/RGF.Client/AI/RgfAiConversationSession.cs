@@ -70,7 +70,8 @@ public sealed class RgfAiConversationSession
             StateChanged?.Invoke();
             var request = Conversation.CreateRequest(instruction);
             var response = await transport.SendAsync(request, cancellationToken);
-            if (!response.CanContinueAfterFailure)
+            if (!response.CanContinueAfterFailure &&
+                !(response.Success && RgfAiApiTransport.HasCompletedIdentity(request, response)))
             {
                 cancellationToken.ThrowIfCancellationRequested();
             }

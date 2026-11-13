@@ -21,7 +21,7 @@ public sealed class RgfAiApiTransport : IRgfAiTransport
 
     /// <summary>Posts a Recroby turn to /api/rgf/ai/recroby with web JSON conventions.</summary>
     /// <param name="request">Current instruction and optional protected continuation identity.</param>
-    /// <param name="cancellationToken">Cancellation checked before and after the API call.</param>
+    /// <param name="cancellationToken">Cancellation checked before the API call and after it unless the response confirms a completed turn.</param>
     /// <returns>The original response, including Success=false workflow responses.</returns>
     /// <exception cref="HttpRequestException">The HTTP envelope reports failure.</exception>
     /// <exception cref="InvalidOperationException">The API supplies no response payload.</exception>
@@ -32,10 +32,20 @@ public sealed class RgfAiApiTransport : IRgfAiTransport
         using var content = new StringContent(JsonSerializer.Serialize(request, JsonOptions), Encoding.UTF8, "application/json");
         var response = await api.PostAsync<RgfAiResponse>("/api/rgf/ai/recroby", content,
             cancellationToken: cancellationToken);
-        // ApiService reports cancellation as a failed result; preserve the transport cancellation contract.
-        cancellationToken.ThrowIfCancellationRequested();
+        // ApiService can report cancellation as a failed result. A completed payload can still advance the conversation.
+        if (!(response.Success && response.Result is { } result && HasCompletedIdentity(request, result)))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+        }
         if (!response.Success)
             throw new HttpRequestException("The Recroby API request failed.", null, response.StatusCode);
         return response.Result ?? throw new InvalidOperationException("The Recroby API returned no AI response.");
     }
+
+    internal static bool HasCompletedIdentity(RgfAiRequest request, RgfAiResponse response) =>
+        response.WorkflowStatus == "Completed" &&
+        !string.IsNullOrWhiteSpace(response.WorkflowRunId) &&
+        !string.IsNullOrWhiteSpace(response.ConversationId) &&
+        !string.IsNullOrWhiteSpace(response.ConversationToken) &&
+        (request.ConversationId is null || request.ConversationId == response.ConversationId);
 }

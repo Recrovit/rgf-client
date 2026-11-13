@@ -519,7 +519,7 @@ public partial class RgfRecrobyWorkspace : IAsyncDisposable
         var transport = new RgfRecrobyConversationTransport(
             () => Services.GetRequiredService<IRgfApiService>(), RecroDict,
             () => ActiveGridContext, InvokeAsync, InvokeAsync,
-            () => _disposed || conversation.Closing, filterActionHandler);
+            () => _disposed || conversation.Closing, filterActionHandler, LogWarning);
         conversation = new Conversation(new RgfAiConversationSession(transport));
         _active = conversation;
         AddConversation(conversation);

@@ -7,7 +7,9 @@ using Recrovit.RecroGridFramework.Abstraction.Contracts.Services;
 using Recrovit.RecroGridFramework.Abstraction.Infrastructure.API;
 using Recrovit.RecroGridFramework.Abstraction.Models;
 using Recrovit.RecroGridFramework.Client.AI;
+using Recrovit.RecroGridFramework.Client.AI.Transport;
 using Recrovit.RecroGridFramework.Client.Blazor.UI.Components.AI;
+using Recrovit.RecroGridFramework.Client.Events;
 using Recrovit.RecroGridFramework.Client.Handlers;
 using Recrovit.RecroGridFramework.Client.Blazor.UI.Tests.Testing;
 using System.Reflection;
@@ -17,6 +19,286 @@ namespace Recrovit.RecroGridFramework.Client.Blazor.UI.Tests.Components;
 
 public sealed partial class RgfRecrobyWorkspaceTests
 {
+    [Theory]
+    [InlineData("before", "RecrobyFilterApplicationUncertain")]
+    [InlineData("during", "RecrobyFilterApplicationUncertain")]
+    [InlineData("after", null)]
+    [InlineData("unchanged", "RecrobyFilterNotApplied")]
+    [InlineData("cancelled", "RecrobyFilterNotApplied")]
+    [InlineData("cancelled-after", null)]
+    [InlineData("dispatcher-cancelled", "RecrobyFilterApplicationUncertain")]
+    [InlineData("dispatcher-unexpected-cancellation", "RecrobyFilterApplicationUncertain")]
+    [InlineData("dispatcher-cancelled-after", null)]
+    [InlineData("apply-cancelled", "RecrobyFilterNotApplied")]
+    [InlineData("apply-cancelled-partial", "RecrobyFilterApplicationUncertain")]
+    [InlineData("apply-cancelled-after", null)]
+    [InlineData("apply-unexpected-cancellation", "RecrobyFilterNotApplied")]
+    [InlineData("apply-error-after-cancellation", "RecrobyFilterNotApplied")]
+    [InlineData("toast-cancelled", "RecrobyFilterNotApplied")]
+    [InlineData("toast-unexpected-cancellation", "RecrobyFilterNotApplied")]
+    [InlineData("toast-error-after-cancellation", "RecrobyFilterNotApplied")]
+    [InlineData("closed", null)]
+    [InlineData("http", null)]
+    public async Task CompletedFilterTurnPreservesTheIssuedIdentityAcrossDispatcherFailures(string scenario, string? errorCode)
+    {
+        using var context = Context();
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(Xunit.TestContext.Current.CancellationToken);
+        var api = new SnapshotApi
+        {
+            Response = new()
+            {
+                Success = true, Message = "filter response", WorkflowStatus = "Completed",
+                ConversationId = "id", ConversationToken = "issued", WorkflowRunId = "run",
+                FilterAction = new(RgfAiFilterOperation.ReplaceIfUnchanged, "session", "grid", 7, [])
+            },
+            HttpSuccess = scenario != "http"
+        };
+        if (scenario == "cancelled")
+        {
+            api.BeforeResponse = cancellation.Cancel;
+        }
+        var manager = DispatchProxy.Create<IRgManager, SnapshotManager>();
+        var fake = (SnapshotManager)manager;
+        var list = DispatchProxy.Create<IRgListHandler, SnapshotList>();
+        var listProxy = (SnapshotList)list;
+        fake.List = list;
+        listProxy.Settings = fake.Settings;
+        listProxy.Refresh = (_, _) => Task.CompletedTask;
+        var applications = 0;
+        var cancellationError = new OperationCanceledException();
+        var applyError = new InvalidOperationException("Apply failed");
+        var toastAttempts = 0;
+        if (scenario.StartsWith("toast-", StringComparison.Ordinal))
+        {
+            fake.ToastManager = new CapturingNotifications();
+        }
+        listProxy.Apply = conditions =>
+        {
+            applications++;
+            if (scenario == "unchanged")
+            {
+                throw new InvalidOperationException("Apply failed before mutation");
+            }
+            if (scenario == "during")
+            {
+                fake.Settings.Conditions![0].Conditions[0].Param1 = "partial";
+                throw new InvalidOperationException("Apply failed during mutation");
+            }
+            switch (scenario)
+            {
+                case "apply-cancelled-partial":
+                    fake.Settings.Conditions![0].Conditions[0].Param1 = "partial";
+                    goto case "apply-cancelled";
+                case "apply-cancelled":
+                    cancellation.Cancel();
+                    throw cancellationError;
+                case "apply-cancelled-after":
+                    fake.Settings.Conditions = conditions;
+                    cancellation.Cancel();
+                    throw cancellationError;
+                case "apply-unexpected-cancellation":
+                    throw cancellationError;
+                case "apply-error-after-cancellation":
+                    cancellation.Cancel();
+                    throw applyError;
+                case "toast-cancelled":
+                case "toast-unexpected-cancellation":
+                case "toast-error-after-cancellation":
+                    throw applyError;
+            }
+            fake.Settings.Conditions = conditions;
+        };
+        var handler = DispatchProxy.Create<IRgFilterHandler, SnapshotFilter>();
+        fake.PrepareFilter = () => Task.FromResult(handler);
+        ((SnapshotFilter)handler).Handle = method => method switch
+        {
+            nameof(IRgFilterHandler.InitFilter) => true,
+            nameof(IRgFilterHandler.StoreFilter) => Array.Empty<RgfFilter.Condition>(),
+            nameof(IRgFilterHandler.SetNewAiFilterSettings) => null,
+            _ => throw new NotSupportedException(method)
+        };
+        var grid = new RgfRecrobyGridContext();
+        grid.SetManager(manager);
+        var warnings = new List<Exception>();
+        Action<Exception, string> log = (error, _) => warnings.Add(error);
+        Exception dispatcherError = scenario is "closed" or "dispatcher-cancelled" or
+            "dispatcher-unexpected-cancellation" or "dispatcher-cancelled-after"
+            ? new OperationCanceledException()
+            : new InvalidOperationException("Dispatcher failed");
+        Func<Task>? lateCallback = null;
+        var abandoned = false;
+        var assembly = typeof(RgfRecrobyWorkspace).Assembly;
+        var prefix = typeof(RgfRecrobyWorkspace).Namespace + ".";
+        // Inject the dispatcher at the internal boundary while exercising the public session lifecycle.
+        var refresher = Activator.CreateInstance(assembly.GetType(prefix + "RgfRecrobyGridRefresher", true)!, log);
+        var dict = context.Services.GetRequiredService<IRecroDictService>();
+        var actionHandler = Activator.CreateInstance(assembly.GetType(prefix + "RgfRecrobyFilterActionHandler", true)!,
+            context.Services, dict, (Func<RgfRecrobyGridContext, bool>)(_ => true),
+            (Func<IRgfNotificationManager, RgfToastEventArgs, Task>)((_, _) =>
+            {
+                toastAttempts++;
+                if (scenario is "toast-cancelled" or "toast-error-after-cancellation")
+                {
+                    cancellation.Cancel();
+                }
+                return Task.FromException(scenario == "toast-error-after-cancellation" ? applyError : cancellationError);
+            }), log, refresher);
+        var transport = (IRgfAiTransport)Activator.CreateInstance(assembly.GetType(prefix + "RgfRecrobyConversationTransport", true)!,
+            (Func<IRgfApiService>)(() => api), dict, (Func<RgfRecrobyGridContext>)(() => grid),
+            (Func<Action, Task>)(action => { action(); return Task.CompletedTask; }),
+            (Func<Func<Task>, Task>)(async callback =>
+            {
+                if (scenario == "closed")
+                {
+                    abandoned = true;
+                }
+                if (scenario is "before" or "dispatcher-cancelled" or "dispatcher-unexpected-cancellation")
+                {
+                    lateCallback = callback;
+                }
+                else
+                {
+                    await callback();
+                }
+                if (scenario is "cancelled-after" or "dispatcher-cancelled" or "dispatcher-cancelled-after")
+                {
+                    cancellation.Cancel();
+                }
+                if (!scenario.StartsWith("apply-", StringComparison.Ordinal) &&
+                    !scenario.StartsWith("toast-", StringComparison.Ordinal))
+                {
+                    throw dispatcherError;
+                }
+            }), (Func<bool>)(() => abandoned), actionHandler, log)!;
+        var session = new RgfAiConversationSession(transport);
+        var other = new RgfAiConversationSession(new RgfAiApiTransport(api));
+
+        if (scenario is "closed" or "http")
+        {
+            if (scenario == "closed")
+            {
+                await Assert.ThrowsAnyAsync<OperationCanceledException>(() => session.SendAsync("filter", cancellationToken: cancellation.Token));
+            }
+            else
+            {
+                await Assert.ThrowsAsync<HttpRequestException>(() => session.SendAsync("filter", cancellationToken: cancellation.Token));
+            }
+            Assert.Empty(warnings);
+            Assert.Null(session.Conversation.ConversationToken);
+            Assert.Empty(session.Conversation.Messages);
+            Assert.Null(other.Conversation.ConversationToken);
+            Assert.Empty(other.Conversation.Messages);
+            Assert.Single(api.Json);
+            Assert.Equal(0, applications);
+            Assert.Equal("value", fake.Settings.Conditions![0].Conditions[0].Param1);
+            return;
+        }
+
+        var response = await session.SendAsync("filter", cancellationToken: cancellation.Token);
+        if (lateCallback is not null)
+        {
+            await lateCallback();
+        }
+        Assert.Equal(scenario.StartsWith("toast-", StringComparison.Ordinal) ? 1 : 0, toastAttempts);
+        switch (scenario)
+        {
+            case "dispatcher-cancelled":
+            case "dispatcher-cancelled-after":
+            case "apply-cancelled":
+            case "apply-cancelled-partial":
+            case "apply-cancelled-after":
+                Assert.Empty(warnings);
+                break;
+            case "apply-unexpected-cancellation":
+                Assert.Same(cancellationError, Assert.Single(warnings));
+                break;
+            case "apply-error-after-cancellation":
+            case "toast-cancelled":
+                Assert.Same(applyError, Assert.Single(warnings));
+                break;
+            case "toast-unexpected-cancellation":
+                Assert.Equal(new Exception[] { applyError, cancellationError }, warnings);
+                break;
+            case "toast-error-after-cancellation":
+                Assert.Equal(new[] { applyError, applyError }, warnings);
+                break;
+            default:
+                Assert.Contains(dispatcherError, warnings);
+                break;
+        }
+        Assert.Equal(errorCode is null, response.Success);
+        Assert.Equal(errorCode, response.ErrorCode);
+        Assert.Equal("run", response.WorkflowRunId);
+        Assert.Equal("id", session.Conversation.ConversationId);
+        Assert.Equal("issued", session.Conversation.ConversationToken);
+        Assert.Equal(response.Success ? 2 : 0, session.Conversation.Messages.Count);
+        Assert.Single(api.Json);
+
+        if (response.Success)
+        {
+            Assert.Equal(1, applications);
+            Assert.Empty(fake.Settings.Conditions!);
+        }
+        else
+        {
+            var attemptedApply = scenario is "during" or "unchanged" ||
+                scenario.StartsWith("apply-", StringComparison.Ordinal) || scenario.StartsWith("toast-", StringComparison.Ordinal);
+            Assert.Equal(attemptedApply ? 1 : 0, applications);
+            Assert.Equal(scenario is "during" or "apply-cancelled-partial" ? "partial" : "value",
+                fake.Settings.Conditions![0].Conditions[0].Param1);
+        }
+        api.Response = new() { Success = true, ConversationId = "id", ConversationToken = "next" };
+        api.BeforeResponse = null;
+        await session.SendAsync("next request", cancellationToken: Xunit.TestContext.Current.CancellationToken);
+        using var next = JsonDocument.Parse(api.Json[1]);
+        Assert.Equal("id", next.RootElement.GetProperty("conversationId").GetString());
+        Assert.Equal("issued", next.RootElement.GetProperty("conversationToken").GetString());
+        Assert.Equal(2, api.Json.Count);
+    }
+
+    [Fact]
+    public async Task ClosingWorkspaceConversationDiscardsLateCompletedFilterResponse()
+    {
+        using var context = Context();
+        var api = new SnapshotApi
+        {
+            Hold = true,
+            Response = new()
+            {
+                Success = true, WorkflowStatus = "Completed", WorkflowRunId = "run",
+                ConversationId = "closed", ConversationToken = "issued",
+                FilterAction = new(RgfAiFilterOperation.ReplaceIfUnchanged, "session", "grid", 7, [])
+            }
+        };
+        context.Services.AddSingleton<IRgfApiService>(api);
+        var cut = context.Render<RgfRecrobyWorkspace>();
+        var manager = DispatchProxy.Create<IRgManager, SnapshotManager>();
+        var fake = (SnapshotManager)manager;
+        var grid = new RgfRecrobyGridContext();
+        grid.SetManager(manager);
+        Assert.True(await context.Services.GetRequiredService<RgfRecrobyWorkspaceService>().RegisterGridAsync(grid));
+        var closing = cut.FindComponent<RgfAiChatComponent>().Instance.Session;
+        var send = closing.SendAsync("clear filter", cancellationToken: Xunit.TestContext.Current.CancellationToken);
+        try
+        {
+            cut.WaitForAssertion(() => Assert.Single(api.Json));
+            cut.Find("[data-action=switch]").Click();
+            cut.Find(".rgf-recroby-choice > .btn-close").Click();
+        }
+        finally
+        {
+            api.Release.TrySetResult();
+        }
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => send);
+        var replacement = cut.FindComponent<RgfAiChatComponent>().Instance.Session;
+        Assert.NotSame(closing, replacement);
+        Assert.Null(closing.Conversation.ConversationToken);
+        Assert.Empty(closing.Conversation.Messages);
+        Assert.Null(replacement.Conversation.ConversationToken);
+        Assert.Empty(replacement.Conversation.Messages);
+        Assert.Equal("value", fake.Settings.Conditions![0].Conditions[0].Param1);
+    }
+
     [Fact]
     public void SnapshotCopiesNestedConditionsAndSortAndAllowlistsEventOutput()
     {
@@ -167,7 +449,7 @@ public sealed partial class RgfRecrobyWorkspaceTests
             Response = new()
             {
                 Success = true, Message = "Modified filter", WorkflowStatus = "Completed",
-                ConversationId = "id", ConversationToken = "next",
+                ConversationId = "id", ConversationToken = "next", WorkflowRunId = "run",
                 FilterAction = new(RgfAiFilterOperation.ReplaceIfUnchanged, "session", "grid", 7, [])
             }
         };
@@ -299,6 +581,7 @@ public sealed partial class RgfRecrobyWorkspaceTests
         };
         public Action<RgfGridRequest>? Created { get; set; }
         public Func<Task<IRgFilterHandler>>? PrepareFilter { get; set; }
+        public IRgfNotificationManager? ToastManager { get; set; }
         public int Requests { get; private set; }
         protected override object? Invoke(MethodInfo? method, object?[]? args)
         {
@@ -312,7 +595,7 @@ public sealed partial class RgfRecrobyWorkspaceTests
             }
             if (method.Name == "get_ToastManager")
             {
-                return null;
+                return ToastManager;
             }
             if (method.Name == "get_SessionParams") return new RgfSessionParams { SessionId = "session", GridId = GridId };
             if (method.Name == "get_ListHandler")
@@ -385,6 +668,8 @@ public sealed partial class RgfRecrobyWorkspaceTests
     {
         public List<string> Json { get; } = [];
         public bool Hold { get; set; }
+        public bool HttpSuccess { get; set; } = true;
+        public Action? BeforeResponse { get; set; }
         public RgfAiResponse Response { get; set; } = new() { Success = true, Message = "answer" };
         public TaskCompletionSource Release { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public Task<IRgfApiResponse<T>> GetAsync<T>(IRgfApiRequest request) where T : class => throw new NotSupportedException();
@@ -392,7 +677,8 @@ public sealed partial class RgfRecrobyWorkspaceTests
         {
             Json.Add(await request.Content.ReadAsStringAsync());
             if (Hold) await Release.Task;
-            return (IRgfApiResponse<T>)(object)new ApiResponse<RgfAiResponse> { Success = true,
+            BeforeResponse?.Invoke();
+            return (IRgfApiResponse<T>)(object)new ApiResponse<RgfAiResponse> { Success = HttpSuccess,
                 Result = Response };
         }
     }
