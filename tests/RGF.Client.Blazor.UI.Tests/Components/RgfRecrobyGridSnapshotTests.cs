@@ -1,5 +1,6 @@
 using Bunit;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Recrovit.RecroGridFramework.Abstraction.Contracts.AI;
 using Recrovit.RecroGridFramework.Abstraction.Contracts.API;
 using Recrovit.RecroGridFramework.Abstraction.Contracts.Services;
@@ -8,6 +9,7 @@ using Recrovit.RecroGridFramework.Abstraction.Models;
 using Recrovit.RecroGridFramework.Client.AI;
 using Recrovit.RecroGridFramework.Client.Blazor.UI.Components.AI;
 using Recrovit.RecroGridFramework.Client.Handlers;
+using Recrovit.RecroGridFramework.Client.Blazor.UI.Tests.Testing;
 using System.Reflection;
 using System.Text.Json;
 
@@ -201,9 +203,90 @@ public sealed partial class RgfRecrobyWorkspaceTests
         Assert.Equal("new value", fake.Settings.Conditions![0].Conditions[0].Param1);
     }
 
+    [Fact]
+    public async Task RecrobyShowsTheReplyWhileTheAppliedListsRefreshIsPendingAndLogsItsFailure()
+    {
+        using var context = Context();
+        using var logs = new ListLoggerProvider();
+        context.Services.AddLogging(logging => logging.AddProvider(logs));
+        var api = new SnapshotApi
+        {
+            Response = new()
+            {
+                Success = true, Message = "Modified filter",
+                FilterAction = new(RgfAiFilterOperation.ReplaceIfUnchanged, "session", "grid", 7, [], "AI description")
+            }
+        };
+        context.Services.AddSingleton<IRgfApiService>(api);
+        var cut = context.Render<RgfRecrobyWorkspace>();
+        var service = context.Services.GetRequiredService<RgfRecrobyWorkspaceService>();
+        var manager = DispatchProxy.Create<IRgManager, SnapshotManager>();
+        var fake = (SnapshotManager)manager;
+        var list = DispatchProxy.Create<IRgListHandler, SnapshotList>();
+        var listProxy = (SnapshotList)list;
+        listProxy.Settings = fake.Settings;
+        fake.List = list;
+        var handler = DispatchProxy.Create<IRgFilterHandler, SnapshotFilter>();
+        fake.PrepareFilter = () => Task.FromResult(handler);
+        var operations = new List<string>();
+        ((SnapshotFilter)handler).Handle = method =>
+        {
+            operations.Add(method);
+            return method switch
+            {
+                nameof(IRgFilterHandler.InitFilter) => true,
+                nameof(IRgFilterHandler.StoreFilter) => Array.Empty<RgfFilter.Condition>(),
+                nameof(IRgFilterHandler.SetNewAiFilterSettings) => null,
+                _ => throw new NotSupportedException(method)
+            };
+        };
+        var refresh = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        listProxy.Apply = conditions =>
+        {
+            operations.Add("Apply");
+            listProxy.Settings.Conditions = conditions;
+        };
+        listProxy.Refresh = (settingsId, invalidateAggregates) =>
+        {
+            operations.Add("Refresh");
+            Assert.Null(settingsId);
+            Assert.False(invalidateAggregates);
+            return refresh.Task;
+        };
+        var grid = new RgfRecrobyGridContext();
+        grid.SetManager(manager);
+        grid.RegisterAiFilterAppliedCallback((appliedManager, appliedHandler) =>
+        {
+            Assert.Same(manager, appliedManager);
+            Assert.Same(handler, appliedHandler);
+            operations.Add("Notify");
+            return Task.CompletedTask;
+        });
+        Assert.True(await service.RegisterGridAsync(grid));
+        var session = cut.FindComponent<RgfAiChatComponent>().Instance.Session;
+        var token = Xunit.TestContext.Current.CancellationToken;
+        try
+        {
+            await session.SendAsync("Clear the applied filter", cancellationToken: token)
+                .WaitAsync(TimeSpan.FromSeconds(5), token);
+            Assert.Equal(new[] { "InitFilter", "StoreFilter", "Apply", "SetNewAiFilterSettings", "Notify", "Refresh" }, operations);
+            Assert.Equal("Modified filter", session.Conversation.Messages[^1].Message);
+            Assert.Null(api.Response.FilterAction);
+            Assert.True(api.Response.Success);
+        }
+        finally
+        {
+            refresh.TrySetException(new InvalidOperationException("Test refresh failure"));
+        }
+
+        cut.WaitForAssertion(() => Assert.Contains(logs.Entries, entry =>
+            entry.Level == LogLevel.Warning && ReferenceEquals(entry.Exception, refresh.Task.Exception!.InnerException)));
+    }
+
     public class SnapshotManager : DispatchProxy
     {
         public string GridId { get; set; } = "grid";
+        public IRgListHandler? List { get; set; }
         public RgfGridSettings Settings { get; } = new()
         {
             Conditions = [new() { Conditions = [new() { Alias = "live", Param1 = "value" }] }],
@@ -229,6 +312,10 @@ public sealed partial class RgfRecrobyWorkspaceTests
             if (method.Name == "get_SessionParams") return new RgfSessionParams { SessionId = "session", GridId = GridId };
             if (method.Name == "get_ListHandler")
             {
+                if (List is not null)
+                {
+                    return List;
+                }
                 var list = DispatchProxy.Create<IRgListHandler, SnapshotList>();
                 ((SnapshotList)list).Settings = Settings;
                 return list;
@@ -249,19 +336,40 @@ public sealed partial class RgfRecrobyWorkspaceTests
     public class SnapshotList : DispatchProxy
     {
         public RgfGridSettings Settings { get; set; } = null!;
-        protected override object? Invoke(MethodInfo? method, object?[]? args) => method!.Name switch
+        public Action<RgfFilter.Condition[]>? Apply { get; set; }
+        public Func<int?, bool, Task>? Refresh { get; set; }
+
+        protected override object? Invoke(MethodInfo? method, object?[]? args)
         {
-            nameof(IRgListHandler.GetGridSettings) => Settings,
-            "get_Initialized" => true,
-            _ => throw new NotSupportedException(method.Name)
-        };
+            switch (method!.Name)
+            {
+                case nameof(IRgListHandler.GetGridSettings):
+                    return Settings;
+                case "get_Initialized":
+                    return true;
+                case "get_SQLTimeout":
+                    return 41;
+                case nameof(IRgListHandler.ApplyFilterState):
+                    Apply!((RgfFilter.Condition[])args![0]!);
+                    return null;
+                case nameof(IRgListHandler.RefreshDataAsync):
+                    return Refresh!((int?)args![0], (bool)args[1]!);
+                default:
+                    throw new NotSupportedException(method.Name);
+            }
+        }
     }
 
     public class SnapshotFilter : DispatchProxy
     {
         public int InitCalls { get; private set; }
+        public Func<string, object?>? Handle { get; set; }
         protected override object? Invoke(MethodInfo? method, object?[]? args)
         {
+            if (Handle is not null)
+            {
+                return Handle(method!.Name);
+            }
             Assert.Equal(nameof(IRgFilterHandler.InitFilter), method!.Name);
             InitCalls++;
             return false;
